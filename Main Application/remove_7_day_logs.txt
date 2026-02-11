@@ -1,0 +1,52 @@
+sudo nano cleanup_logs.sh 
+
+
+#!/bin/bash
+set -euo pipefail
+
+LOG_DIR="/home/gateway/logs"
+RETENTION_DAYS=7
+
+# Safety check
+if [[ ! -d "$LOG_DIR" || "$LOG_DIR" == "/" ]]; then
+    echo "ERROR: Invalid LOG_DIR: $LOG_DIR"
+    exit 1
+fi
+
+echo "Cleaning logs older than $RETENTION_DAYS days in $LOG_DIR"
+
+# Date cutoff (YYYY-MM-DD)
+CUTOFF_DATE=$(date -d "$RETENTION_DAYS days ago" +%Y-%m-%d)
+
+for dir in "$LOG_DIR"/*; do
+    [[ -d "$dir" ]] || continue
+
+    folder_name=$(basename "$dir")
+
+    # Match YYYY-MM-DD
+    if [[ "$folder_name" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+        # Lexicographical compare works for ISO dates
+        if [[ "$folder_name" < "$CUTOFF_DATE" ]]; then
+            echo "Removing old log folder: $dir"
+            rm -rf --one-file-system "$dir"
+        fi
+    fi
+done
+
+echo "Log cleanup completed"
+
+
+
+
+sudo chown gateway:gateway cleanup_logs.sh
+chmod +x cleanup_logs.sh
+
+
+./cleanup_logs.sh
+
+
+sudo crontab -e
+
+
+
+0 2 * * * /home/gateway/cleanup_logs.sh >/dev/null 2>&1

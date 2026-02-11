@@ -1,0 +1,904 @@
+{
+  "comPort": {
+    "baudRate": "19200",
+    "comPort": "COM7",
+    "connectionType": "USB",
+    "dataBit": "",
+    "firmware": "RDL V2.00.1",
+    "parity": "",
+    "serial": "RDL0009",
+    "stopBit": ""
+  },
+  "ioSettings": {
+    "analog": {
+      "channels": [
+        {
+          "address": "0x48",
+          "enabled": true,
+          "mode": "0-10V",
+          "name": "Analog input",
+          "range": "0-5"
+        }
+      ],
+      "db": {
+        "db_name": "tata_motors",
+        "table_name": "analog_reading",
+        "upload_cloud": false,
+        "upload_local": true
+      },
+      "generate_random": true,
+      "name": "Analog Input",
+      "pollingInterval": 5,
+      "pollingIntervalUnit": "Sec"
+    },
+    "digitalInput": {
+      "channels": [
+        {
+          "enabled": true,
+          "name": "Digital Input 1",
+          "pin": "530"
+        },
+        {
+          "enabled": true,
+          "name": "DI2",
+          "pin": "531"
+        }
+      ],
+      "db": {
+        "db_name": "test",
+        "table_name": "digital_reading",
+        "upload_cloud": false,
+        "upload_local": true
+      },
+      "generate_random": false,
+      "name": "Digital Input",
+      "pollingInterval": 1,
+      "pollingIntervalUnit": "Sec"
+    },
+    "digitalOutput": {
+      "channels": [
+        {
+          "name": "DO1",
+          "pin": "532",
+          "state": 0
+        },
+        {
+          "name": "DO2",
+          "pin": "533",
+          "state": 1
+        }
+      ]
+    },
+    "settings": {
+      "analog": false,
+      "digitalInput": false,
+      "modbus": true,
+      "modbusTCP": false
+    }
+  },
+  "wireless": {
+    "apn": "airtelgprs.com",
+    "communicationMedia": "4G/LTE",
+    "ftp": {
+      "logFolder": "",
+      "password": "",
+      "port": 21,
+      "serverIP": "",
+      "username": ""
+    },
+    "jsonEndpoint": "https://testfor4glte.vercel.app/api/voltages/uploadCsv",
+    "pollingInterval": 5,
+    "pollingTimeUnit": "Sec",
+    "sendFormat": "JSON",
+    "wifiDns1": "",
+    "wifiDns2": "",
+    "wifiGateway": "",
+    "wifiIp": "",
+    "wifiIpMode": "DHCP",
+    "wifiPassword": "9398255369",
+    "wifiSsid": "Srinivas Kommirisetty",
+    "wifiSubnet": ""
+  },
+  "modbusTcp": {
+    "gateway": "",
+    "ip": "",
+    "log": true,
+    "mac": "",
+    "modbusTcpInterval": 3,
+    "subnet": "",
+    "table": [
+      {
+        "conv": "Float: Big Endian",
+        "enabled": false,
+        "len": 1,
+        "offset": 0,
+        "port": 12345,
+        "slave": 1,
+        "slaveIp": "192.168.137.1",
+        "socket": 502,
+        "start": 1,
+        "type": "Input Register"
+      }
+    ]
+  },
+  "ethernet": {
+    "recvIp": "0.0.0.0",
+    "recvPort": 12345,
+    "sendTargets": [
+      {
+        "ip": "192.168.137.1",
+        "port": 12345
+      }
+    ]
+  },
+  "rs485": {
+    "baud": 9600,
+    "port": "/dev/ttyAMA5"
+  },
+  "offlineData": {
+    "enabled": true,
+    "ftp": {
+      "folder": "datalogger",
+      "pass": "",
+      "port": 8080,
+      "server": "FTPserver",
+      "user": "ftpusername"
+    },
+    "mode": "schedule",
+    "schedule": {
+      "date": "2025-10-08",
+      "hour": 17,
+      "min": 15,
+      "sec": 0
+    }
+  },
+  "kafka": {
+    "brokers": [
+      "127.0.0.1:9092"
+    ],
+    "certFiles": {
+      "ca": "ca.pem",
+      "cert": "service.cert",
+      "key": "service.key"
+    },
+    "topic": "test-topic"
+  },
+  "Database": {
+    "cloud": {
+      "cred": {
+        "autocommit": "false",
+        "charset": "utf8mb4",
+        "database": "cloud_plc",
+        "host": "cloud.db.example.com",
+        "password": "secret",
+        "port": 3306,
+        "user": "clouduser"
+      },
+      "enabled": false
+    },
+    "local": {
+      "cred": {
+        "autocommit": "false",
+        "charset": "utf8mb4",
+        "database": "gateway",
+        "host": "localhost",
+        "password": "gateway",
+        "port": 3306,
+        "user": "gateway"
+      },
+      "enabled": true
+    }
+  },
+  "plc_configurations": [
+    {
+      "PLC": {
+        "Database": {
+          "db_name": "test",
+          "table_name": "delta_plc",
+          "upload_cloud": false,
+          "upload_local": true
+        },
+        "address_access": {
+          "read": [
+            {
+              "address": "100",
+              "datatype": "INT",
+              "length": 1,
+              "max": "4000",
+              "min": 0,
+              "read": false,
+              "tag": "Data register",
+              "value": 60,
+              "write": true
+            },
+            {
+              "address": "6",
+              "datatype": "INT",
+              "length": 1,
+              "max": 100,
+              "min": 0,
+              "read": false,
+              "tag": "Read register",
+              "value": "",
+              "write": false
+            }
+          ]
+        },
+        "cred": {
+          "ip": "192.168.1.5",
+          "port": 502
+        },
+        "data_freq_sec": 1
+      },
+      "enabled": true,
+      "isExpanded": true,
+      "plcType": "Delta"
+    }
+  ],
+  "fileToDb": {
+    "files": [
+      {
+        "SMBShare": {
+          "local_mount_point": "",
+          "share_password": "Admin@123",
+          "share_username": "ADMIN",
+          "smb_share": "//192.9.3.212/re-aoi-v25m/DSM.mdb",
+          "sudo_password": ""
+        },
+        "_internal": {
+          "collapsed": false,
+          "datetimeInfo": null,
+          "enabled": false,
+          "filterField": "",
+          "hasDatetime": false,
+          "skipLines": 0
+        },
+        "data_freq(in secs)": 900,
+        "file_details": {
+          "columns_to_fetch": [],
+          "file_header": null,
+          "file_keyword": "",
+          "file_type": "json"
+        },
+        "log_file_path": "",
+        "processed_files_table": "",
+        "storing_database": {
+          "table_name": ""
+        }
+      }
+    ]
+  },
+  "alarmSettings": {
+    "Analog": {
+      "A1": {
+        "alerts": [
+          {
+            "condition": "<=",
+            "contact": "",
+            "delay": 1,
+            "email": "abc@gmail.com",
+            "enabled": false,
+            "message": "Value very low",
+            "threshold": 1.5
+          },
+          {
+            "condition": ">=",
+            "contact": "",
+            "delay": 1,
+            "email": "abc@gmail.com",
+            "enabled": false,
+            "message": "Value very high",
+            "threshold": 5
+          }
+        ]
+      },
+      "Channel 1": {
+        "alerts": [
+          {
+            "condition": "<=",
+            "contact": "",
+            "delay": "",
+            "enabled": false,
+            "message": "",
+            "threshold": ""
+          }
+        ]
+      }
+    },
+    "Digital I/O": {
+      "Channel 1": {
+        "alerts": [
+          {
+            "contact": "9999999999",
+            "email": "abc@gmail.com",
+            "enabled": true,
+            "message": "Low",
+            "trigger": "Low"
+          }
+        ]
+      }
+    },
+    "Modbus": {
+      "analog_acquisition_module": {
+        "slaves": {
+          "1": {
+            "alerts": {
+              "0|0|Input Register|1": [
+                {
+                  "condition": "<=",
+                  "contact": "",
+                  "email": "",
+                  "enabled": true,
+                  "message": "analog_acquisition_module S1",
+                  "threshold": ""
+                }
+              ],
+              "0|1|Input Register|2": [
+                {
+                  "condition": "<=",
+                  "contact": "9999999999",
+                  "email": "abc@gmail.com",
+                  "enabled": true,
+                  "message": "analog_acquisition_module S2",
+                  "threshold": "5"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "schneider": {
+        "slaves": {
+          "2": {
+            "alerts": {
+              "2998|0|Holding Register|2": [
+                {
+                  "condition": "<=",
+                  "contact": "",
+                  "email": "",
+                  "enabled": true,
+                  "message": "schneider S2",
+                  "threshold": ""
+                }
+              ],
+              "3028|0|Input Register|2": [
+                {
+                  "condition": "<=",
+                  "contact": "",
+                  "email": "abc@gmail.com",
+                  "enabled": false,
+                  "message": "schneider S2",
+                  "threshold": "120"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "Modbus TCP": {
+      "Allen Bradley": {
+        "allen": {
+          "allen_test_reading": []
+        },
+        "allen_test": {
+          "allen_test_reading": [
+            {
+              "condition": "<=",
+              "email": "",
+              "enabled": true,
+              "message": "allen_test allen_test_reading",
+              "threshold": "19"
+            }
+          ],
+          "undefined": []
+        }
+      },
+      "Delta": {
+        "delta_plc": {
+          "Read register": [
+            {
+              "condition": "<=",
+              "contact": "",
+              "email": "",
+              "enabled": true,
+              "message": "delta_plc Read register",
+              "threshold": ""
+            }
+          ]
+        }
+      },
+      "Siemens": {
+        "siemens": {
+          "test": []
+        },
+        "siemens_test1": {
+          "test": [
+            {
+              "condition": "<=",
+              "contact": "",
+              "email": "abc@gmail.com",
+              "enabled": true,
+              "message": "siemens_test1 test",
+              "threshold": "5"
+            }
+          ]
+        }
+      }
+    },
+    "PLC": {
+      "Allen Bradley": {
+        "slaves": {
+          "1": {
+            "alerts": [
+              {
+                "condition": "<=",
+                "contact": "9999999999",
+                "enabled": true,
+                "message": "Allen Bradley S1",
+                "threshold": 115
+              }
+            ]
+          }
+        }
+      }
+    },
+    "energyMeter": {
+      "analog_acquisition_module": {
+        "1": {
+          "Reading_1": [
+            {
+              "condition": "<=",
+              "contact": "",
+              "email": "",
+              "enabled": true,
+              "message": "Reading less than 0.5",
+              "threshold": 0.5
+            }
+          ]
+        }
+      },
+      "waveshare_4-20ma_analog_acquisition_module": {
+        "1": {
+          "Reading_1": [
+            {
+              "condition": ">=",
+              "contact": "",
+              "email": "abc@gmail.com",
+              "enabled": false,
+              "message": "Reading Greater than 4.5",
+              "threshold": 4.5
+            },
+            {
+              "condition": "<=",
+              "contact": "",
+              "email": "abc@gmail.com",
+              "enabled": false,
+              "message": "Reading Less than 0.5",
+              "threshold": 0.5
+            }
+          ]
+        }
+      }
+    }
+  },
+  "ModbusRTU": {
+    "Devices": {
+      "brands": {
+        "analog_acquisition_module": {
+          "label": "Analog Acquisition Module",
+          "registersBySlave": {
+            "1": [
+              {
+                "name": "Temperature",
+                "start": 1,
+                "offset": 0,
+                "type": "Input Register",
+                "conversion": "Float: Big Endian",
+                "sql_type": "FLOAT",
+                "length": 1,
+                "multiply": 1,
+                "divide": 1,
+                "process_min": "-20",
+                "process_max": "100",
+                "eng_unit": "4-20mA",
+                "enabled": false
+              },
+              {
+                "name": "Moisture",
+                "start": 3,
+                "offset": 0,
+                "type": "Input Register",
+                "conversion": "Float: Big Endian",
+                "sql_type": "FLOAT",
+                "length": 1,
+                "multiply": 1,
+                "divide": 1,
+                "process_min": "0",
+                "process_max": "10",
+                "eng_unit": "4-20mA",
+                "enabled": false
+              },
+              {
+                "name": "Signal Simulator",
+                "start": 3,
+                "offset": -1,
+                "type": "Input Register",
+                "conversion": "Float: Big Endian",
+                "sql_type": "FLOAT",
+                "length": 1,
+                "multiply": 1,
+                "divide": 1,
+                "process_min": "0",
+                "process_max": "10",
+                "eng_unit": "0-10V",
+                "enabled": true
+              }
+            ]
+          },
+          "slaves": [
+            {
+              "id": 1,
+              "enabled": false,
+              "rs485_port": "/dev/ttyACM1",
+              "baudRate": 9600,
+              "parity": "None",
+              "dataBits": 8,
+              "stopBits": 1,
+              "pollingInterval": 5,
+              "pollingIntervalUnit": "Sec",
+              "use_usb": false,
+              "upload_local": true,
+              "upload_cloud": false,
+              "db_name": "test",
+              "table_name": "analog_sensors"
+            }
+          ]
+        },
+        "schneider": {
+          "label": "Schneider EM6436H",
+          "presets": {},
+          "registersBySlave": {
+            "2": [
+              {
+                "conversion": "Float: Big Endian",
+                "divide": 1,
+                "enabled": true,
+                "eng_unit": "none",
+                "length": 2,
+                "multiply": 1,
+                "name": "Current L1",
+                "offset": 0,
+                "process_max": "",
+                "process_min": "",
+                "sql_type": "FLOAT",
+                "start": 2998,
+                "type": "Input Register"
+              },
+              {
+                "conversion": "Float: Big Endian",
+                "divide": 1,
+                "enabled": true,
+                "eng_unit": "none",
+                "length": 2,
+                "multiply": 1,
+                "name": "Current L2",
+                "offset": 0,
+                "process_max": "",
+                "process_min": "",
+                "sql_type": "FLOAT",
+                "start": 3000,
+                "type": "Input Register"
+              },
+              {
+                "conversion": "Float: Big Endian",
+                "divide": 1,
+                "enabled": true,
+                "eng_unit": "none",
+                "length": 2,
+                "multiply": 1,
+                "name": "Current L3",
+                "offset": 0,
+                "process_max": "",
+                "process_min": "",
+                "sql_type": "FLOAT",
+                "start": 3002,
+                "type": "Input Register"
+              },
+              {
+                "conversion": "Float: Big Endian",
+                "divide": 1,
+                "enabled": true,
+                "eng_unit": "none",
+                "length": 2,
+                "multiply": 1,
+                "name": "Voltage L1-L2",
+                "offset": 0,
+                "process_max": "",
+                "process_min": "",
+                "sql_type": "FLOAT",
+                "start": 3018,
+                "type": "Input Register"
+              },
+              {
+                "conversion": "Float: Big Endian",
+                "divide": 1,
+                "enabled": true,
+                "eng_unit": "none",
+                "length": 2,
+                "multiply": 1,
+                "name": "Voltage L2-L3",
+                "offset": 0,
+                "process_max": "",
+                "process_min": "",
+                "sql_type": "FLOAT",
+                "start": 3020,
+                "type": "Input Register"
+              },
+              {
+                "conversion": "Float: Big Endian",
+                "divide": 1,
+                "enabled": true,
+                "eng_unit": "none",
+                "length": 2,
+                "multiply": 1,
+                "name": "Voltage L3-L1",
+                "offset": 0,
+                "process_max": "",
+                "process_min": "",
+                "sql_type": "FLOAT",
+                "start": 3022,
+                "type": "Input Register"
+              },
+              {
+                "conversion": "Float: Big Endian",
+                "divide": 1,
+                "enabled": true,
+                "eng_unit": "none",
+                "length": 2,
+                "multiply": 1,
+                "name": "Voltage L1-N",
+                "offset": 0,
+                "process_max": "",
+                "process_min": "",
+                "sql_type": "FLOAT",
+                "start": 3026,
+                "type": "Input Register"
+              },
+              {
+                "conversion": "Float: Big Endian",
+                "divide": 1,
+                "enabled": true,
+                "eng_unit": "none",
+                "length": 2,
+                "multiply": 1,
+                "name": "Voltage L2-N",
+                "offset": 0,
+                "process_max": "",
+                "process_min": "",
+                "sql_type": "FLOAT",
+                "start": 3028,
+                "type": "Input Register"
+              },
+              {
+                "conversion": "Float: Big Endian",
+                "divide": 1,
+                "enabled": true,
+                "eng_unit": "none",
+                "length": 2,
+                "multiply": 1,
+                "name": "Voltage L3-N",
+                "offset": 0,
+                "process_max": "",
+                "process_min": "",
+                "sql_type": "FLOAT",
+                "start": 3030,
+                "type": "Input Register"
+              }
+            ]
+          },
+          "slaves": [
+            {
+              "id": 2,
+              "enabled": false,
+              "rs485_port": "/dev/ttyACM1",
+              "baudRate": 9600,
+              "parity": "Even",
+              "dataBits": 8,
+              "stopBits": 1,
+              "pollingInterval": 5,
+              "pollingIntervalUnit": "Sec",
+              "use_usb": false,
+              "upload_local": true,
+              "upload_cloud": false,
+              "db_name": "test",
+              "table_name": "energy_meter"
+            }
+          ]
+        }
+      },
+      "globalPresets": {
+        "analog_acquisition_module": {
+          "name": "Analog Acquisition Module",
+          "rows": [
+            {
+              "conversion": "Float: Big Endian",
+              "divide": 1,
+              "enabled": true,
+              "eng_unit": "4-20mA",
+              "length": 1,
+              "multiply": 1,
+              "name": "Temperature",
+              "offset": 0,
+              "process_max": "100",
+              "process_min": "-20",
+              "sql_type": "FLOAT",
+              "start": 1,
+              "type": "Input Register"
+            },
+            {
+              "conversion": "Float: Big Endian",
+              "divide": 1,
+              "enabled": true,
+              "eng_unit": "4-20mA",
+              "length": 1,
+              "multiply": 1,
+              "name": "Moisture",
+              "offset": 0,
+              "process_max": "10",
+              "process_min": "0",
+              "sql_type": "FLOAT",
+              "start": 3,
+              "type": "Input Register"
+            }
+          ]
+        },
+        "global_brand": {
+          "name": "Global Brand",
+          "rows": [
+            {
+              "conversion": "Float: Big Endian",
+              "enabled": true,
+              "length": 2,
+              "name": "Current L1",
+              "offset": 0,
+              "start": 3000,
+              "type": "Input Register"
+            },
+            {
+              "conversion": "Float: Big Endian",
+              "enabled": true,
+              "length": 2,
+              "name": "Current L2",
+              "offset": 0,
+              "start": 3002,
+              "type": "Input Register"
+            },
+            {
+              "conversion": "Float: Big Endian",
+              "enabled": true,
+              "length": 2,
+              "name": "Current L3",
+              "offset": 0,
+              "start": 3004,
+              "type": "Input Register"
+            },
+            {
+              "conversion": "Float: Big Endian",
+              "enabled": true,
+              "length": 2,
+              "name": "Voltage L1-L2",
+              "offset": 0,
+              "start": 3020,
+              "type": "Input Register"
+            },
+            {
+              "conversion": "Float: Big Endian",
+              "enabled": true,
+              "length": 2,
+              "name": "Voltage L2-L3",
+              "offset": 0,
+              "start": 3022,
+              "type": "Input Register"
+            },
+            {
+              "conversion": "Float: Big Endian",
+              "enabled": true,
+              "length": 2,
+              "name": "Voltage L3-L1",
+              "offset": 0,
+              "start": 3024,
+              "type": "Input Register"
+            },
+            {
+              "conversion": "Float: Big Endian",
+              "enabled": true,
+              "length": 2,
+              "name": "Voltage L1-N",
+              "offset": 0,
+              "start": 3028,
+              "type": "Input Register"
+            },
+            {
+              "conversion": "Float: Big Endian",
+              "enabled": true,
+              "length": 2,
+              "name": "Voltage L2-N",
+              "offset": 0,
+              "start": 3030,
+              "type": "Input Register"
+            },
+            {
+              "conversion": "Float: Big Endian",
+              "enabled": true,
+              "length": 2,
+              "name": "Voltage L3-N",
+              "offset": 0,
+              "start": 3032,
+              "type": "Input Register"
+            },
+            {
+              "conversion": "Float: Big Endian",
+              "enabled": true,
+              "length": 2,
+              "name": "Power Factor Total",
+              "offset": 0,
+              "start": 3084,
+              "type": "Input Register"
+            }
+          ]
+        }
+      },
+      "order": [
+        "analog_acquisition_module",
+        "schneider"
+      ]
+    },
+    "settings": {
+      "baudRate": "9600",
+      "dataBits": 8,
+      "parity": "None",
+      "stopBits": 1
+    },
+    "transmitters": []
+  },
+  "smtp": {
+    "password": "uael gnyc rsvy dgxx",
+    "port": 587,
+    "server": "smtp.gmail.com",
+    "user": "munjalhopperalerts@gmail.com"
+  },
+  "network": {
+    "sim4g": {
+      "apn": "",
+      "provider": ""
+    },
+    "static": {
+      "dns_primary": "8.8.8.8",
+      "dns_secondary": "8.8.4.4",
+      "enabled": true,
+      "gateway": "",
+      "ip": "192.168.1.10",
+      "subnet": "255.255.255.0"
+    },
+    "wifi": {
+      "password": "",
+      "ssid": ""
+    }
+  },
+  "adminSettings": {
+    "mailBody": {
+      "analog": "",
+      "digital": "",
+      "modbus_rtu": "",
+      "plc": "",
+      "smtp": ""
+    }
+  },
+  "mysqlConfig": {
+    "database": "test",
+    "host": "localhost",
+    "password": "gateway",
+    "user": "gateway"
+  }
+}

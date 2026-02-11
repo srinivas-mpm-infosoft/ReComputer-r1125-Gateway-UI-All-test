@@ -1,0 +1,10 @@
+{
+  "wifi": {
+    "password": "",
+    "ssid": ""
+  },
+  "sim4g": {
+    "apn": "",
+    "provider": ""
+  }
+}

@@ -1,0 +1,67 @@
+sudo nano /etc/mysql/mariadb.conf.d/50-server.cnf
+
+
+[mysqld]
+event_scheduler=ON
+
+
+sudo systemctl restart mysql
+
+
+GRANT EVENT, TRIGGER, ALTER, DROP
+ON *.*
+TO 'gateway'@'localhost';
+
+
+FLUSH PRIVILEGES;
+
+
+
+
+DELIMITER $$
+
+CREATE EVENT IF NOT EXISTS truncate_gateway_tables
+ON SCHEDULE EVERY 7 DAY
+STARTS CURRENT_TIMESTAMP
+ON COMPLETION PRESERVE
+DO
+BEGIN
+    DECLARE done INT DEFAULT 0;
+    DECLARE tbl VARCHAR(255);
+
+    DECLARE cur CURSOR FOR
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema = 'gateway'
+          AND table_type = 'BASE TABLE';
+
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = 1;
+
+    SET FOREIGN_KEY_CHECKS = 0;
+
+    OPEN cur;
+
+    read_loop: LOOP
+        FETCH cur INTO tbl;
+        IF done THEN
+            LEAVE read_loop;
+        END IF;
+
+        SET @sql = CONCAT(
+            'TRUNCATE TABLE `gateway`.`', tbl, '`'
+        );
+        PREPARE stmt FROM @sql;
+        EXECUTE stmt;
+        DEALLOCATE PREPARE stmt;
+    END LOOP;
+
+    CLOSE cur;
+
+    SET FOREIGN_KEY_CHECKS = 1;
+END$$
+
+DELIMITER ;
+
+
+
+SHOW EVENTS FROM gateway;

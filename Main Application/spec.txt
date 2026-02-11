@@ -1,0 +1,97 @@
+# -*- mode: python ; coding: utf-8 -*-
+
+import sys
+from pathlib import Path
+
+# --------------------------------------------------
+# STRICT SSL LOCATION ENFORCEMENT
+# --------------------------------------------------
+
+ssl_path = Path("/usr/lib/python3.13/lib-dynload/_ssl.cpython-313-aarch64-linux-gnu.so")
+
+if not ssl_path.exists():
+    sys.exit(
+        "FATAL: _ssl not found in /usr/lib. "
+        "This build refuses to use /usr/local or custom Python."
+    )
+
+# --------------------------------------------------
+
+a = Analysis(
+    ["main_program.py"],
+    pathex=["."],
+    # ONLY system _ssl
+    binaries=[(str(ssl_path), "python3.13/lib-dynload")],
+    datas=[
+        (
+            "/home/gateway/GATEWAY-COMPLETE/Demo application/Main Application/static",
+            "static",
+        ),
+    ],
+    hiddenimports=[
+        "numpy",
+        "pandas",
+        "asyncio",
+        "pymodbus",
+        "pymodbus.client",
+        "flask",
+        "flask_sqlalchemy",
+        "flask_cors",
+    ],
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=[],
+    noarchive=False,
+    optimize=0,
+)
+
+# --------------------------------------------------
+# HARD FILTER: DROP ALL OpenSSL SHARED LIBS
+# --------------------------------------------------
+
+FORBIDDEN = (
+    'libssl.so',
+    'libcrypto.so',
+    '/usr/local',
+    'mysql/vendor',
+)
+
+def keep_binary(b):
+    dest = str(b[0])
+    src  = str(b[1]) if len(b) > 1 else ''
+    for bad in FORBIDDEN:
+        if bad in dest or bad in src:
+            return False
+    return True
+
+a.binaries = [b for b in a.binaries if keep_binary(b)]
+
+# --------------------------------------------------
+
+pyz = PYZ(a.pure)
+
+exe = EXE(
+    pyz,
+    a.scripts,
+    a.binaries,
+    a.datas,
+    [],
+    name='main_program',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    runtime_tmpdir=None,
+    console=True,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+)
+
+
+
+pyinstaller main_program.spec --distpath dist_new --workpath build_new

@@ -1,0 +1,147 @@
+sudo nano /etc/systemd/system/main_program.service
+
+
+[Unit]
+Description=Main Program Service
+After=network.target
+
+[Service]
+User=gateway
+Group=gateway
+WorkingDirectory=/home/gateway/executablefiles
+ExecStart=/home/gateway/executablefiles/main_program
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+
+
+sudo nano /etc/systemd/system/smb_final.service
+
+
+[Unit]
+Description=SMB Final Service
+After=network.target
+
+[Service]
+User=gateway
+Group=gateway
+WorkingDirectory="/home/gateway/Downloads/Munjal-Phase1/Gateway-UI/Gateway-UI/Main Application/dist"
+ExecStart="/home/gateway/Downloads/Munjal-Phase1/Gateway-UI/Gateway-UI/Main Application/dist/smb_final"
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+
+
+
+sudo nano /etc/systemd/system/grafana_custom.service
+
+
+[Unit]
+Description=Grafana Server (Custom Binary)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=gateway
+Group=gateway
+WorkingDirectory=/home/gateway/grafana-12.1.1/bin
+
+ExecStart=/home/gateway/grafana-12.1.1/bin/grafana-server \
+  --homepath /home/gateway/grafana-12.1.1 \
+  --config /home/gateway/grafana-12.1.1/conf/defaults.ini
+
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=10000
+
+[Install]
+WantedBy=multi-user.target
+
+
+
+
+sudo nano /etc/systemd/system/main_linux_gateway_ui.service
+
+
+[Unit]
+Description=Main Linux Gateway UI
+After=network.target
+
+[Service]
+User=gateway
+Group=gateway
+WorkingDirectory=/home/gateway/executablefiles
+ExecStart=/home/gateway/executablefiles/main_linux_gateway_ui
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+
+
+
+sudo nano /etc/systemd/system/network_apply.service
+
+
+[Unit]
+Description=Network Apply
+After=network.target
+
+[Service]
+
+User=gateway
+Group=gateway
+WorkingDirectory="/home/gateway/Downloads/Munjal-Phase1/Gateway-UI/Gateway-UI/Main Application/dist"
+ExecStart="/home/gateway/Downloads/Munjal-Phase1/Gateway-UI/Gateway-UI/Main Application/dist/network_apply"
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+
+
+
+
+sudo systemctl daemon-reexec
+sudo systemctl daemon-reload
+
+
+
+sudo systemctl enable main_program.service
+sudo systemctl enable main_linux_gateway_ui.service
+sudo systemctl enable network_apply.service
+sudo systemctl enable grafana_custom.service
+
+
+
+sudo systemctl start main_program.service
+sudo systemctl start main_linux_gateway_ui.service
+sudo systemctl start network_apply.service
+sudo systemctl start grafana_custom.service
+
+
+
+
+sudo systemctl stop main_program_phase2.service
+sudo systemctl stop smb_final.service
+sudo systemctl stop main_linux_gateway_ui.service
+sudo systemctl stop network_apply.service
+
+
+
+sudo systemctl disable main_program_phase2.service
+sudo systemctl disable smb_final.service
+sudo systemctl disable main_linux_gateway_ui.service
+sudo systemctl disable network_apply.service
+
+
+
+sudo systemctl delete main_program_phase2.service
+sudo systemctl delete smb_final.service
+sudo systemctl delete main_linux_gateway_ui.service
+sudo systemctl delete network_apply.service

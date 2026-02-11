@@ -1,0 +1,70 @@
+Option 1: Use systemd (recommended for Raspberry Pi)
+
+Create a systemd service file:
+
+sudo nano /etc/systemd/system/gateway-app.service
+
+Paste the following (adjust paths as needed):
+
+[Unit]
+Description=Gateway App Docker Container
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Restart=always
+ExecStart=/usr/bin/docker run --rm --name gateway-app --network host \
+    --device /dev/i2c-1 \
+    --device /dev/gpiochip0 \
+    --device /dev/ttyAMA5 \
+    -v /home/mpminfosoft/cm4poe4gboardtest/Compute_Module_4_PoE_4G_Board_Code/Gateway-UI/fast-api_json_file:/app \
+    gateway-app
+ExecStop=/usr/bin/docker stop gateway-app
+
+[Install]
+WantedBy=multi-user.target
+
+
+Reload systemd:
+
+sudo systemctl daemon-reload
+
+
+Enable it to start on boot:
+
+sudo systemctl enable gateway-app.service
+
+
+Start it immediately:
+
+sudo systemctl start gateway-app.service
+
+
+Check status/logs:
+
+sudo systemctl status gateway-app.service
+sudo journalctl -u gateway-app.service -f
+
+
+✅ This will:
+
+Run your container at boot.
+
+Restart it if it crashes.
+
+Respect your device mappings and mounted volume.
+
+Option 2: Docker native restart policy
+
+You can also use Docker’s restart flag, but for boot-time guaranteed start with devices, systemd is cleaner. Still, the flag works:
+
+docker run -d --name gateway-app --network host \
+    --device /dev/i2c-1 \
+    --device /dev/gpiochip0 \
+    --device /dev/ttyAMA5 \
+    -v /home/mpminfosoft/cm4poe4gboardtest/Compute_Module_4_PoE_4G_Board_Code/Gateway-UI/fast-api_json_file:/app \
+    --restart unless-stopped \
+    gateway-app
+
+
+--restart unless-stopped will automatically start your container after reboot unless you manually stop it.
