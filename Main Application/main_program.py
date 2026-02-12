@@ -1815,20 +1815,24 @@ def _poll_file_source_loop(file_cfg):
 def start_enabled_threads():
     global MANAGED_THREADS
 
+    STOP_EVENT.clear()
+
     with THREAD_LOCK:
         MANAGED_THREADS = []
 
         def start(name, target):
-            t = threading.Thread(target=target, daemon=True, name=name)
+            t = threading.Thread(
+                target=target,
+                daemon=True,      # 🔴 IMPORTANT
+                name=name
+            )
             t.start()
             MANAGED_THREADS.append(t)
             log_info(f"[THREAD] {name} started")
 
-        # Always-on
         start("NetworkWatcher", network_watcher_loop)
         start("SystemStatus", system_status_monitor)
 
-        # Conditional
         if ANALOG_ENABLED:
             start("AnalogReader", analog_reader_loop)
 
@@ -1841,20 +1845,21 @@ def start_enabled_threads():
         if MODBUS_TCP_ENABLED:
             start("ModbusTCP", modbus_tcp_handler)
 
-def stop_all_threads(timeout=3):
-    log_info("[THREAD] Stopping all threads...")
-    STOP_EVENT.set()
+def stop_all_threads():
+    global MANAGED_THREADS
+    log_info("[THREAD] Stopping all background tasks...")
+    STOP_EVENT.set()  # Signal everyone to stop
 
+    # We iterate through the list and wait for each thread to actually close
     with THREAD_LOCK:
         for t in MANAGED_THREADS:
-            log_info(f"[THREAD] Waiting for {t.name}")
-            t.join(timeout=timeout)
-
-        MANAGED_THREADS.clear()
-
-    STOP_EVENT.clear()
-    log_info("[THREAD] All threads stopped")
-
+            if t.is_alive():
+                log_info(f"[THREAD] Waiting for {t.name} to exit...")
+                t.join(timeout=3.0)  # Give it 3 seconds to finish its current loop
+        
+        MANAGED_THREADS.clear() # Clear the list for the next start
+    
+    log_info("[THREAD] All tasks fully stopped.")
 
 """
 What: Background loop that watches is_updated.json and reloads global config when it becomes true.
@@ -1868,36 +1873,43 @@ def config_monitor_loop():
     log_info("[CONFIG] Monitor started")
     last_flag_state = None
 
-    while True:
+    while not STOP_EVENT.is_set():
         try:
             update_flag = read_update_flag(f"{BASE_DIR}/is_updated.json")
 
             if update_flag is True and update_flag != last_flag_state:
                 log_info("[CONFIG] 🔄 Update detected")
-
-                # 1️⃣ Stop everything
+                
+                # 1. STOP EVERYTHING FIRST
                 stop_all_threads()
+                
+                # 2. WAIT A SECOND for OS resources (Serial/GPIO) to release
+                time.sleep(1.5)
 
-                # 2️⃣ Reload config ONCE
+                # 3. RELOAD CONFIG
                 if not update_global_config():
-                    log_error("[CONFIG] Reload failed")
+                    log_error("[CONFIG] Reload failed, keeping old config")
                     continue
 
-                # 3️⃣ Clear update flag
                 clear_update_flag(f"{BASE_DIR}/is_updated.json")
-
-                # 4️⃣ Restart threads based on NEW config
+                
+                # 4. RESTART EVERYTHING
+                # Ensure the event is clear so new threads don't exit immediately
+                STOP_EVENT.clear() 
                 start_enabled_threads()
-
-                log_info("[CONFIG] Reload + restart complete")
+                
+                log_info("[CONFIG] 🚀 Reload + restart complete")
 
             last_flag_state = update_flag
-            time.sleep(5)
+            
+            # Non-blocking sleep for the monitor itself
+            for _ in range(50):
+                if STOP_EVENT.is_set(): return
+                time.sleep(0.1)
 
         except Exception as e:
             log_error(f"[CONFIG] Monitor error: {e}")
             time.sleep(5)
-
 
 """
 What: Ensure initial configuration is loaded, then spawn config_monitor_loop() as a daemon thread.
@@ -2034,18 +2046,54 @@ def read_all_analog_channels():
 # DIGITAL I/O FUNCTIONS
 # ==================================================
 
+def setup_gpio_once(gpio_num, direction="out"):
+    """
+    Ensures the GPIO is exported and the direction is set.
+    """
+    base_path = f"/sys/class/gpio/gpio{gpio_num}"
+    
+    # 1. Export the pin if the directory doesn't exist
+    if not os.path.exists(base_path):
+        try:
+            with open("/sys/class/gpio/export", "w") as f:
+                f.write(str(gpio_num))
+            # Critical: Give the OS time to create the file nodes
+            time.sleep(0.1) 
+        except OSError as e:
+            # Error 16 is "Device or resource busy", which is fine
+            if e.errno != 16:
+                raise
+
+    # 2. Set the direction (in or out)
+    direction_path = f"{base_path}/direction"
+    with open(direction_path, "w") as f:
+        f.write(direction)
+
 def write_sysfs_gpio(gpio_num, value):
+    """
+    Prepares the pin and writes the value (1 or 0).
+    """
     try:
-        with open(f"/sys/class/gpio/gpio{gpio_num}/value", "w") as f:
+        # Step A: Setup (Ensure exported and set to 'out')
+        setup_gpio_once(gpio_num, "out")
+        
+        # Step B: Write Value
+        path = f"/sys/class/gpio/gpio{gpio_num}/value"
+        with open(path, "w") as f:
             f.write("1" if value else "0")
+            
     except Exception as e:
+        # Assuming log_error is defined in your environment
         log_error(f"[SYSFS GPIO ERROR] gpio{gpio_num}: {e}")
 
-
 def apply_digital_outputs(do_channels):
+    """
+    Iterates through channels and applies states.
+    """
     for idx, ch in enumerate(do_channels):
         pin = ch.get("pin")
-        state = int(ch.get("state", 0))
+        # Ensure state is handled as boolean/int 1/0
+        state = 1 if ch.get("state") in [1, "1", True] else 0
 
         if pin is None:
             continue
@@ -2055,7 +2103,6 @@ def apply_digital_outputs(do_channels):
             log_info(f"[DO] CH{idx} GPIO{pin} ← {state}")
         except Exception as e:
             log_error(f"[DO][ERROR] CH{idx} (pin={pin}): {e}")
-
 
 def apply_digital_outputs_gpio(do_channels):
     for idx, ch in enumerate(do_channels):
@@ -2097,43 +2144,30 @@ def get_digital_interval():
 
 
 def digital_io_loop():
+    log_info("[THREAD] Digital I/O loop started")
+    last_run = 0  # Initialize outside loop
     while not STOP_EVENT.is_set():
-        interval = get_digital_interval()
-        log_info(f"[THREAD] Digital I/O loop started (interval={interval}s)")
-
-        last = time.time()
-
         try:
+            interval = get_digital_interval()
             now = time.time()
-            if (now - last) < interval:
-                time.sleep(0.1)
-                continue
+            
+            if (now - last_run) >= interval:
+                ts = datetime.now(timezone.utc).astimezone(ZoneInfo("Asia/Kolkata")).strftime('%Y-%m-%d %H:%M:%S')
+                
+                apply_digital_outputs(DIGITAL_OUTPUT_CHANNELS)
+                digital_readings = read_digital_inputs(DIGITAL_CHANNELS, DIGITAL_INPUT_CONFIG.get("generate_random", False))
 
-            last = now
-
-            ts = datetime.now(timezone.utc).astimezone(
-                ZoneInfo("Asia/Kolkata")
-            ).strftime('%Y-%m-%d %H:%M:%S')
-
-            # 1️⃣ Apply outputs
-            apply_digital_outputs(DIGITAL_OUTPUT_CHANNELS)
-
-            # 2️⃣ Read inputs
-            digital_readings = read_digital_inputs(DIGITAL_CHANNELS,DIGITAL_INPUT_CONFIG["generate_random"])
-
-            if not digital_readings:
-                log_warn("[DIGITAL] No digital inputs read")
-                continue
-
-            log_info(f"[DIGITAL] {ts} → {digital_readings}")
-
-            # 3️⃣ DB insert (same pipeline as analog)
-            insert_digital_data(ts, digital_readings)
-
+                if digital_readings:
+                    log_info(f"[DIGITAL] {ts} → {digital_readings}")
+                    insert_digital_data(ts, digital_readings)
+                
+                last_run = now
+            
+            # Use small sleeps to keep the thread responsive to STOP_EVENT
+            time.sleep(0.5)
         except Exception as e:
             log_error(f"[DIGITAL][LOOP ERROR]: {e}")
-            time.sleep(2.0)
-
+            time.sleep(2.0)     
 
 """
 What: Evaluate a digital input state against configured alarm thresholds and report alarms.
@@ -2607,8 +2641,22 @@ def regs_to_float_energy(reg1, reg2, byte_order='big', word_order='little'):
     
     return struct.unpack('>f', raw_bytes)[0]
 
+def safe_read(inst, start, length, fc):
+    """
+    Tries to read registers, handling variations in library support.
+    """
+    try:
+        # Most modern versions of MinimalModbus use this:
+        return inst.read_registers(start, int(length), functioncode=fc)
+    except Exception as e:
+        # Fallback for older libraries or specific instrument types
+        try:
+            return inst.read_registers(start, int(length))
+        except Exception as e_inner:
+            raise Exception(f"Modbus Read Failed: {e_inner}")
 
-def read_energy_meters(instruments):
+
+def read_modbus_devices(instruments):
     readings = {}
 
     devices = (
@@ -2679,15 +2727,25 @@ def read_energy_meters(instruments):
                         else:
                             # 🔁 RS485 RTU
                             log_info(f"[INFO] Reading from {start} of length {length}")
-                            raw = inst.read_registers(start, length,fc)
-                        if reg.get("length")==1:
+                            raw = safe_read(inst, start, length, fc)
+                        if length == 1:
                             vals = [float(raw[0])]
                         else:
-                            vals = convert_regs(raw, conversion,length)
+                            vals = []
+                            for i in range(0, length, 2):
+                                f = regs_to_float_energy(
+                                    raw[i],
+                                    raw[i+1],
+                                    byte_order='big',
+                                    word_order='little'
+                                )
+                                vals.append(f)
+
                         # vals = raw
                         print(f"Values for sid {slave_id} are", raw)
-                        value = vals[0] if vals else None
-                        print(f"Values after convert regs {vals} for sid {slave_id}")
+                        value = vals[0] if vals is not None and len(vals) > 0 else None
+
+                        print(f"Values after convert regs {vals} for sid {slave_id} and value is {value}")
                         # ---- multiply / divide ----
                         mul = safe_float(reg.get("multiply"), 1.0)
                         div = safe_float(reg.get("divide"), 1.0)
@@ -2695,13 +2753,171 @@ def read_energy_meters(instruments):
                         log_info(f"[INFO] Division Factor {div} for sid {slave_id}")
                         if div == 0:
                             div = 1.0
-
                         value = (value * mul) / div
                         log_info(f"[INFO] Value after applying mul and div {value} for sid {slave_id}")
 
                         if reg.get("eng_unit")=="none":
-                            continue
                         # ---- parse eng_unit ----
+                            if value=="nan":
+                                value = "NULL"
+                            readings[key] = value
+                            print(f"Values for read: {value}")
+                            continue
+                        log_info(
+                            f"[DEBUG] REG OBJ ID={id(reg)} "
+                            f"NAME={reg.get('name')} "
+                            f"ENG_UNIT={reg.get('eng_unit')}"
+)
+                        eng_min, eng_max = parse_eng_unit(reg.get("eng_unit"))
+                        log_info(f"[INFO] ENG_MIN: {eng_min}, ENG_MAX {eng_max}")
+
+                        # ---- process range ----
+                        proc_min = safe_float(reg.get("process_min"),1.0)
+                        proc_max = safe_float(reg.get("process_max"),100)
+
+                        log_info(f"[INFO] Process_MIN: {proc_min}, Process_MAX {proc_max} for sid {slave_id}")
+
+                        # ---- apply scaling only if ALL present ----
+                        if (
+                            eng_min is not None
+                            and eng_max is not None
+                            and proc_min not in ("", None)
+                            and proc_max not in ("", None)
+                        ):
+                            scaled = scale_value(value, eng_min, eng_max, proc_min, proc_max)
+                            if scaled is not None:
+                                value = round(scaled, 3)
+                        log_info(f"[INFO] Value after scaling {value} for sid {slave_id}")
+
+                        if isinstance(value, (int, float)):
+                            if math.isnan(value) or math.isinf(value):
+                                value = None
+                        
+                    readings[key] = value
+                    log_info(f"[INFO] The reading for {slave_id} after conversion is {value} for sid {slave_id}")
+
+                except Exception as e:
+                    log_error(f"[ENERGY] Failed {key}: {e}")
+
+    return readings
+
+
+
+def read_modbus_devices_setup_every_time(instruments):
+    readings = {}
+
+    devices = (
+        config.get("ModbusRTU", {})
+        .get("Devices", {})
+        .get("brands", {})
+    )
+
+    for brand_key, brand in devices.items():
+        registers_by_slave = brand.get("registersBySlave", {})
+        slaves = brand.get("slaves", [])
+
+        for slave in slaves:
+            slave_id = slave.get("id")
+            if slave_id is None:
+                continue
+
+            generate = bool(slave.get("generate_random", False))
+            use_usb = bool(slave.get("use_usb", False))
+            regs = registers_by_slave.get(str(slave_id), [])
+            inst_key = f"{brand_key}_{slave_id}"
+            inst = instruments.get(inst_key)
+
+            if not generate and not use_usb and not inst:
+                log_warn(f"[ENERGY] Instrument missing for {inst_key}")
+                continue
+
+            for reg in regs:
+                if not reg.get("enabled"):
+                    continue
+
+                name = reg.get("name", "unknown")
+                key = f"{brand_key}_S{slave_id}_{name}"
+
+                try:
+                    # ===== RANDOM MODE =====
+                    if generate:
+                        min_v = safe_float(reg.get("process_min"), 0.0)
+                        max_v = safe_float(reg.get("process_max"), 100.0)
+                        if min_v > max_v:
+                            min_v, max_v = max_v, min_v
+                        value = round(random.uniform(min_v, max_v), 3)
+                        log_info(f"[ENERGY][RANDOM] {key} = {value}")
+
+                    # ===== REAL MODBUS =====
+                    else:
+                        start = int(reg["start"])+int(reg["offset"])
+                        length = int(reg.get("length", 1))
+                        reg_type = reg.get("type", "Input Register")
+                        conversion = reg.get("conversion", "Integer")
+
+                        fc = 4 if "input" in reg_type.lower() else 3
+                        inst.serial.baudrate = int(slave.get("baudRate", 9600))
+                        inst.serial.stopbits = int(slave.get("stopBits", 1))
+                        inst.serial.parity = {
+                            "None": "N",
+                            "Even": "E",
+                            "Odd": "O"
+                        }.get(slave.get("parity", "None"), "N")
+
+                        if use_usb:
+                            # 🔌 USB READ PATH
+                            raw = read_usb_register(
+                                brand_key=brand_key,
+                                slave_id=slave_id,
+                                start=start,
+                                length=length,
+                                reg_type=reg_type
+                            )
+                            value = float(raw[0])
+                            if value=="nan":
+                                value = "NULL"
+                            readings[key] = value
+                            print(f"Values for usb read: {value}")
+                            continue
+                        else:
+                            # 🔁 RS485 RTU
+                            log_info(f"[INFO] Reading from {start} of length {length}")
+                            raw = safe_read(inst, start, length, fc)
+                        if length == 1:
+                            vals = [float(raw[0])]
+                        else:
+                            vals = []
+                            for i in range(0, length, 2):
+                                f = regs_to_float_energy(
+                                    raw[i],
+                                    raw[i+1],
+                                    byte_order='big',
+                                    word_order='little'
+                                )
+                                vals.append(f)
+
+                        # vals = raw
+                        print(f"Values for sid {slave_id} are", raw)
+                        value = vals[0] if vals is not None and len(vals) > 0 else None
+
+                        print(f"Values after convert regs {vals} for sid {slave_id} and value is {value}")
+                        # ---- multiply / divide ----
+                        mul = safe_float(reg.get("multiply"), 1.0)
+                        div = safe_float(reg.get("divide"), 1.0)
+                        log_info(f"[INFO] Multiplication Factor {mul} for sid {slave_id}")
+                        log_info(f"[INFO] Division Factor {div} for sid {slave_id}")
+                        if div == 0:
+                            div = 1.0
+                        value = (value * mul) / div
+                        log_info(f"[INFO] Value after applying mul and div {value} for sid {slave_id}")
+
+                        if reg.get("eng_unit")=="none":
+                        # ---- parse eng_unit ----
+                            if value=="nan":
+                                value = "NULL"
+                            readings[key] = value
+                            print(f"Values for read: {value}")
+                            continue
                         log_info(
                             f"[DEBUG] REG OBJ ID={id(reg)} "
                             f"NAME={reg.get('name')} "
@@ -3907,33 +4123,23 @@ def process_analog_alarms(analog_readings):
 
 
 def analog_reader_loop():
-    """Reads analog channels on its own interval, inserts into analog_wide, and buffers for CSV/send."""
+    log_info("[THREAD] Analog reader loop started")
+    last_run = 0
     while not STOP_EVENT.is_set():
         try:
-            interval = convert_polling_interval_to_seconds(
-                ANALOG_POLLING_INTERVAL, ANALOG_POLLING_UNIT
-            )
-        except Exception:
-            interval = 2
-        log_info(f"[THREAD] Analog reader started, interval={interval}s")
-        last = time.time()
-
-        try:
+            interval = convert_polling_interval_to_seconds(ANALOG_POLLING_INTERVAL, ANALOG_POLLING_UNIT)
             now = time.time()
-            if ANALOG_ENABLED and (now - last) >= interval:
+
+            if ANALOG_ENABLED and (now - last_run) >= interval:
                 ts = datetime.now(timezone.utc).astimezone(ZoneInfo("Asia/Kolkata")).strftime('%Y-%m-%d %H:%M:%S')
                 analog_readings = read_all_analog_channels()
                 if analog_readings:
-                    print(analog_readings)
                     log_info(f"[DEBUG] Analog readings at {ts}: {analog_readings}")
                     insert_analog_data(ts, analog_readings)
                     process_analog_alarms(analog_readings)
-                # if analog_readings:
-                #     log_info(f"[DEBUG] Analog readings at {ts}: {analog_readings}")
-                    # buffer_merge(ts, analog_readings)
-                    # kafka_publish("analog", {"ts": ts, "readings": analog_readings})
-                last = now
-            time.sleep(0.2)
+                last_run = now
+            
+            time.sleep(0.5)
         except Exception as e:
             log_error(f"[ERROR] Analog reader: {e}")
             time.sleep(1.0)
@@ -4076,15 +4282,41 @@ def insert_digital_into_single_db(db_cred, table, database, timestamp, values):
     finally:
         if conn:
             conn.close()
+def setup_gpio_input(gpio_num):
+    """
+    Ensures the GPIO is exported and set to 'in' direction.
+    """
+    base_path = f"/sys/class/gpio/gpio{gpio_num}"
+    
+    # 1. Export if directory doesn't exist
+    if not os.path.exists(base_path):
+        try:
+            with open("/sys/class/gpio/export", "w") as f:
+                f.write(str(gpio_num))
+            time.sleep(0.1)  # Wait for udev to create sysfs nodes
+        except OSError as e:
+            if e.errno != 16: # 16 is 'Device or resource busy'
+                raise
+
+    # 2. Set direction to 'in'
+    with open(f"{base_path}/direction", "w") as f:
+        f.write("in")
 
 def read_sysfs_gpio(gpio_num):
+    """
+    Ensures pin is ready, then reads the value.
+    """
     try:
-        with open(f"/sys/class/gpio/gpio{gpio_num}/value", "r") as f:
+        # Step A: Ensure pin is exported and set to 'in'
+        setup_gpio_input(gpio_num)
+        
+        # Step B: Read the value
+        path = f"/sys/class/gpio/gpio{gpio_num}/value"
+        with open(path, "r") as f:
             return int(f.read().strip())
     except Exception as e:
         log_error(f"[SYSFS GPIO ERROR] gpio{gpio_num}: {e}")
         return None
-
 
 def read_digital_inputs(di_channels, generate=False):
     readings = {}
@@ -4106,12 +4338,15 @@ def read_digital_inputs(di_channels, generate=False):
                 if raw is None:
                     continue
 
-            # 🔥 ACTIVE-LOW inversion
+            # 🔥 ACTIVE-LOW inversion: 
+            # High voltage (1) -> state 0 (OFF)
+            # Low voltage (0)  -> state 1 (ON)
             state = 0 if raw == 1 else 1
 
             readings[f"digital_ch_{idx}"] = state
             log_info(f"[DI] CH{idx} GPIO{pin} raw={raw} state={state}")
 
+            # Assuming check_digital_alarm is defined elsewhere
             check_digital_alarm(idx, state)
 
         except Exception as e:
@@ -4252,16 +4487,18 @@ def send_email(to_email, subject, body):
 
 
 def modbus_reader_loop():
-    while not STOP_EVENT.is_set():
-        log_info("[THREAD] Modbus reader started")
-        instruments = None
-        last_poll = time.time()
-        poll_interval = 5
 
+    log_info("[THREAD] Modbus reader started")
+    instruments = None
+    last_poll = time.time()
+    poll_interval = 5
+    while not STOP_EVENT.is_set():
         try:
             if MODBUS_ENABLED:
                 if instruments is None:
+                    log_warn("[MODBUS] Instruments missing, reinitializing")
                     instruments = setup_modbus_instruments()
+                    last_poll = 0
 
                 now = time.time()
                 if now - last_poll >= poll_interval:
@@ -4269,7 +4506,7 @@ def modbus_reader_loop():
                         ZoneInfo("Asia/Kolkata")
                     ).strftime("%Y-%m-%d %H:%M:%S")
 
-                    readings = read_energy_meters(
+                    readings = read_modbus_devices_setup_every_time(
                         instruments
                     )
 
@@ -4522,29 +4759,27 @@ Side effects: None besides logs (for now).
 
 
 def modbus_tcp_handler():
+    log_info("[THREAD] Modbus TCP Handler started")
+    global PLC_THREADS
+    PLC_THREADS = []
+
+    # Start the sub-threads once
+    for siemens_config in SIEMENS_CONFIGS:
+        t = threading.Thread(target=poll_plc, args=(siemens_config, "Siemens"), daemon=True)
+        t.start()
+        PLC_THREADS.append(t)
+
+    for ab_config in COMBINED_CONFIG:
+        t = threading.Thread(target=poll_plc, args=(ab_config, "Allen Bradley"), daemon=True)
+        t.start()
+        PLC_THREADS.append(t)
+
+    # Keep this master thread alive until STOP_EVENT
     while not STOP_EVENT.is_set():
-        global PLC_THREADS
-
-        # Start fresh
-        PLC_THREADS = []
-
-        for siemens_config in SIEMENS_CONFIGS:
-            t = threading.Thread(
-                target=poll_plc,
-                args=(siemens_config, "Siemens"),
-                daemon=True
-            )
-            t.start()
-            PLC_THREADS.append(t)
-
-        for ab_config in COMBINED_CONFIG:
-            t = threading.Thread(
-                target=poll_plc,
-                args=(ab_config, "Allen Bradley"),
-                daemon=True
-            )
-            t.start()
-            PLC_THREADS.append(t)
+        time.sleep(1)
+    
+    log_info("[THREAD] Modbus TCP Handler shutting down sub-threads")
+        
 
 
 """
@@ -5235,7 +5470,7 @@ def connect_wifi(ssid, password):
     ).stdout
 
     for line in active.splitlines():
-        if line.startswith("yes:") and line.split(".", 1)[1] == ssid:
+        if line.startswith("yes:") and line.split(":", 1)[1] == ssid:
             log_info(f"[WiFi] Already connected to {ssid}")
             return
 
@@ -5245,8 +5480,9 @@ def connect_wifi(ssid, password):
         capture_output=True, text=True
     ).stdout
 
+    log_info(f"[INFO] Saved WIFI: {saved}")
     for line in saved.splitlines():
-        name, ctype = line.split(".", 1)
+        name, ctype = line.split(":", 1)
         if name == ssid and ctype == "802-11-wireless":
             log_info(f"[WiFi] Bringing up saved connection {ssid}")
             subprocess.run(
@@ -5283,8 +5519,8 @@ def setup_4g(apn):
         return
     log_info("[4G] Starting CFUN-based attach (Jio-safe)")
     if not modem_present():
-        subprocess.run(["sudo","4g_power_on.sh"],check=False)
-        time.sleep(5)
+        subprocess.run(["sudo","gpioset","0","6=1"],check=False)
+        time.sleep(8)
 
     free_port(SERIAL_PORT)
     wait_for_tty(SERIAL_PORT)
@@ -5412,6 +5648,7 @@ def apply_static_ethernet_dhcp(static_cfg, prev_cfg):
             subprocess.run([
                 "sudo", "nmcli", "con", "mod", ETH_CONNECTION,
                 "ipv4.addresses", "",
+                "ipv4.method", "auto",
                 "ipv4.ignore-auto-dns", "no",
                 "ipv4.dns", ""
             ], check=False)
@@ -5436,7 +5673,7 @@ def apply_static_ethernet_dhcp(static_cfg, prev_cfg):
             # DHCP + secondary IP
             subprocess.run([
                 "sudo", "nmcli", "con", "mod", ETH_CONNECTION,
-                "ipv4.method", "manual",
+                "ipv4.method", "auto",
                 "ipv4.addresses", addr,
                 # "ipv4.gateway",gateway
             ], check=True)
@@ -5468,7 +5705,7 @@ def apply_static_ethernet_dhcp(static_cfg, prev_cfg):
 def network_watcher_loop():
     log_info("[INFO] Network watcher started")
     first_time = True
-    while True:
+    while not STOP_EVENT.is_set(): # Fix: Check stop event:
         try:
             updated = load_json(UPDATED_FILE, False)
 
@@ -5587,11 +5824,12 @@ def main():
     threads = []
 
     # Start config monitor
-    threading.Thread(
-        target=config_monitor_loop,
-        daemon=True,
-        name="ConfigMonitor"
-    ).start()
+    monitor_thread = threading.Thread(
+            target=config_monitor_loop,
+            daemon=False, # Make it non-daemon so we can wait for its clean exit
+            name="ConfigMonitor"
+        )
+    monitor_thread.start()
 
     # TCP Server
     # tcp_thread = threading.Thread(target=start_tcp_server, daemon=True)
@@ -5678,10 +5916,20 @@ def main():
     except Exception as e:
         log_error(f"\n[CRITICAL] Main crashed: {e}")
 
-    stop_all_threads()
-    log_info("\n" + "=" * 60)
-    log_info("DATA LOGGER SYSTEM SHUTTING DOWN")
-    log_info("=" * 60)
+    finally:
+            # Ensure STOP_EVENT is set no matter how we exit
+            STOP_EVENT.set()
+            stop_all_threads()
+            
+            log_info("[THREAD] Waiting for Config Monitor to exit...")
+            monitor_thread.join(timeout=2)
+            
+            log_info("=" * 60)
+            log_info("DATA LOGGER SYSTEM SHUTDOWN COMPLETE")
+            log_info("=" * 60)
+            
+            # Force exit if threads are still hanging
+            os._exit(0)
 
 
 if __name__ == "__main__":
