@@ -198,7 +198,7 @@ ${canSeeDbFields
 function normalizeDigitalSchema() {
   const io = config.ioSettings;
 
-  // ---- Digital Input ----
+  // ---- Digital I/O ----
   if (Array.isArray(io.digitalInput.channels)) {
     io.digitalInput.channels = io.digitalInput.channels.map((ch, i) => {
       if (typeof ch === "boolean") {
@@ -225,12 +225,12 @@ function addDI() {
     enabled: false,
     pin: "",
   });
-  renderIOSettingsPanel("Digital Input");
+  renderIOSettingsPanel("Digital I/O");
 }
 
 function removeDI(index) {
   config.ioSettings.digitalInput.channels.splice(index, 1);
-  renderIOSettingsPanel("Digital Input");
+  renderIOSettingsPanel("Digital I/O");
 }
 
 function addDO() {
@@ -239,12 +239,12 @@ function addDO() {
     state: 0,
     pin: "",
   });
-  renderIOSettingsPanel("Digital Input");
+  renderIOSettingsPanel("Digital I/O");
 }
 
 function removeDO(index) {
   config.ioSettings.digitalOutput.channels.splice(index, 1);
-  renderIOSettingsPanel("Digital Input");
+  renderIOSettingsPanel("Digital I/O");
 }
 
 function addAI() {
@@ -305,7 +305,7 @@ function renderIOSettingsPanel(subTab = "Settings") {
   let html = `
       <div class="panel-header">I/O Settings</div>
       <div class="tab-list">
-        ${["Settings", "Analog", "Digital Input"]
+        ${["Settings", "Analog", "Digital I/O"]
       .map(
         (t) => `
           <button class="tab-btn ${subTab === t ? "active" : ""}"
@@ -324,7 +324,7 @@ function renderIOSettingsPanel(subTab = "Settings") {
           <label><input type="checkbox" name="modbus" ${io.settings.modbus ? "checked" : ""}> Modbus RTU</label>
           <label><input type="checkbox" name="modbusTCP" ${io.settings.modbusTCP ? "checked" : ""}> Modbus TCP</label>
           <label><input type="checkbox" name="analog" ${io.settings.analog ? "checked" : ""}> Analog</label>
-          <label><input type="checkbox" name="digitalInput" ${io.settings.digitalInput ? "checked" : ""}> Digital Input</label>
+          <label><input type="checkbox" name="digitalInput" ${io.settings.digitalInput ? "checked" : ""}> Digital I/O</label>
           <br><br>
           <button class="button-primary" type="submit">Save</button>
         </form>
@@ -399,7 +399,7 @@ function renderIOSettingsPanel(subTab = "Settings") {
   
 
   /* ================= DIGITAL ================= */
-  if (subTab === "Digital Input") {
+  if (subTab === "Digital I/O") {
     const di = io.digitalInput;
     const doo = io.digitalOutput;
   
@@ -437,7 +437,7 @@ function renderIOSettingsPanel(subTab = "Settings") {
   `).join("")}
   </table>
   
-  <button type="button" onclick="addDI()">+ Add Digital Input</button>
+  <button type="button" onclick="addDI()">+ Add Digital I/O</button>
   
   <br><br>
   
@@ -542,7 +542,7 @@ function renderIOSettingsPanel(subTab = "Settings") {
   }
     
 
-  if (subTab === "Digital Input") {
+  if (subTab === "Digital I/O") {
     const f = document.getElementById("digital-io-form");
   
     f.onsubmit = (e) => {
@@ -5139,16 +5139,27 @@ function renderNetworkPanel() {
   // ---------- HARD GUARANTEES ----------
   if (!config.network) config.network = {};
 
-  if (!config.network.wifi) {
+  if (!config.network.wifi)
     config.network.wifi = { ssid: "", password: "" };
-  }
 
-  if (!config.network.sim4g) {
+  if (!config.network.sim4g)
     config.network.sim4g = { provider: "", apn: "" };
-  }
 
   if (!config.network.static) {
     config.network.static = {
+      iface: "eth0",
+      enabled: false,
+      ip: "",
+      subnet: "",
+      gateway: "",
+      dns_primary: "",
+      dns_secondary: "",
+    };
+  }
+
+  if (!config.network.static2) {
+    config.network.static2 = {
+      iface: "eth1",
       enabled: false,
       ip: "",
       subnet: "",
@@ -5162,88 +5173,129 @@ function renderNetworkPanel() {
 
   // ---------- UI ----------
   document.getElementById("main-panel").innerHTML = `
-        <div class="panel-header">Network Configuration</div>
+    <div class="panel-header">Network Configuration</div>
 
-        <div class="tab-list">
-          <button class="active" data-tab="wifi">Wi-Fi</button>
-          <button data-tab="sim">4G SIM</button>
-          <button data-tab="static">Ethernet</button>
-        </div>
+    <div class="tab-list">
+      <button class="active" data-tab="wifi">Wi-Fi</button>
+      <button data-tab="sim">4G SIM</button>
+      <button data-tab="static">Ethernet 1</button>
+      <button data-tab="static2">Ethernet 2</button>
+    </div>
 
-        <!-- Wi-Fi -->
-        <div class="tab-content" id="wifi-tab">
-          <fieldset class="net-fieldset">
-            <legend>Wi-Fi Credentials</legend>
+    <!-- Wi-Fi -->
+    <div class="tab-content" id="wifi-tab">
+      <fieldset class="net-fieldset">
+        <legend>Wi-Fi Credentials</legend>
 
-            <label>SSID</label>
-            <input type="text" id="wifi-ssid" value="${net.wifi.ssid}">
+        <label>SSID</label>
+        <input type="text" id="wifi-ssid" value="${net.wifi.ssid}">
 
-            <label>Password</label>
-            <input type="password" id="wifi-password" value="${net.wifi.password
-    }">
-          </fieldset>
+        <label>Password</label>
+        <input type="password" id="wifi-password" value="${net.wifi.password}">
+      </fieldset>
 
-          <button class="button-primary" id="save-wifi">Save Wi-Fi</button>
-          <span class="checkmark" id="wifi-tick" style="display:none">✔</span>
-        </div>
+      <button class="button-primary" id="save-wifi">Save Wi-Fi</button>
+      <span class="checkmark" id="wifi-tick" style="display:none">✔</span>
+    </div>
 
-        <!-- SIM -->
-        <div class="tab-content" id="sim-tab" style="display:none">
-          <fieldset class="net-fieldset">
-            <legend>4G SIM (APN)</legend>
+    <!-- SIM -->
+    <div class="tab-content" id="sim-tab" style="display:none">
+      <fieldset class="net-fieldset">
+        <legend>4G SIM (APN)</legend>
 
-            <label>Provider</label>
-            <select id="apn-provider">
-              <option value="">Select provider</option>
-              ${Object.keys(APN_MAP)
-      .map(
-        (p) => `
-                    <option value="${p}" ${net.sim4g.provider === p ? "selected" : ""
-          }>${p.toUpperCase()}</option>`,
-      )
-      .join("")}
-            </select>
+        <label>Provider</label>
+        <select id="apn-provider">
+          <option value="">Select provider</option>
+          ${Object.keys(APN_MAP)
+            .map(
+              (p) =>
+                `<option value="${p}" ${
+                  net.sim4g.provider === p ? "selected" : ""
+                }>${p.toUpperCase()}</option>`
+            )
+            .join("")}
+        </select>
 
-            <label>APN</label>
-            <input type="text" id="apn-value" value="${net.sim4g.apn}">
-          </fieldset>
+        <label>APN</label>
+        <input type="text" id="apn-value" value="${net.sim4g.apn}">
+      </fieldset>
 
-          <button class="button-primary" id="save-sim">Save SIM</button>
-          <span class="checkmark" id="sim-tick" style="display:none">✔</span>
-        </div>
+      <button class="button-primary" id="save-sim">Save SIM</button>
+      <span class="checkmark" id="sim-tick" style="display:none">✔</span>
+    </div>
 
-        <!-- Static IP -->
-        <div class="tab-content" id="static-tab" style="display:none">
-          <fieldset class="net-fieldset">
-            <legend>Static IP Configuration</legend>
+    <!-- Ethernet 1 -->
+    <div class="tab-content" id="static-tab" style="display:none">
+      <fieldset class="net-fieldset">
+        <legend>Static IP Configuration</legend>
 
-            <label>
-              <input type="checkbox" id="static-enable" ${net.static.enabled ? "checked" : ""
-    }>
-              Enable Static IP
-            </label>
+        <label>Interface</label>
+        <select id="static-iface">
+          <option value="Wired connection 1" ${net.static.iface === "Wired connection 1" ? "selected" : ""}>eth0</option>
+          <option value="Wired connection 2" ${net.static.iface === "Wired connection 2" ? "selected" : ""}>eth1</option>
+        </select>
 
-            <label>IP Address</label>
-            <input type="text" id="static-ip" value="${net.static.ip}">
+        <label>
+          <input type="checkbox" id="static-enable" ${net.static.enabled ? "checked" : ""}>
+          Enable Static IP
+        </label>
 
-            <label>Subnet Mask</label>
-            <input type="text" id="static-subnet" value="${net.static.subnet}">
+        <label>IP Address</label>
+        <input type="text" id="static-ip" value="${net.static.ip}">
 
-            <label>Gateway</label>
-            <input type="text" id="static-gw" value="${net.static.gateway}">
+        <label>Subnet Mask</label>
+        <input type="text" id="static-subnet" value="${net.static.subnet}">
 
-            <label>Preferred DNS Server</label>
-            <input type="text" id="static-dns1" value="${net.static.dns_primary}">
+        <label>Gateway</label>
+        <input type="text" id="static-gw" value="${net.static.gateway}">
 
-            <label>Alternate DNS Server</label>
-            <input type="text" id="static-dns2" value="${net.static.dns_secondary
-    }">
-          </fieldset>
+        <label>Preferred DNS Server</label>
+        <input type="text" id="static-dns1" value="${net.static.dns_primary}">
 
-          <button class="button-primary" id="save-static">Save Static IP</button>
-          <span class="checkmark" id="static-tick" style="display:none">✔</span>
-        </div>
-      `;
+        <label>Alternate DNS Server</label>
+        <input type="text" id="static-dns2" value="${net.static.dns_secondary}">
+      </fieldset>
+
+      <button class="button-primary" id="save-static">Save Static IP</button>
+      <span class="checkmark" id="static-tick" style="display:none">✔</span>
+    </div>
+
+    <!-- Ethernet 2 -->
+    <div class="tab-content" id="static2-tab" style="display:none">
+      <fieldset class="net-fieldset">
+        <legend>Static IP Configuration</legend>
+
+        <label>Interface</label>
+        <select id="static-iface">
+          <option value="Wired connection 1" ${net.static2.iface === "Wired connection 1" ? "selected" : ""}>eth0</option>
+          <option value="Wired connection 2" ${net.static2.iface === "Wired connection 2" ? "selected" : ""}>eth1</option>
+        </select>
+
+        <label>
+          <input type="checkbox" id="static2-enable" ${net.static2.enabled ? "checked" : ""}>
+          Enable Static IP
+        </label>
+
+        <label>IP Address</label>
+        <input type="text" id="static2-ip" value="${net.static2.ip}">
+
+        <label>Subnet Mask</label>
+        <input type="text" id="static2-subnet" value="${net.static2.subnet}">
+
+        <label>Gateway</label>
+        <input type="text" id="static2-gw" value="${net.static2.gateway}">
+
+        <label>Preferred DNS Server</label>
+        <input type="text" id="static2-dns1" value="${net.static2.dns_primary}">
+
+        <label>Alternate DNS Server</label>
+        <input type="text" id="static2-dns2" value="${net.static2.dns_secondary}">
+      </fieldset>
+
+      <button class="button-primary" id="save-static2">Save Static IP</button>
+      <span class="checkmark" id="static2-tick" style="display:none">✔</span>
+    </div>
+  `;
 
   // ---------- Tabs ----------
   document.querySelectorAll(".tab-list button").forEach((btn) => {
@@ -5253,7 +5305,7 @@ function renderNetworkPanel() {
         .forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
 
-      ["wifi", "sim", "static"].forEach((t) => {
+      ["wifi", "sim", "static", "static2"].forEach((t) => {
         document.getElementById(`${t}-tab`).style.display =
           btn.dataset.tab === t ? "block" : "none";
       });
@@ -5268,10 +5320,7 @@ function renderNetworkPanel() {
     if (!providerSel.value) {
       apnInput.value = "";
       apnInput.disabled = true;
-      return;
-    }
-
-    if (providerSel.value === "other") {
+    } else if (providerSel.value === "other") {
       apnInput.disabled = false;
       apnInput.value = "";
     } else {
@@ -5281,27 +5330,28 @@ function renderNetworkPanel() {
   };
   providerSel.onchange();
 
-  // ---------- Static enable toggle ----------
-  const toggleStaticFields = () => {
+  // ---------- Static enable toggle (Ethernet 1) ----------
+  const toggleStatic1 = () => {
     const en = document.getElementById("static-enable").checked;
-    [
-      "static-ip",
-      "static-subnet",
-      "static-gw",
-      "static-dns1",
-      "static-dns2",
-    ].forEach((id) => {
-      document.getElementById(id).disabled = !en;
-    });
+    ["static-ip", "static-subnet", "static-gw", "static-dns1", "static-dns2"]
+      .forEach(id => document.getElementById(id).disabled = !en);
   };
+  document.getElementById("static-enable").onchange = toggleStatic1;
+  toggleStatic1();
 
-  document.getElementById("static-enable").onchange = toggleStaticFields;
-  toggleStaticFields();
+  // ---------- Static enable toggle (Ethernet 2) ----------
+  const toggleStatic2 = () => {
+    const en = document.getElementById("static2-enable").checked;
+    ["static2-ip", "static2-subnet", "static2-gw", "static2-dns1", "static2-dns2"]
+      .forEach(id => document.getElementById(id).disabled = !en);
+  };
+  document.getElementById("static2-enable").onchange = toggleStatic2;
+  toggleStatic2();
 
   // ---------- Save handlers ----------
   document.getElementById("save-wifi").onclick = async () => {
-    net.wifi.ssid = document.getElementById("wifi-ssid").value.trim();
-    net.wifi.password = document.getElementById("wifi-password").value;
+    net.wifi.ssid = wifi-ssid.value.trim();
+    net.wifi.password = wifi-password.value;
     await saveConfig();
     showTick("wifi-tick");
   };
@@ -5314,21 +5364,34 @@ function renderNetworkPanel() {
   };
 
   document.getElementById("save-static").onclick = async () => {
-    net.static.enabled = document.getElementById("static-enable").checked;
-    net.static.ip = document.getElementById("static-ip").value.trim();
-    net.static.subnet = document.getElementById("static-subnet").value.trim();
-    net.static.gateway = document.getElementById("static-gw").value.trim();
-    net.static.dns_primary = document
-      .getElementById("static-dns1")
-      .value.trim();
-    net.static.dns_secondary = document
-      .getElementById("static-dns2")
-      .value.trim();
-
+    Object.assign(net.static, {
+      iface: static-iface.value,
+      enabled: static-enable.checked,
+      ip: static-ip.value.trim(),
+      subnet: static-subnet.value.trim(),
+      gateway: static-gw.value.trim(),
+      dns_primary: static-dns1.value.trim(),
+      dns_secondary: static-dns2.value.trim(),
+    });
     await saveConfig();
     showTick("static-tick");
   };
+
+  document.getElementById("save-static2").onclick = async () => {
+    Object.assign(net.static2, {
+      iface: static2-iface.value,
+      enabled: static2-enable.checked,
+      ip: static2-ip.value.trim(),
+      subnet: static2-subnet.value.trim(),
+      gateway: static2-gw.value.trim(),
+      dns_primary: static2-dns1.value.trim(),
+      dns_secondary: static2-dns2.value.trim(),
+    });
+    await saveConfig();
+    showTick("static2-tick");
+  };
 }
+
 
 function renderOfflineDataPanel() {
   // Inject styles (only once)

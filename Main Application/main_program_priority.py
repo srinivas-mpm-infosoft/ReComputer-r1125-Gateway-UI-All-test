@@ -61,6 +61,7 @@ import mariadb
 # from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from threading import Event
+import queue
 
 CONFIG_RELOAD_EVENT = Event()
 PLC_THREADS = []
@@ -672,12 +673,17 @@ class ModbusTCPProtocol:
                 time.sleep(max(0, self.data_freq - elapsed))
 
 
+# Versioning and Synchronization
+CONFIG_VERSION = 0
+THREAD_LOCK = threading.Lock()
+HW_LOCK = threading.Lock()  # Protects I2C and Serial Bus
+GPIO_LOCK   = threading.Lock()
+I2C_LOCK    = threading.Lock()
+RS485_LOCK  = threading.Lock()
+DIGITAL_QUEUE = queue.Queue(maxsize=1000)
+MODBUS_QUEUE = Queue(maxsize=1000)
 STOP_EVENT = threading.Event()
 MANAGED_THREADS = []
-THREAD_LOCK = threading.Lock()
-
-CONFIG_LOCK = threading.Lock()
-CONFIG_VERSION = 0
 
 
 
@@ -1842,9 +1848,11 @@ def start_enabled_threads():
 
         if DIGITAL_INPUT_ENABLED:
             start("DigitalReader", digital_io_loop)
+            start("DigitalWriter", digital_db_writer_loop)
 
         if MODBUS_ENABLED:
             start("ModbusReader", modbus_reader_loop)
+            start("ModbusDBWriter",modbus_db_writer_loop)
 
         if MODBUS_TCP_ENABLED:
             start("ModbusTCP", modbus_tcp_handler)
@@ -1875,49 +1883,32 @@ Notes: Sleeps 5s between checks; tracks last_flag_state to avoid duplicate logs.
 Side effects: Mutates globals via update_global_config(); writes is_updated.json via clear_update_flag().
 """
 
+CONFIG_VERSION = 0
+
 def config_monitor_loop():
-    log_info("[CONFIG] Monitor started")
-    last_flag_state = None
+    global CONFIG_VERSION
+    log_info("[CONFIG] Independent Monitor started")
 
     while not STOP_EVENT.is_set():
         try:
-            update_flag = read_update_flag(f"{BASE_DIR}/is_updated.json")
-
-            if update_flag is True:
-                log_info("[CONFIG] 🔄 Update detected")
+            # Check if the JSON flag file says we need an update
+            if read_update_flag(f"{BASE_DIR}/is_updated.json"):
+                log_info("[CONFIG] 🔄 Update detected. Reloading globals...")
                 
+                # Update global variables
+                if update_global_config():
+                    with THREAD_LOCK:
+                        CONFIG_VERSION += 1  # Increment version to signal threads
+                    clear_update_flag(f"{BASE_DIR}/is_updated.json")
+                    log_info(f"[CONFIG] 🚀 Global Config Version {CONFIG_VERSION} applied")
 
-                # 1. STOP EVERYTHING FIRST
-                stop_all_threads()
-                
-                # 2. WAIT A SECOND for OS resources (Serial/GPIO) to release
-                time.sleep(1.5)
-
-                # 3. RELOAD CONFIG
-                if not update_global_config():
-                    log_error("[CONFIG] Reload failed, keeping old config")
-                    continue
-
-                clear_update_flag(f"{BASE_DIR}/is_updated.json")
-                
-                # 4. RESTART EVERYTHING
-                # Ensure the event is clear so new threads don't exit immediately
-                STOP_EVENT.clear() 
-                start_enabled_threads()
-                
-                log_info("[CONFIG] 🚀 Reload + restart complete")
-
-            last_flag_state = update_flag
-            
-            # Non-blocking sleep for the monitor itself
+            # Efficient sleep
             for _ in range(50):
                 if STOP_EVENT.is_set(): return
-                time.sleep(0.1)
-
+                time.sleep(0.01)
         except Exception as e:
             log_error(f"[CONFIG] Monitor error: {e}")
             time.sleep(5)
-
 
 """
 What: Ensure initial configuration is loaded, then spawn config_monitor_loop() as a daemon thread.
@@ -2164,32 +2155,58 @@ def get_digital_interval():
         log_error(f"[DIGITAL] Interval error, using default: {e}")
         return 10.0
 
+def digital_db_writer_loop():
+    log_info("[THREAD] DigitalDBWriter started")
 
-def digital_io_loop():
-    log_info("[THREAD] Digital I/O loop started")
-    last_run = 0  # Initialize outside loop
     while not STOP_EVENT.is_set():
         try:
-            interval = get_digital_interval()
-            now = time.time()
-            
-            if (now - last_run) >= interval:
-                ts = datetime.now(timezone.utc).astimezone(ZoneInfo("Asia/Kolkata")).strftime('%Y-%m-%d %H:%M:%S')
-                
-                apply_digital_outputs(DIGITAL_OUTPUT_CHANNELS)
-                digital_readings = read_digital_inputs(DIGITAL_CHANNELS, DIGITAL_INPUT_CONFIG.get("generate_random", False))
+            ts, readings = DIGITAL_QUEUE.get(timeout=0.5)
+            insert_digital_data(ts, readings)
+            DIGITAL_QUEUE.task_done()
 
-                if digital_readings:
-                    log_info(f"[DIGITAL] {ts} → {digital_readings}")
-                    insert_digital_data(ts, digital_readings)
-                
-                last_run = now
-            
-            # Use small sleeps to keep the thread responsive to STOP_EVENT
-            time.sleep(0.5)
+        except queue.Empty:
+            continue
+
         except Exception as e:
-            log_error(f"[DIGITAL][LOOP ERROR]: {e}")
-            time.sleep(2.0)     
+            log_error(f"[DIGITAL][DB] {e}")
+
+
+def digital_io_loop():
+    log_info("[THREAD] DigitalReader started")
+
+    interval = get_digital_interval()  # seconds
+    next_run = time.monotonic()
+
+    while not STOP_EVENT.is_set():
+        now = time.monotonic()
+
+        if now >= next_run:
+            scheduled = next_run
+            next_run += interval
+
+            try:
+                ts = datetime.now(
+                    ZoneInfo("Asia/Kolkata")
+                ).strftime("%Y-%m-%d %H:%M:%S")
+
+                with GPIO_LOCK:
+                    apply_digital_outputs(DIGITAL_OUTPUT_CHANNELS)
+                    readings = read_digital_inputs(
+                        DIGITAL_CHANNELS,
+                        DIGITAL_INPUT_CONFIG.get("generate_random", False)
+                    )
+
+                if readings:
+                    DIGITAL_QUEUE.put_nowait((ts, readings))
+
+            except queue.Full:
+                log_warn("[DIGITAL] Queue full, dropping sample")
+
+            except Exception as e:
+                log_error(f"[DIGITAL] Error: {e}")
+
+        sleep = max(0, next_run - time.monotonic())
+        STOP_EVENT.wait(timeout=sleep)
 
 
 """
@@ -2826,7 +2843,7 @@ def read_modbus_devices(instruments):
 
 
 
-def read_modbus_devices_setup_every_time(instruments):
+def read_modbus_devices_setup_every_time(instruments,emit_cb:None):
     readings = {}
 
     devices = (
@@ -2972,11 +2989,13 @@ def read_modbus_devices_setup_every_time(instruments):
                                 value = None
                         
                     readings[key] = value
+                    if emit_cb:
+                        emit_cb({key: value})
                     log_info(f"[INFO] The reading for {slave_id} after conversion is {value} for sid {slave_id}")
 
                 except Exception as e:
                     log_error(f"[ENERGY] Failed {key}: {e}")
-
+    
     return readings
 
 
@@ -3070,7 +3089,7 @@ def insert_energy_data(timestamp, readings):
         cloud_cfg = DATABASE_CFG.get("cloud")
         if (
             isinstance(cloud_cfg, dict)
-            and slave_cfg.get("upload_local") is True
+            and slave_cfg.get("upload_cloud") is True
             and isinstance(cloud_cfg.get("cred"), dict)
         ):
             try:
@@ -4146,26 +4165,34 @@ def process_analog_alarms(analog_readings):
 
 
 def analog_reader_loop():
-    log_info("[THREAD] Analog reader loop started")
+    log_info("[THREAD] Analog reader started")
+    local_version = -1
     last_run = 0
-    while not STOP_EVENT.is_set():
-        try:
-            interval = convert_polling_interval_to_seconds(ANALOG_POLLING_INTERVAL, ANALOG_POLLING_UNIT)
-            now = time.time()
+    interval = 5 # Default
 
+    while not STOP_EVENT.is_set():
+        # Check for config updates specific to this thread
+        if local_version != CONFIG_VERSION:
+            interval = convert_polling_interval_to_seconds(ANALOG_POLLING_INTERVAL, ANALOG_POLLING_UNIT)
+            local_version = CONFIG_VERSION
+            log_info(f"[ANALOG] Settings refreshed (Interval: {interval}s)")
+
+        try:
+            now = time.time()
             if ANALOG_ENABLED and (now - last_run) >= interval:
                 ts = datetime.now(timezone.utc).astimezone(ZoneInfo("Asia/Kolkata")).strftime('%Y-%m-%d %H:%M:%S')
-                analog_readings = read_all_analog_channels()
-                if analog_readings:
-                    log_info(f"[DEBUG] Analog readings at {ts}: {analog_readings}")
-                    insert_analog_data(ts, analog_readings)
-                    process_analog_alarms(analog_readings)
+                
+                with HW_LOCK: # Prevent I2C collision
+                    readings = read_all_analog_channels()
+                
+                if readings:
+                    insert_analog_data(ts, readings)
+                    process_analog_alarms(readings)
                 last_run = now
-            
-            time.sleep(0.5)
         except Exception as e:
             log_error(f"[ERROR] Analog reader: {e}")
-            time.sleep(1.0)
+        
+        time.sleep(0.5)
 
 
 def insert_digital_data(timestamp, readings):
@@ -4508,43 +4535,57 @@ def send_email(to_email, subject, body):
         log_error(f"[ERROR] Email send failed: {e}")
         raise
 
+def modbus_db_writer_loop():
+    log_info("[THREAD] Modbus DB writer started")
 
-def modbus_reader_loop():
-
-    log_info("[THREAD] Modbus reader started")
-    instruments = None
-    last_poll = time.time()
-    poll_interval = 5
     while not STOP_EVENT.is_set():
         try:
-            if MODBUS_ENABLED:
-                if instruments is None:
-                    log_warn("[MODBUS] Instruments missing, reinitializing")
-                    instruments = setup_modbus_instruments()
-                    last_poll = 0
+            ts, reading = MODBUS_DB_QUEUE.get(timeout=0.5)
+            insert_energy_data(ts, reading)
+            MODBUS_DB_QUEUE.task_done()
 
-                now = time.time()
-                if now - last_poll >= poll_interval:
-                    ts = datetime.now(timezone.utc).astimezone(
-                        ZoneInfo("Asia/Kolkata")
-                    ).strftime("%Y-%m-%d %H:%M:%S")
+        except queue.Empty:
+            continue
+        except Exception as e:
+            log_error(f"[MODBUS][DB] Error: {e}")
 
-                    readings = read_modbus_devices_setup_every_time(
-                        instruments
+
+def modbus_reader_loop():
+    log_info("[THREAD] Modbus reader started")
+    local_version = -1
+    instruments = None
+    last_poll = 0
+
+    while not STOP_EVENT.is_set():
+        if local_version != CONFIG_VERSION:
+            with RS485_LOCK:
+                instruments = setup_modbus_instruments()
+            local_version = CONFIG_VERSION
+            log_info("[MODBUS] Serial instruments re-initialized")
+
+        try:
+            if MODBUS_ENABLED and (time.time() - last_poll >= 5):
+                ts = datetime.now(timezone.utc)\
+                    .astimezone(ZoneInfo("Asia/Kolkata"))\
+                    .strftime("%Y-%m-%d %H:%M:%S")
+
+                def emit_cb(single_reading):
+                    MODBUS_DB_QUEUE.put((ts, single_reading))
+
+                with RS485_LOCK:
+                    read_modbus_devices_setup_every_time(
+                        instruments,
+                        emit_cb=emit_cb
                     )
 
-                    if readings:
-                        log_info(f"[INFO] Reading Values: {readings}")
-                        insert_energy_data(ts, readings)
-                        #check_energy_alarms(readings)
-
-                    last_poll = now
-
-            time.sleep(0.5)
+                last_poll = time.time()
 
         except Exception as e:
-            log_error(f"[ENERGY LOOP] {e}")
-            time.sleep(1)
+            log_error(f"[MODBUS] Error: {e}")
+            instruments = None
+        
+        time.sleep(0.5)
+
 
 
 # ==================================================
@@ -4781,27 +4822,48 @@ Side effects: None besides logs (for now).
 """
 
 
+PLC_REGISTRY = {} # Keep track of {plc_id: thread_object}
+
 def modbus_tcp_handler():
-    log_info("[THREAD] Modbus TCP Handler started")
-    global PLC_THREADS
-    PLC_THREADS = []
+    log_info("[THREAD] Modbus TCP Manager started")
+    local_version = -1
 
-    # Start the sub-threads once
-    for siemens_config in SIEMENS_CONFIGS:
-        t = threading.Thread(target=poll_plc, args=(siemens_config, "Siemens"), daemon=True)
-        t.start()
-        PLC_THREADS.append(t)
-
-    for ab_config in COMBINED_CONFIG:
-        t = threading.Thread(target=poll_plc, args=(ab_config, "Allen Bradley"), daemon=True)
-        t.start()
-        PLC_THREADS.append(t)
-
-    # Keep this master thread alive until STOP_EVENT
     while not STOP_EVENT.is_set():
-        time.sleep(1)
-    
-    log_info("[THREAD] Modbus TCP Handler shutting down sub-threads")
+        if local_version != CONFIG_VERSION:
+            log_info("[MODBUS TCP] Config change detected. Updating PLC sub-threads...")
+            
+            # Note: We don't kill threads here. 
+            # We let existing poll_plc threads detect the version change themselves.
+            # We only need to start threads for NEW configurations if they aren't running.
+            
+            if MODBUS_TCP_ENABLED:
+                # Start Siemens PLCs
+                for i, cfg in enumerate(SIEMENS_CONFIGS):
+                    thread_id = f"Siemens_{i}"
+                    ensure_plc_thread_running(thread_id, cfg, "Siemens")
+
+                # Start Allen Bradley / Delta PLCs
+                for i, cfg in enumerate(COMBINED_CONFIG):
+                    thread_id = f"AB_Delta_{i}"
+                    ensure_plc_thread_running(thread_id, cfg, "Allen Bradley")
+            
+            local_version = CONFIG_VERSION
+
+        time.sleep(2)
+
+def ensure_plc_thread_running(thread_id, config, plc_type):
+    global PLC_REGISTRY
+    with THREAD_LOCK:
+        if thread_id not in PLC_REGISTRY or not PLC_REGISTRY[thread_id].is_alive():
+            log_info(f"[MODBUS TCP] Launching independent thread for {thread_id}")
+            t = threading.Thread(
+                target=poll_plc, 
+                args=(config, plc_type, thread_id), 
+                name=thread_id, 
+                daemon=True
+            )
+            t.start()
+            PLC_REGISTRY[thread_id] = t
         
 
 
@@ -5727,81 +5789,41 @@ def apply_static_ethernet_dhcp(static_cfg, prev_cfg):
 
 def network_watcher_loop():
     log_info("[INFO] Network watcher started")
+    local_version = -1
     first_time = True
-    while not STOP_EVENT.is_set(): # Fix: Check stop event:
+    
+    while not STOP_EVENT.is_set():
         try:
-            updated = load_json(UPDATED_FILE, False)
+            # Check if we need to force a network re-check based on Global Config
+            force_update = (local_version != CONFIG_VERSION)
+            updated_flag = load_json(UPDATED_FILE, False)
 
-            if not updated and not first_time:
-                log_info("[INFO] Skipping run as nothing is changed")
-                time.sleep(2)
+            if not updated_flag and not first_time and not force_update:
+                time.sleep(5)
                 continue
 
-            config = load_json(CONFIG_FILE, {})
-            network = config.get("network", {})
-            wifi = network.get("wifi", {})
-            sim  = network.get("sim4g", {})
+            config_data = load_json(CONFIG_FILE, {})
+            network = config_data.get("network", {})
             static_ip =  network.get("static", {})
-
-            state = {"wifi": wifi, "sim4g": sim}
-            current_hash = hash_dict(state)
-            last_hash = load_json(STATE_FILE, "")
-
-            if first_time:
-                log_info("Running for the first time")
-
-                connect_wifi(
-                    wifi.get("ssid", ""),
-                    wifi.get("password", "")
-                )
-
-                setup_4g(sim.get("apn", ""))
-
-                apply_static_ethernet_dhcp(
-                    network.get("static", {}),
-                    {}
-                )
-
-                first_time = False
-                write_json(STATE_FILE, state)
-                continue
-
             
+            # Apply network logic (WiFi/4G/Static)
+            log_info("[NETWORK] Validating/Applying connection settings...")
+            connect_wifi(network.get("wifi", {}).get("ssid", ""), network.get("wifi", {}).get("password", ""))
+            setup_4g(network.get("sim4g", {}).get("apn", ""))
 
-            if current_hash == last_hash:
-                log_info("[INFO] No network changes detected")
-                time.sleep(2)
-                continue
-
-            log_info("[INFO] Applying network changes")
-
-            connect_wifi(
-                wifi.get("ssid", ""),
-                wifi.get("password", "")
-            )
-
-            setup_4g(sim.get("apn", ""))
-
-            prev_state = load_json(STATE_FILE, {})
-            prev_static = prev_state.get("static", {})
-            new_static = network.get("static", {})
-
-            applied_static = apply_static_ethernet_dhcp(
-                new_static,
-                prev_static
-            )
-
-            state["static"] = applied_static
-            write_json(STATE_FILE, state)
-
-            log_info("[SUCCESS] Network applied")
-
-
+            apply_static_ethernet_dhcp(
+                network.get("static", {}),
+                {}
+                )
+            
+            local_version = CONFIG_VERSION
+            first_time = False
+            write_json(STATE_FILE, network) # Save current state
+            
         except Exception as e:
-            log.exception(f"[ERROR] {e}")
-
-        time.sleep(2)
-
+            log_error(f"[NETWORK] Watcher Error: {e}")
+        
+        time.sleep(10)
 
 
 # ==================================================
@@ -5822,137 +5844,50 @@ Side effects: Launches multiple daemon threads; sets up hardware/network; runs i
 
 
 def main():
+    # Initial load
     if not UPDATED:
         update_global_config()
+
     log_info("=" * 60)
-    log_info("ENHANCED DATA LOGGER SYSTEM STARTING")
+    log_info("INDEPENDENT DATA LOGGER SYSTEM STARTING")
     log_info("=" * 60)
 
-    # Print configuration summary
-    # print(f"[CONFIG] Communication Media: {COMMUNICATION_MEDIA}")
-    # print(f"[CONFIG] Send Format: {SEND_FORMAT}")
-    log_info(f"[CONFIG] Analog Enabled: {ANALOG_ENABLED}")
-    log_info(f"[CONFIG] Digital Input Enabled: {DIGITAL_INPUT_ENABLED}")
-    log_info(f"[CONFIG] Modbus Enabled: {MODBUS_ENABLED}")
-    # print(f"[CONFIG] Offline Data Enabled: {OFFLINE_ENABLED}")
-    # print(f"[CONFIG] APN: {APN}")
-    # print(f"[CONFIG] JSON Endpoint: {JSON_ENDPOINT}")
-    log_info(f"[CONFIG] RS485 Port: {RS485_PORT} @ {RS485_BAUD_RATE} baud")
-
-    # Initialize 4G module (if using LTE)
-    # print("[INIT] Initializing 4G module...")
-    # enable_4g_module()
-    # connect_4g()
-
-    threads = []
-
-    # Start config monitor
+    # 1. Start the Configuration Monitor (The Heart)
+    # This thread stays alive forever and updates CONFIG_VERSION
     monitor_thread = threading.Thread(
-            target=config_monitor_loop,
-            daemon=False, # Make it non-daemon so we can wait for its clean exit
-            name="ConfigMonitor"
-        )
+        target=config_monitor_loop,
+        daemon=False, # We join this on exit
+        name="ConfigMonitor"
+    )
     monitor_thread.start()
 
-    # TCP Server
-    # tcp_thread = threading.Thread(target=start_tcp_server, daemon=True)
-    # tcp_thread.start()
-    # threads.append(tcp_thread)
-    # print("[THREAD] TCP Server started")
-
-    # Network Watcher
-    # network_thread = threading.Thread(
-    #     target=network_watcher_loop,
-    #     daemon=True
-    # )
-    # network_thread.start()
-    # threads.append(network_thread)
-    # log_info("[THREAD] Network Watcher started")
-
-    # HTTP Command Poller
-    # http_thread = threading.Thread(target=http_command_poller, daemon=True)
-    # http_thread.start()
-    # threads.append(http_thread)
-    # print("[THREAD] HTTP Command Poller started")
-
-    # Offline Data Handler
-    # offline_thread = threading.Thread(target=offline_data_handler, daemon=True)
-    # offline_thread.start()
-    # threads.append(offline_thread)
-    # print("[THREAD] Offline Data Handler started")
-
-    # Modbus TCP Handler
-    # if MODBUS_TCP_ENABLED:
-    #     modbus_tcp_thread = threading.Thread(target=modbus_tcp_handler, daemon=True)
-    #     modbus_tcp_thread.start()
-    #     threads.append(modbus_tcp_thread)
-    #     print("[THREAD] Modbus TCP Handler started")
-
-    # RS485 Communication
-    # rs485_thread = threading.Thread(target=rs485_communication_handler, daemon=True)
-    # rs485_thread.start()
-    # threads.append(rs485_thread)
-    # print("[THREAD] RS485 Communication started")
-
-    # System Status Monitor
-    # status_thread = threading.Thread(target=system_status_monitor, daemon=True)
-    # status_thread.start()
-    # threads.append(status_thread)
-    # log_info("[THREAD] System Status Monitor started")
-
-    # # NEW: Parallel sensor readers
-    # if ANALOG_ENABLED:
-    #     t = threading.Thread(target=analog_reader_loop, daemon=True)
-    #     t.start()
-    #     threads.append(t)
-    #     log_info("[THREAD] Analog Reader started")
-    # if DIGITAL_INPUT_ENABLED:
-    #     t = threading.Thread(target=digital_io_loop, daemon=True)
-    #     t.start()
-    #     threads.append(t)
-    #     log_info("[THREAD] Digital Reader started")
-    # if MODBUS_ENABLED:
-    #     t = threading.Thread(target=modbus_reader_loop, daemon=True)
-    #     t.start()
-    #     threads.append(t)
-    #     log_info("[THREAD] Modbus Reader started")
-    
+    # 2. Launch all functional threads
+    # These threads are written to be self-healing and version-aware
     start_enabled_threads()
 
-    # NEW: Sender/CSV flusher
-    # sender_thread = threading.Thread(target=send_flush_loop, daemon=True)
-    # sender_thread.start()
-    # threads.append(sender_thread)
-    # print("[THREAD] Sender/Flusher started")
-
     log_info("=" * 60)
-    log_info("ALL BACKGROUND THREADS STARTED")
-    log_info("READERS RUNNING IN PARALLEL")
+    log_info("ALL INDEPENDENT THREADS DISPATCHED")
     log_info("=" * 60)
 
-    # Keep main alive, no sequential collection loop
     try:
-        while True:
+        # Keep the main process alive
+        while not STOP_EVENT.is_set():
             time.sleep(1)
+            
     except KeyboardInterrupt:
         log_info("\n[INFO] Shutdown requested by user")
     except Exception as e:
         log_error(f"\n[CRITICAL] Main crashed: {e}")
 
     finally:
-            # Ensure STOP_EVENT is set no matter how we exit
-            STOP_EVENT.set()
-            stop_all_threads()
-            
-            log_info("[THREAD] Waiting for Config Monitor to exit...")
-            monitor_thread.join(timeout=2)
-            
-            log_info("=" * 60)
-            log_info("DATA LOGGER SYSTEM SHUTDOWN COMPLETE")
-            log_info("=" * 60)
-            
-            # Force exit if threads are still hanging
-            os._exit(0)
+        log_info("[SHUTDOWN] Signaling all threads to stop...")
+        STOP_EVENT.set()
+        
+        # Give threads time to close sockets/files
+        time.sleep(2)
+        
+        log_info("[SHUTDOWN] System complete.")
+        os._exit(0)
 
 
 if __name__ == "__main__":

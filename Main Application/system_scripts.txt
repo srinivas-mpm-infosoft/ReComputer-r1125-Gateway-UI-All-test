@@ -47,13 +47,13 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=gateway
-Group=gateway
+User=recomputer
+Group=recomputer
 WorkingDirectory=/home/gateway/grafana-12.1.1/bin
 
-ExecStart=/home/gateway/grafana-12.1.1/bin/grafana-server \
-  --homepath /home/gateway/grafana-12.1.1 \
-  --config /home/gateway/grafana-12.1.1/conf/defaults.ini
+ExecStart=/home/recomputer/Downloads/grafana-12.1.1/bin/grafana-server \
+  --homepath /home/recomputer/Downloads/grafana-12.1.1 \
+  --config /home/recomputer/Downloads/grafana-12.1.1/conf/defaults.ini
 
 Restart=on-failure
 RestartSec=5
@@ -124,7 +124,7 @@ sudo systemctl start main_linux_gateway_ui.service
 sudo systemctl start network_apply.service
 sudo systemctl start grafana_custom.service
 
-
+sudo systemctl restart grafana_custom.service
 
 
 sudo systemctl stop main_program_phase2.service

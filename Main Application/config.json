@@ -39,7 +39,7 @@
           "pin": "530"
         },
         {
-          "name": "DI2",
+          "name": "Digital Input 2",
           "enabled": true,
           "pin": "531"
         }
@@ -47,7 +47,7 @@
       "db": {
         "db_name": "test",
         "table_name": "digital_reading",
-        "upload_cloud": false,
+        "upload_cloud": true,
         "upload_local": true
       },
       "generate_random": false,
@@ -58,12 +58,12 @@
     "digitalOutput": {
       "channels": [
         {
-          "name": "DO1",
+          "name": "Digital Output 1",
           "state": 0,
           "pin": "532"
         },
         {
-          "name": "DO2",
+          "name": "Digital Output 2",
           "state": 0,
           "pin": "533"
         }
@@ -168,13 +168,13 @@
       "cred": {
         "autocommit": "false",
         "charset": "utf8mb4",
-        "database": "cloud_plc",
-        "host": "cloud.db.example.com",
-        "password": "secret",
-        "port": 3306,
-        "user": "clouduser"
+        "database": "test",
+        "host": "caboose.proxy.rlwy.net",
+        "password": "fnRaJLFnIlNWyDsNYEpVsnyuZCMppLlO",
+        "port": 15805,
+        "user": "root"
       },
-      "enabled": false
+      "enabled": true
     },
     "local": {
       "cred": {
@@ -274,21 +274,19 @@
         "alerts": [
           {
             "condition": "<=",
-            "contact": "",
+            "threshold": 1.5,
             "delay": 1,
-            "email": "abc@gmail.com",
-            "enabled": false,
+            "contact": "",
             "message": "Value very low",
-            "threshold": 1.5
+            "enabled": false
           },
           {
             "condition": ">=",
-            "contact": "",
+            "threshold": 5,
             "delay": 1,
-            "email": "abc@gmail.com",
-            "enabled": false,
+            "contact": "",
             "message": "Value very high",
-            "threshold": 5
+            "enabled": false
           }
         ]
       },
@@ -490,9 +488,9 @@
           "registersBySlave": {
             "1": [
               {
-                "name": "Temperature",
+                "name": "Analog Input 1",
                 "start": 1,
-                "offset": 0,
+                "offset": -1,
                 "type": "Input Register",
                 "conversion": "Float: Big Endian",
                 "sql_type": "FLOAT",
@@ -505,9 +503,9 @@
                 "enabled": false
               },
               {
-                "name": "Moisture",
-                "start": 3,
-                "offset": 0,
+                "name": "Analog Input 2",
+                "start": 2,
+                "offset": -1,
                 "type": "Input Register",
                 "conversion": "Float: Big Endian",
                 "sql_type": "FLOAT",
@@ -520,7 +518,7 @@
                 "enabled": false
               },
               {
-                "name": "Signal Simulator",
+                "name": "Analog Input 3",
                 "start": 3,
                 "offset": -1,
                 "type": "Input Register",
@@ -531,8 +529,83 @@
                 "divide": 1,
                 "process_min": "0",
                 "process_max": "10",
-                "eng_unit": "0-10V",
+                "eng_unit": "4-20mA",
                 "enabled": true
+              },
+              {
+                "name": "Analog Input 4",
+                "start": 4,
+                "offset": -1,
+                "type": "Input Register",
+                "conversion": "Float: Big Endian",
+                "sql_type": "FLOAT",
+                "length": 1,
+                "multiply": 1,
+                "divide": 1,
+                "process_min": "",
+                "process_max": "",
+                "eng_unit": "4-20mA",
+                "enabled": false
+              },
+              {
+                "name": "Analog Input 5",
+                "start": 5,
+                "offset": -1,
+                "type": "Input Register",
+                "conversion": "Float: Big Endian",
+                "sql_type": "FLOAT",
+                "length": 1,
+                "multiply": 1,
+                "divide": 1,
+                "process_min": "",
+                "process_max": "",
+                "eng_unit": "4-20mA",
+                "enabled": false
+              },
+              {
+                "name": "Analog Input 6",
+                "start": 6,
+                "offset": -1,
+                "type": "Input Register",
+                "conversion": "Float: Big Endian",
+                "sql_type": "FLOAT",
+                "length": 1,
+                "multiply": 1,
+                "divide": 1,
+                "process_min": "",
+                "process_max": "",
+                "eng_unit": "4-20mA",
+                "enabled": false
+              },
+              {
+                "name": "Analog Input 7",
+                "start": 7,
+                "offset": -1,
+                "type": "Input Register",
+                "conversion": "Float: Big Endian",
+                "sql_type": "FLOAT",
+                "length": 1,
+                "multiply": 1,
+                "divide": 1,
+                "process_min": "",
+                "process_max": "",
+                "eng_unit": "4-20mA",
+                "enabled": false
+              },
+              {
+                "name": "Analog Input 8",
+                "start": 8,
+                "offset": -1,
+                "type": "Input Register",
+                "conversion": "Float: Big Endian",
+                "sql_type": "FLOAT",
+                "length": 1,
+                "multiply": 1,
+                "divide": 1,
+                "process_min": "",
+                "process_max": "",
+                "eng_unit": "4-20mA",
+                "enabled": false
               }
             ]
           },
@@ -694,6 +767,51 @@
                 "process_max": "",
                 "eng_unit": "none",
                 "enabled": true
+              },
+              {
+                "name": "Power Factor",
+                "start": 3082,
+                "offset": 0,
+                "type": "Input Register",
+                "conversion": "Float: Big Endian",
+                "sql_type": "FLOAT",
+                "length": 2,
+                "multiply": 1,
+                "divide": 1,
+                "process_min": "",
+                "process_max": "",
+                "eng_unit": "4-20mA",
+                "enabled": false
+              },
+              {
+                "name": "Frequency",
+                "start": 3108,
+                "offset": 0,
+                "type": "Input Register",
+                "conversion": "Float: Big Endian",
+                "sql_type": "FLOAT",
+                "length": 2,
+                "multiply": 1,
+                "divide": 1,
+                "process_min": "",
+                "process_max": "",
+                "eng_unit": "4-20mA",
+                "enabled": false
+              },
+              {
+                "name": "KWH",
+                "start": 3204,
+                "offset": 0,
+                "type": "Input Register",
+                "conversion": "Float: Big Endian",
+                "sql_type": "FLOAT",
+                "length": 2,
+                "multiply": 1,
+                "divide": 1,
+                "process_min": "",
+                "process_max": "",
+                "eng_unit": "4-20mA",
+                "enabled": false
               }
             ]
           },
@@ -884,6 +1002,15 @@
     "wifi": {
       "password": "",
       "ssid": ""
+    },
+    "static2": {
+      "iface": "eth1",
+      "enabled": false,
+      "ip": "",
+      "subnet": "",
+      "gateway": "",
+      "dns_primary": "",
+      "dns_secondary": ""
     }
   },
   "adminSettings": {
