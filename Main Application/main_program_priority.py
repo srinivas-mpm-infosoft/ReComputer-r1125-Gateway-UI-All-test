@@ -681,7 +681,7 @@ GPIO_LOCK   = threading.Lock()
 I2C_LOCK    = threading.Lock()
 RS485_LOCK  = threading.Lock()
 DIGITAL_QUEUE = queue.Queue(maxsize=1000)
-MODBUS_QUEUE = Queue(maxsize=1000)
+MODBUS_DB_QUEUE = queue.Queue(maxsize=1000)
 STOP_EVENT = threading.Event()
 MANAGED_THREADS = []
 
@@ -2045,17 +2045,6 @@ def read_all_analog_channels():
 # DIGITAL I/O FUNCTIONS
 # ==================================================
 
-def reapply_digital_outputs():
-    if not DIGITAL_OUTPUT_ENABLED:
-        return
-
-    try:
-        do_channels = GLOBAL_CONFIG.get("digital_outputs", [])
-        log_info("[DO] Reapplying digital outputs after config reload")
-        apply_digital_outputs(do_channels)
-    except Exception as e:
-        log_error(f"[DO] Reapply failed: {e}")
-
 def setup_gpio_once(gpio_num, direction="out"):
     """
     Ensures the GPIO is exported and the direction is set.
@@ -2096,6 +2085,16 @@ def write_sysfs_gpio(gpio_num, value):
     except Exception as e:
         # Assuming log_error is defined in your environment
         log_error(f"[SYSFS GPIO ERROR] gpio{gpio_num}: {e}")
+
+
+def read_digital_outputs(do_channels):
+    outputs = {}
+
+    for idx, ch in enumerate(do_channels):
+        state = 1 if ch.get("state") in [1, "1", True] else 0
+        outputs[f"digital_out_{idx}"] = state
+
+    return outputs
 
 
 def apply_digital_outputs(do_channels):
@@ -2175,38 +2174,39 @@ def digital_io_loop():
     log_info("[THREAD] DigitalReader started")
 
     interval = get_digital_interval()  # seconds
-    next_run = time.monotonic()
 
     while not STOP_EVENT.is_set():
-        now = time.monotonic()
+        try:
+            ts = datetime.now(
+                ZoneInfo("Asia/Kolkata")
+            ).strftime("%Y-%m-%d %H:%M:%S")
 
-        if now >= next_run:
-            scheduled = next_run
-            next_run += interval
+            with GPIO_LOCK:
+                apply_digital_outputs(DIGITAL_OUTPUT_CHANNELS)
 
-            try:
-                ts = datetime.now(
-                    ZoneInfo("Asia/Kolkata")
-                ).strftime("%Y-%m-%d %H:%M:%S")
+                di_readings = read_digital_inputs(
+                    DIGITAL_CHANNELS,
+                    DIGITAL_INPUT_CONFIG.get("generate_random", False)
+                )
 
-                with GPIO_LOCK:
-                    apply_digital_outputs(DIGITAL_OUTPUT_CHANNELS)
-                    readings = read_digital_inputs(
-                        DIGITAL_CHANNELS,
-                        DIGITAL_INPUT_CONFIG.get("generate_random", False)
-                    )
+                do_readings = read_digital_outputs(DIGITAL_OUTPUT_CHANNELS)
 
-                if readings:
-                    DIGITAL_QUEUE.put_nowait((ts, readings))
+                readings = {}
+                if isinstance(di_readings, dict):
+                    readings.update(di_readings)
 
-            except queue.Full:
-                log_warn("[DIGITAL] Queue full, dropping sample")
+                readings.update(do_readings)
 
-            except Exception as e:
-                log_error(f"[DIGITAL] Error: {e}")
+            if readings:
+                DIGITAL_QUEUE.put_nowait((ts, readings))
 
-        sleep = max(0, next_run - time.monotonic())
-        STOP_EVENT.wait(timeout=sleep)
+        except queue.Full:
+            log_warn("[DIGITAL] Queue full, dropping sample")
+
+        except Exception as e:
+            log_error(f"[DIGITAL] Error: {e}")
+
+        STOP_EVENT.wait(timeout=interval)
 
 
 """
@@ -2218,14 +2218,41 @@ Side effects: Print to console; could be extended to send notifications.
 """
 
 
-# Global alarm memory (required)
-DIGITAL_ALARM_STATE = {}
+DIGITAL_ALARM_STATE = {}   # {(channel, alert_index): bool}
+DIGITAL_ALARM_TIMER = {}  # {(channel, alert_index): first_trigger_time}
+
+def normalize_digital_channel_key(key):
+    if isinstance(key, int):
+        return key
+
+    if isinstance(key, str):
+        key = key.strip()
+        if key.isdigit():
+            return int(key)
+        if key.lower().startswith("channel"):
+            try:
+                return int(key.split()[-1]) - 1
+            except Exception:
+                pass
+
+    return None
+
 
 def check_digital_alarm(channel, state):
-    channel_key = f"Channel {channel + 1}"
+    now = time.time()
+    log_info(f"[INFO] Channel is {channel}")
+    # Find matching config block
+    channel_cfg = None
+    for k, v in DIGITAL_IO_ALARMS.items():
+        ch = normalize_digital_channel_key(k)
+        log_info(f"[INFO] Channel ch is {ch}")
+        if ch == channel:
+            channel_cfg = v
+            log_info(f"[INFO] Channel is {channel}")
+            break
 
-    channel_cfg = DIGITAL_IO_ALARMS.get(channel_key)
     if not channel_cfg:
+        log_info(f'[INFO] No channel_cfg found')
         return
 
     alerts = channel_cfg.get("alerts", [])
@@ -2234,49 +2261,66 @@ def check_digital_alarm(channel, state):
 
     for idx, alert in enumerate(alerts):
         if not alert.get("enabled", False):
+            DIGITAL_ALARM_STATE.pop((channel, idx), None)
+            DIGITAL_ALARM_TIMER.pop((channel, idx), None)
             continue
 
-        trigger = alert.get("trigger", "High")
-        contact = alert.get("contact", "")
+        trigger = alert.get("trigger", "").strip().upper()
+        delay = int(alert.get("delay", 0))
         email = alert.get("email", "")
+        contact = alert.get("contact", "")
         message = alert.get("message", "")
 
-        # Determine trigger condition
-        if trigger == "High":
-            triggered = state == 0
-        elif trigger == "Low":
+        # Trigger logic (ACTIVE-LOW aware)
+        if trigger == "HIGH":
             triggered = state == 1
+        elif trigger == "LOW":
+            triggered = state == 0
         else:
-            # Unknown trigger type
+            log_error(f"[DIGITAL ALARM] Invalid trigger '{trigger}'")
             continue
 
-        alarm_id = f"{channel_key}_{idx}"
-        prev_state = DIGITAL_ALARM_STATE.get(alarm_id, False)
+        key = (channel, idx)
+        prev_state = DIGITAL_ALARM_STATE.get(key, False)
 
-        # 🔴 Rising edge only
-        if triggered and not prev_state:
-            DIGITAL_ALARM_STATE[alarm_id] = True
+        if triggered:
+            if key not in DIGITAL_ALARM_TIMER:
+                DIGITAL_ALARM_TIMER[key] = now
+                log_info(
+                    f"[DIGITAL ALARM] CH{channel} trigger detected, delay started ({delay}s)"
+                )
 
-            subject = f"[DIGITAL ALARM] {channel_key} - {trigger}"
-            body = (
-                f"Digital Alarm Triggered\n\n"
-                f"Channel: {channel_key}\n"
-                f"Trigger: {trigger}\n"
-                f"State: {state}\n"
-                f"Message: {message}\n"
-                f"Contact: {contact}\n"
-            )
+            if now - DIGITAL_ALARM_TIMER[key] < delay:
+                continue
 
-            log_warn(f"[DIGITAL ALARM] {channel_key}: {message}")
+            # 🔴 Rising edge after delay
+            if not prev_state:
+                DIGITAL_ALARM_STATE[key] = True
+                DIGITAL_ALARM_TIMER.pop(key, None)
 
-            if email:
-                send_email(email, subject, body)
-            else:
-                log_error(f"[DIGITAL ALARM] No email configured for {channel_key}")
+                subject = f"[DIGITAL ALARM] Channel {channel + 1} - {trigger}"
+                body = (
+                    f"Digital Alarm Triggered\n\n"
+                    f"Channel: Channel {channel + 1}\n"
+                    f"Trigger: {trigger}\n"
+                    f"State: {state}\n"
+                    f"Message: {message}\n"
+                    f"Contact: {contact}\n"
+                )
 
-        # Reset latch when condition clears
-        elif not triggered and prev_state:
-            DIGITAL_ALARM_STATE[alarm_id] = False
+                log_warn(f"[DIGITAL ALARM] CH{channel + 1}: {message}")
+
+                if email:
+                    send_email(email, subject, body)
+                else:
+                    log_error(
+                        f"[DIGITAL ALARM] No email configured for CH{channel + 1}"
+                    )
+
+        else:
+            # Condition cleared → reset latch & timer
+            DIGITAL_ALARM_STATE.pop(key, None)
+            DIGITAL_ALARM_TIMER.pop(key, None)
 
 
 # ==================================================
@@ -2734,12 +2778,16 @@ def read_modbus_devices(instruments):
                 try:
                     # ===== RANDOM MODE =====
                     if generate:
-                        min_v = safe_float(reg.get("process_min"), 0.0)
-                        max_v = safe_float(reg.get("process_max"), 100.0)
+                        # min_v = safe_float(reg.get("process_min"), 0.0)
+                        # max_v = safe_float(reg.get("process_max"), 100.0)
+                        min_v = 0
+                        max_v = 250
                         if min_v > max_v:
                             min_v, max_v = max_v, min_v
                         value = round(random.uniform(min_v, max_v), 3)
+                        readings[key] = value
                         log_info(f"[ENERGY][RANDOM] {key} = {value}")
+                        continue
 
                     # ===== REAL MODBUS =====
                     else:
@@ -2832,9 +2880,9 @@ def read_modbus_devices(instruments):
                         if isinstance(value, (int, float)):
                             if math.isnan(value) or math.isinf(value):
                                 value = None
-                        
-                    readings[key] = value
-                    log_info(f"[INFO] The reading for {slave_id} after conversion is {value} for sid {slave_id}")
+                    if not generate:
+                        readings[key] = value
+                        log_info(f"[INFO] The reading for {slave_id} after conversion is {value} for sid {slave_id}")
 
                 except Exception as e:
                     log_error(f"[ENERGY] Failed {key}: {e}")
@@ -2843,7 +2891,7 @@ def read_modbus_devices(instruments):
 
 
 
-def read_modbus_devices_setup_every_time(instruments,emit_cb:None):
+def read_modbus_devices_setup_every_time(instruments):
     readings = {}
 
     devices = (
@@ -2989,8 +3037,6 @@ def read_modbus_devices_setup_every_time(instruments,emit_cb:None):
                                 value = None
                         
                     readings[key] = value
-                    if emit_cb:
-                        emit_cb({key: value})
                     log_info(f"[INFO] The reading for {slave_id} after conversion is {value} for sid {slave_id}")
 
                 except Exception as e:
@@ -3045,7 +3091,7 @@ def insert_energy_data(timestamp, readings):
             log_warn(f"[ENERGY][DB] Invalid key format: {key}")
             continue
 
-        col = safe_col_name(tag)   # ONLY tag name
+        col = tag  # ONLY tag name
         grouped.setdefault((brand, slave_id), {})[col] = value
 
     for (brand, slave_id), values in grouped.items():
@@ -4077,33 +4123,37 @@ def process_modbus_tcp_alarms(
                 f"{value} {condition} {threshold}"
             )
 
+ANALOG_ALARM_STATE = {}  # {(channel, alert_index): first_trigger_time}
 
 def process_analog_alarms(analog_readings):
-    analog_alarms = config.get("alarmSettings", {}).get("Analog", {})
+    analog_cfg = config.get("alarmSettings", {}).get("Analog", {})
 
-    for alarm_channel, cfg in analog_alarms.items():
-        analog_key = map_alarm_channel_to_analog_key(alarm_channel)
-        log_info(
-            f"[DEBUG] Processing alarm for channel {alarm_channel} mapped to {analog_key}"
-        )
-        if not analog_key:
+    now = time.time()
+
+    for channel_str, channel_cfg in analog_cfg.items():
+        try:
+            channel = int(channel_str)
+        except ValueError:
+            log_error(f"[ALARM] Invalid analog channel key: {channel_str}")
             continue
 
-        if analog_key not in analog_readings:
+        if channel not in analog_readings:
             continue
 
-        value = analog_readings[analog_key]
-        log_info(f"[DEBUG] Alarm check for {alarm_channel} value: {value}")
-        alerts = cfg.get("alerts", [])
-        for alert in alerts:
+        value = analog_readings[channel]
+        alerts = channel_cfg.get("alerts", [])
+
+        for idx, alert in enumerate(alerts):
             if not alert.get("enabled", False):
+                ANALOG_ALARM_STATE.pop((channel, idx), None)
                 continue
 
             condition = alert.get("condition")
             threshold = alert.get("threshold")
-            message = alert.get("message", "No additional message provided.")
-
-            log_info(f"[DEBUG] Alarm condition: {condition} {threshold}")
+            delay = int(alert.get("delay", 0))
+            email = alert.get("email", "")
+            contact = alert.get("contact", "")
+            message = alert.get("message", "")
 
             if threshold in ("", None):
                 continue
@@ -4114,54 +4164,59 @@ def process_analog_alarms(analog_readings):
                 continue
 
             if evaluate_condition(value, condition, threshold):
-                subject = f"[ALERT] Analog Alarm Triggered – {alarm_channel}"
+                key = (channel, idx)
+
+                # Start delay timer
+                if key not in ANALOG_ALARM_STATE:
+                    ANALOG_ALARM_STATE[key] = now
+                    log_info(
+                        f"[ALARM] Channel {channel} condition met, delay started ({delay}s)"
+                    )
+                    continue
+
+                # Check delay expiry
+                if now - ANALOG_ALARM_STATE[key] < delay:
+                    continue
+
+                # ---- ALARM FIRED ----
+                ANALOG_ALARM_STATE.pop(key, None)
+
+                subject = f"[ALERT] Analog Alarm – Channel {channel}"
 
                 body = f"""
                 <html>
-                <body style="font-family: Arial, sans-serif; color: #000;">
-                    <h2 style="color: #b30000;">⚠ Analog Alarm Triggered</h2>
-
-                    <table cellpadding="6" cellspacing="0" border="1" style="border-collapse: collapse;">
-                    <tr>
-                        <td><b>Channel</b></td>
-                        <td>{alarm_channel}</td>
-                    </tr>
-                    <tr>
-                        <td><b>Current Value</b></td>
-                        <td>{value}</td>
-                    </tr>
-                    <tr>
-                        <td><b>Condition</b></td>
-                        <td>{condition} {threshold}</td>
-                    </tr>
-                    <tr>
-                        <td><b>Message</b></td>
-                        <td>{message}</td>
-                    </tr>
-                    <tr>
-                        <td><b>Timestamp (IST)</b></td>
-                        <td>{datetime.now(timezone.utc).astimezone(ZoneInfo("Asia/Kolkata")).strftime('%Y-%m-%d %H:%M:%S')}</td>
-                    </tr>
-
+                <body style="font-family: Arial;">
+                    <h2 style="color:#b30000;">⚠ Analog Alarm Triggered</h2>
+                    <table border="1" cellpadding="6" cellspacing="0">
+                        <tr><td><b>Channel</b></td><td>{channel}</td></tr>
+                        <tr><td><b>Value</b></td><td>{value}</td></tr>
+                        <tr><td><b>Condition</b></td><td>{condition} {threshold}</td></tr>
+                        <tr><td><b>Message</b></td><td>{message}</td></tr>
+                        <tr><td><b>Timestamp (IST)</b></td>
+                            <td>{datetime.now(timezone.utc).astimezone(
+                                ZoneInfo("Asia/Kolkata")
+                            ).strftime('%Y-%m-%d %H:%M:%S')}</td>
+                        </tr>
                     </table>
-
-                    <p style="margin-top: 12px;">
-                    This is an automated alert generated by the Data Logger System.
-                    </p>
                 </body>
                 </html>
                 """
 
-                # Send SMS if configured
-                to_mail = alert.get("email")
-                if to_mail:
-                    log_info(f"[ALARM] Sending email to {to_mail}")
-                    send_email(to_mail, subject, body)
+                if email:
+                    log_info(f"[ALARM] Sending email to {email}")
+                    send_email(email, subject, body)
+
+                if contact:
+                    log_info(f"[ALARM] Contact configured (SMS pending): {contact}")
+                    # send_sms(contact, ...)
 
                 log_error(
-                    f"[ALARM] {alarm_channel} violated: "
-                    f"{value} {condition} {threshold}"
+                    f"[ALARM] Channel {channel} violated: {value} {condition} {threshold}"
                 )
+
+            else:
+                # Reset delay timer if condition clears
+                ANALOG_ALARM_STATE.pop((channel, idx), None)
 
 
 def analog_reader_loop():
@@ -4214,26 +4269,34 @@ def insert_digital_data(timestamp, readings):
             log_error("[DIGITAL] db_name missing in config")
             return
 
-        channels = digital_cfg.get("channels", [])
+        di_channels = DIGITAL_INPUT_CONFIG.get("channels", [])
+        do_channels = DIGITAL_OUTPUT_CHANNELS
+
 
         values = {}
-
+        
         for key, raw_val in readings.items():
             try:
-                # Expect key like digital_ch_0
                 idx = int(key.split("_")[-1])
             except Exception:
                 log_error(f"[DIGITAL] Invalid reading key: {key}")
                 continue
 
-            # Get channel name from config
-            ch_name = (
-                channels[idx].get("name")
-                if idx < len(channels) and isinstance(channels[idx], dict)
-                else f"digital_ch_{idx}"
-            )
+            if key.startswith("digital_out_"):
+                ch_name = (
+                    do_channels[idx].get("name")
+                    if idx < len(do_channels)
+                    else f"digital_out_{idx}"
+                )
+            else:
+                ch_name = (
+                    di_channels[idx].get("name")
+                    if idx < len(di_channels)
+                    else f"digital_ch_{idx}"
+                )
 
             values[ch_name] = int(bool(raw_val))
+
 
         if not values:
             log_error("[DIGITAL] No valid digital values to insert")
@@ -4332,6 +4395,8 @@ def insert_digital_into_single_db(db_cred, table, database, timestamp, values):
     finally:
         if conn:
             conn.close()
+
+
 def setup_gpio_input(gpio_num):
     """
     Ensures the GPIO is exported and set to 'in' direction.
@@ -4403,6 +4468,7 @@ def read_digital_inputs(di_channels, generate=False):
             log_error(f"[DI][ERROR] CH{idx} (pin={pin}): {e}")
 
     return readings
+
 
 def read_digital_inputs_gpio(di_channels, generate=False):
     readings = {}
@@ -4525,7 +4591,9 @@ def send_email(to_email, subject, body):
         msg["From"] = smtp_user
         msg["To"] = to_email
 
+        log_info(f"[INFO] Message for mail: {msg}")
         server = smtplib.SMTP(smtp_server, smtp_port)
+        log_info(f"[INFO] Server: {server}")
         server.starttls()
         server.login(smtp_user, smtp_pass)
         server.send_message(msg)
@@ -4542,6 +4610,7 @@ def modbus_db_writer_loop():
         try:
             ts, reading = MODBUS_DB_QUEUE.get(timeout=0.5)
             insert_energy_data(ts, reading)
+            check_modbus_alarms(reading)
             MODBUS_DB_QUEUE.task_done()
 
         except queue.Empty:
@@ -4569,14 +4638,13 @@ def modbus_reader_loop():
                     .astimezone(ZoneInfo("Asia/Kolkata"))\
                     .strftime("%Y-%m-%d %H:%M:%S")
 
-                def emit_cb(single_reading):
-                    MODBUS_DB_QUEUE.put((ts, single_reading))
 
                 with RS485_LOCK:
-                    read_modbus_devices_setup_every_time(
-                        instruments,
-                        emit_cb=emit_cb
+                    readings = read_modbus_devices_setup_every_time(
+                        instruments
                     )
+                    MODBUS_DB_QUEUE.put((ts, readings))
+                    log_info(f"[INFO] Readings: {readings}")
 
                 last_poll = time.time()
 
@@ -5680,6 +5748,7 @@ def setup_4g(apn):
 
 # ---------------- STATIC ETHERNET (DHCP + STATIC IP) ----------------
 ETH_CONNECTION = "Wired connection 1"
+ETH_CONNECTION2 = "Wired connection 2"
 
 # ---------------- ETH IP CHECK ----------------
 def eth0_has_ip(ip):
@@ -5706,32 +5775,24 @@ def eth0_has_ip(ip):
         return False
 
 
-def apply_static_ethernet_dhcp(static_cfg, prev_cfg):
+def apply_static_ethernet(static_cfg, iface, prev_cfg):
     """
-    Apply DHCP + secondary static IP + forced DNS
-    ONLY if config changed.
+    Apply DHCP or DHCP + secondary static IP on a given interface
     """
-
-    # enabled = static_cfg.get("enabled", False)
-    # ip = static_cfg.get("ip", "")
-
-    # # 🔒 HARD GUARD: IP already present on eth0
-    # if enabled and ip and eth0_has_ip(ip):
-    #     log_info(f"[ETH] Static IP {ip} already present on eth0 — skipping nmcli")
-    #     return static_cfg
+    iface = ETH_CONNECTION2 if iface=="eth1" else ETH_CONNECTION
 
     if static_cfg == prev_cfg:
-        log_info("[ETH] No static ethernet change")
+        log_info(f"[{iface}] No config change")
         return static_cfg
-    log_info("[ETH] Applying DHCP + static IP on Ethernet")
 
     enabled = static_cfg.get("enabled", False)
 
     try:
         if not enabled:
-            # Remove static IP and restore DHCP DNS
+            log_info(f"[{iface}] Restoring pure DHCP")
+
             subprocess.run([
-                "sudo", "nmcli", "con", "mod", ETH_CONNECTION,
+                "sudo", "nmcli", "con", "mod", iface,
                 "ipv4.addresses", "",
                 "ipv4.method", "auto",
                 "ipv4.ignore-auto-dns", "no",
@@ -5739,90 +5800,89 @@ def apply_static_ethernet_dhcp(static_cfg, prev_cfg):
             ], check=False)
 
         else:
-            ip = static_cfg.get("ip", "")
-            subnet = static_cfg.get("subnet", "")
+            ip = static_cfg.get("ip")
+            subnet = static_cfg.get("subnet")
 
             if not ip or not subnet:
-                log.warning("[ETH] Static IP enabled but IP/subnet missing")
+                log_warning(f"[{iface}] Static enabled but IP/subnet missing")
                 return prev_cfg
 
-            # subnet mask -> CIDR
             cidr = sum(bin(int(x)).count("1") for x in subnet.split("."))
             addr = f"{ip}/{cidr}"
 
             dns1 = static_cfg.get("dns_primary", "")
             dns2 = static_cfg.get("dns_secondary", "")
-            gateway = static_cfg.get("gateway","")
             dns = " ".join(d for d in [dns1, dns2] if d)
 
-            # DHCP + secondary IP
+            log_info(f"[{iface}] Applying DHCP + static {addr}")
+
             subprocess.run([
-                "sudo", "nmcli", "con", "mod", ETH_CONNECTION,
+                "sudo", "nmcli", "con", "mod", iface,
                 "ipv4.method", "auto",
-                "ipv4.addresses", addr,
-                # "ipv4.gateway",gateway
+                "ipv4.addresses", addr
             ], check=True)
 
-            # Force DNS
             subprocess.run([
-                "sudo", "nmcli", "con", "mod", ETH_CONNECTION,
+                "sudo", "nmcli", "con", "mod", iface,
                 "ipv4.ignore-auto-dns", "yes"
             ], check=True)
 
             if dns:
                 subprocess.run([
-                    "sudo", "nmcli", "con", "mod", ETH_CONNECTION,
+                    "sudo", "nmcli", "con", "mod", iface,
                     "ipv4.dns", dns
                 ], check=True)
 
-        # Restart ONLY ethernet
-        subprocess.run(["sudo", "nmcli", "con", "down", ETH_CONNECTION], check=False)
-        subprocess.run(["sudo", "nmcli", "con", "up", ETH_CONNECTION], check=False)
+        subprocess.run(["sudo", "nmcli", "con", "down", iface], check=False)
+        subprocess.run(["sudo", "nmcli", "con", "up", iface], check=False)
 
-        log_info("[ETH] Static ethernet applied successfully")
+        log_info(f"[{iface}] Network applied successfully")
         return static_cfg
 
-    except Exception as e:
-        log.exception("[ETH] Failed to apply static ethernet")
+    except Exception:
+        log.exception(f"[{iface}] Failed to apply network config")
         return prev_cfg
 
 
 def network_watcher_loop():
     log_info("[INFO] Network watcher started")
-    local_version = -1
-    first_time = True
-    
+
+    prev_static = {}
+    prev_static2 = {}
+
     while not STOP_EVENT.is_set():
         try:
-            # Check if we need to force a network re-check based on Global Config
-            force_update = (local_version != CONFIG_VERSION)
-            updated_flag = load_json(UPDATED_FILE, False)
-
-            if not updated_flag and not first_time and not force_update:
-                time.sleep(5)
-                continue
-
             config_data = load_json(CONFIG_FILE, {})
             network = config_data.get("network", {})
-            static_ip =  network.get("static", {})
-            
-            # Apply network logic (WiFi/4G/Static)
-            log_info("[NETWORK] Validating/Applying connection settings...")
-            connect_wifi(network.get("wifi", {}).get("ssid", ""), network.get("wifi", {}).get("password", ""))
+
+            # WiFi & 4G (still unconditional — acceptable for now)
+            connect_wifi(
+                network.get("wifi", {}).get("ssid", ""),
+                network.get("wifi", {}).get("password", "")
+            )
             setup_4g(network.get("sim4g", {}).get("apn", ""))
 
-            apply_static_ethernet_dhcp(
+            # ---- ETH0 ----
+            prev_static = apply_static_ethernet(
                 network.get("static", {}),
-                {}
+                "eth0",
+                prev_static
+            )
+
+            # ---- ETH1 / STATIC2 ----
+            static2 = network.get("static2", {})
+            iface2 = static2.get("iface")
+
+            if iface2:
+                prev_static2 = apply_static_ethernet(
+                    static2,
+                    iface2,
+                    prev_static2
                 )
-            
-            local_version = CONFIG_VERSION
-            first_time = False
-            write_json(STATE_FILE, network) # Save current state
-            
+
         except Exception as e:
-            log_error(f"[NETWORK] Watcher Error: {e}")
-        
+            log_error(f"[NETWORK] Watcher error: {e}")
+
         time.sleep(10)
 
 

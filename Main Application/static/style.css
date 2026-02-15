@@ -725,3 +725,132 @@ fieldset:has([data-freq-field]) legend {
   padding: 5px 10px;
   border-radius: 4px;
 }
+
+
+/* Tab content blocks */
+#wifi-tab,
+#sim-tab,
+#static-tab,
+#static2-tab {
+  background: #ffffff;
+  padding: 22px;
+  min-height: 260px;
+  border-radius: 0 0 8px 8px;
+}
+
+/* Fieldsets */
+#wifi-tab fieldset,
+#sim-tab fieldset,
+#static-tab fieldset,
+#static2-tab fieldset {
+  background: #f9fafb;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+/* Labels */
+#wifi-tab label,
+#sim-tab label,
+#static-tab label,
+#static2-tab label {
+  display: block;
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+}
+
+/* Inputs & selects */
+#wifi-ssid,
+#wifi-password,
+#apn-provider,
+#apn-value,
+#static1-ip,
+#static1-subnet,
+#static1-gw,
+#static1-dns1,
+#static1-dns2,
+#static2-ip,
+#static2-subnet,
+#static2-gw,
+#static2-dns1,
+#static2-dns2 {
+  width: 100%;
+  margin-top: 4px;
+  padding: 8px 10px;
+  font-size: 14px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+}
+
+#wifi-ssid:focus,
+#wifi-password:focus,
+#apn-provider:focus,
+#apn-value:focus,
+#static1-ip:focus,
+#static1-subnet:focus,
+#static1-gw:focus,
+#static1-dns1:focus,
+#static1-dns2:focus,
+#static2-ip:focus,
+#static2-subnet:focus,
+#static2-gw:focus,
+#static2-dns1:focus,
+#static2-dns2:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.35);
+}
+
+/* Disabled inputs */
+#wifi-tab input:disabled,
+#sim-tab input:disabled,
+#static-tab input:disabled,
+#static2-tab input:disabled {
+  background: #e5e7eb;
+  color: #6b7280;
+}
+
+/* Checkboxes */
+#static1-enable,
+#static2-enable {
+  transform: scale(1.1);
+  margin-right: 6px;
+}
+
+/* Buttons */
+#save-wifi,
+#save-sim,
+#save-static,
+#save-static2 {
+  margin-top: 14px;
+  padding: 10px 18px;
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+#save-wifi:hover,
+#save-sim:hover,
+#save-static:hover,
+#save-static2:hover {
+  background: #1e40af;
+}
+
+/* Checkmarks */
+#wifi-tick,
+#sim-tick,
+#static1-tick,
+#static2-tick {
+  margin-left: 10px;
+  font-size: 18px;
+  font-weight: bold;
+  color: #16a34a;
+}

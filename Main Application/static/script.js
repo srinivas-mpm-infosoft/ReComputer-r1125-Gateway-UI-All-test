@@ -14,6 +14,11 @@ let config = {};
 //    })
 //    .catch(err => console.error("Error loading config", err));
 //}
+
+function isReadOnly() {
+  return uiState.role === "user" || uiState.role === "guest";
+}
+
 async function loadConfig() {
   const res = await fetch("/config");
   const cfg = await res.json();
@@ -22,6 +27,10 @@ async function loadConfig() {
 }
 
 async function saveConfig() {
+  if (isReadOnly()) {
+    alert("User can only view. Changes are not allowed.");
+    return;
+  }
   console.log("Config: ", config);
 
   const res = await fetch("/config", {
@@ -44,7 +53,7 @@ if (!config.ioSettings.analog)
     channels: [
       {
         enabled: true,
-        mode: "0-10V",
+        mode: "0.-2.048V",
         range: "0-5V",
         resolution: "16 bit",
       },
@@ -109,11 +118,11 @@ function updateAnalogRange(index, selected = "") {
 
   let options = [];
 
-  if (mode === "0-10V") {
+  if (mode === "0.-2.048V") {
     options = [
       { v: "0-10", l: "0–10 V" },
-      { v: "0-5",  l: "0–5 V" },
-      { v: "0-2",  l: "0–2 V" },
+      { v: "0-5", l: "0–5 V" },
+      { v: "0-2", l: "0–2 V" },
     ];
   } else if (mode === "4-20mA") {
     options = [
@@ -166,17 +175,24 @@ function renderDBSettings(prefix, db, opts = {}) {
         </label>
 ${canSeeDbFields
       ? `
+      <label>
+              <b>Database Name</b>
       <input type="text"
         name="${prefix}_db_name"
         placeholder="Database name"
         value="${db.db_name || "ifex_demo"}"
         style="width:140px;">
 
+        </label>
+
+        <label>
+                <b>Table Name</b>
       <input type="text"
         name="${prefix}_table_name"
         placeholder="Table name"
         value="${db.table_name || ""}"
         style="width:140px;">
+        </label>
     `
       : `
       <input type="hidden"
@@ -251,16 +267,61 @@ function addAI() {
   config.ioSettings.analog.channels.push({
     name: `AI${config.ioSettings.analog.channels.length + 1}`,
     enabled: false,
-    mode: "0-10V",
+    mode: "0.-2.048V",
     range: "",
     address: "",
   });
-  renderIOSettingsPanel("Analog");
+  renderIOSettingsPanel("Analog I/O");
 }
+
+function addAO() {
+  config.ioSettings.analogOutput.channels.push({
+    name: `AO${config.ioSettings.analogOutput.channels.length + 1}`,
+    enabled: false,
+    mode: "0-10V",
+    range: "",
+    address: ""
+  });
+  renderIOSettingsPanel("Analog I/O");
+}
+
+function removeAO(index) {
+  config.ioSettings.analogOutput.channels.splice(index, 1);
+  renderIOSettingsPanel("Analog I/O");
+}
+
 
 function removeAI(index) {
   config.ioSettings.analog.channels.splice(index, 1);
-  renderIOSettingsPanel("Analog");
+  renderIOSettingsPanel("Analog I/O");
+}
+
+function getAnalogMin(range) {
+  if (!range || !range.includes(":")) return "";
+  const [min] = range.split(":");
+  return min;
+}
+
+function getAnalogMax(range) {
+  const [min, max] = range
+  .match(/-?\d+(\.\d+)?/g)
+  ?.map(Number) || [];
+  return max;
+}
+
+function addRelay() {
+  config.ioSettings.digitalRelay.channels.push({
+    name: `R${config.ioSettings.digitalRelay.channels.length + 1}`,
+    enabled: false,
+    pin: "",
+    mode: "NO"
+  });
+  renderIOSettingsPanel("Digital I/O");
+}
+
+function removeRelay(index) {
+  config.ioSettings.digitalRelay.channels.splice(index, 1);
+  renderIOSettingsPanel("Digital I/O");
 }
 
 
@@ -270,10 +331,15 @@ function renderIOSettingsPanel(subTab = "Settings") {
 
   /* ---------- SAFETY DEFAULTS ---------- */
   io.analog ??= {};
+  io.analogOutput ??= {};
+io.analogOutput.channels ??= [
+  { name: "AO1", enabled: false, mode: "0-10V", range: "", address: "" }
+];
+
   io.analog.pollingInterval ??= 5;
   io.analog.pollingIntervalUnit ??= "Sec";
   io.analog.channels ??= [
-    { name: "AI1", enabled: false, mode: "0-10V", range: "", address: "" },
+    { name: "AI1", enabled: false, mode: "0.-2.048V", range: "", address: "" },
   ];
   io.analog.db ??= {
     upload_local: true,
@@ -286,8 +352,8 @@ function renderIOSettingsPanel(subTab = "Settings") {
   io.digitalInput.pollingInterval ??= 1;
   io.digitalInput.pollingIntervalUnit ??= "Sec";
   io.digitalInput.channels ??= [
-    { name: "DI1", enabled: false, pin: ""  },
-    { name: "DI2", enabled: false,  pin: ""  },
+    { name: "DI1", enabled: false, pin: "" },
+    { name: "DI2", enabled: false, pin: "" },
   ];
   io.digitalInput.db ??= {
     upload_local: true,
@@ -298,191 +364,324 @@ function renderIOSettingsPanel(subTab = "Settings") {
 
   io.digitalOutput ??= {};
   io.digitalOutput.channels ??= [
-    { name: "DO1", state: 0,  pin: ""  },
-    { name: "DO2", state: 0,  pin: ""  },
+    { name: "DO1", state: 0, pin: "" },
+    { name: "DO2", state: 0, pin: "" },
   ];
 
-  let html = `
-      <div class="panel-header">I/O Settings</div>
-      <div class="tab-list">
-        ${["Settings", "Analog", "Digital I/O"]
+  io.digitalRelay ??= {};
+io.digitalRelay.channels ??= [
+  { name: "R1", enabled: false, pin: "", mode: "NO" }
+];
+
+
+let html = `
+  <div class="panel-header">I/O Settings</div>
+
+  <div class="tab-list">
+    ${["Settings", "Analog I/O", "Digital I/O", "Modbus RTU", "Modbus TCP"]
       .map(
         (t) => `
           <button class="tab-btn ${subTab === t ? "active" : ""}"
-                  data-tab="${t}">${t}</button>
-        `,
+                  data-tab="${t}">
+            ${t}
+          </button>`
       )
       .join("")}
-      </div>
-      <div class="tab-content">
-    `;
+  </div>
 
-  /* ================= SETTINGS ================= */
-  if (subTab === "Settings") {
-    html += `
-        <form id="io-settings-form">
-          <label><input type="checkbox" name="modbus" ${io.settings.modbus ? "checked" : ""}> Modbus RTU</label>
-          <label><input type="checkbox" name="modbusTCP" ${io.settings.modbusTCP ? "checked" : ""}> Modbus TCP</label>
-          <label><input type="checkbox" name="analog" ${io.settings.analog ? "checked" : ""}> Analog</label>
-          <label><input type="checkbox" name="digitalInput" ${io.settings.digitalInput ? "checked" : ""}> Digital I/O</label>
-          <br><br>
-          <button class="button-primary" type="submit">Save</button>
-        </form>
-      `;
-  }
+  <div class="tab-content">
+    <div id="io-tab-mount"></div>
+  </div>
+`;
 
-  /* ================= ANALOG ================= */
-  if (subTab === "Analog") {
-    const a = io.analog;
-  
-    html += `
-  <form id="analog-form">
-  <h3>Analog Input</h3>
-  
-  <label><input type="radio" name="intervalUnit" value="Sec" ${a.pollingIntervalUnit === "Sec" ? "checked" : ""}> Sec</label>
-  <label><input type="radio" name="intervalUnit" value="Min" ${a.pollingIntervalUnit === "Min" ? "checked" : ""}> Min</label>
-  <label><input type="radio" name="intervalUnit" value="Hour" ${a.pollingIntervalUnit === "Hour" ? "checked" : ""}> Hour</label>
-  
-  &nbsp; Polling:
-  <input type="number" name="pollingInterval" value="${a.pollingInterval}" min="1" style="width:70px;">
-  
-  <br><br>
-  
-  <table class="channel-table">
-  <tr>
-    <th>Channel</th>
-    <th>Name</th>
-    <th>Enable</th>
-    <th>Mode</th>
-    <th>Scaling</th>
-    <th>Address</th>
-    <th></th>
-  </tr>
-  
-  ${a.channels.map((ch, i) => `
-  <tr>
-    <td>AI ${i + 1}</td>
-    <td><input name="ai_name_${i}" value="${ch.name}"></td>
-    <td><input type="checkbox" name="ai_enable_${i}" ${ch.enabled ? "checked" : ""}></td>
-  
-    <td>
-      <select name="ai_mode_${i}" onchange="updateAnalogRange(${i})">
-        <option value="0-10V" ${ch.mode === "0-10V" ? "selected" : ""}>0–2.048V</option>
-        <option value="4-20mA" ${ch.mode === "4-20mA" ? "selected" : ""}>4–20mA</option>
-      </select>
-    </td>
-  
-    <td>
-      <select name="ai_range_${i}" id="ch_range_${i}"></select>
-    </td>
-  
-    <td>
-      <input name="ai_address_${i}" value="${ch.address ?? ""}" placeholder="Addr">
-    </td>
-  
-    <td>
-      <button type="button" onclick="removeAI(${i})">✕</button>
-    </td>
-  </tr>
-  `).join("")}
-  
-  </table>
-  
-  <button type="button" onclick="addAI()">+ Add Analog Input</button>
-  
-  ${renderDBSettings("analog", a.db)}
-  
-  <br>
-  <button class="button-primary" type="submit">Save</button>
-  </form>`;
-  }
-  
 
-  /* ================= DIGITAL ================= */
-  if (subTab === "Digital I/O") {
-    const di = io.digitalInput;
-    const doo = io.digitalOutput;
-  
-    html += `
-  <form id="digital-io-form">
-  
-  <h3>Digital Input</h3>
-  
-  <label>
-    Polling:
-    <input type="number" name="digitalPollingInterval"
-           value="${di.pollingInterval}" min="1" style="width:70px;">
-  </label>
-  
-  <label>
-    <select name="digitalIntervalUnit">
-      <option value="Sec" ${di.pollingIntervalUnit === "Sec" ? "selected" : ""}>Sec</option>
-      <option value="Min" ${di.pollingIntervalUnit === "Min" ? "selected" : ""}>Min</option>
-      <option value="Hour" ${di.pollingIntervalUnit === "Hour" ? "selected" : ""}>Hour</option>
-    </select>
-  </label>
-  
-  <br><br>
-  
-  <table class="channel-table">
-  <tr><th>Channel</th><th>Name</th><th>Pin</th><th>Enable</th><th></th></tr>
-  ${di.channels.map((ch, i) => `
-  <tr>
-    <td>DI ${i + 1}</td>
-    <td><input name="di_name_${i}" value="${ch.name}"></td>
-    <td><input name="di_pin_${i}" value="${ch.pin}" placeholder="GPIO"></td>
-    <td><input type="checkbox" name="di_enable_${i}" ${ch.enabled ? "checked" : ""}></td>
-    <td><button type="button" onclick="removeDI(${i})">✕</button></td>
-  </tr>
-  `).join("")}
-  </table>
-  
-  <button type="button" onclick="addDI()">+ Add Digital I/O</button>
-  
-  <br><br>
-  
-  <h3>Digital Output</h3>
-  
-  <table class="channel-table">
-  <tr><th>Channel</th><th>Name</th><th>Pin</th><th>State</th><th></th></tr>
-  ${doo.channels.map((ch, i) => `
-  <tr>
-    <td>DO ${i + 1}</td>
-    <td><input name="do_name_${i}" value="${ch.name}"></td>
-    <td><input name="do_pin_${i}" value="${ch.pin}" placeholder="GPIO"></td>
-    <td>
-      <select name="do_state_${i}">
-        <option value="0" ${ch.state === 0 ? "selected" : ""}>LOW</option>
-        <option value="1" ${ch.state === 1 ? "selected" : ""}>HIGH</option>
-      </select>
-    </td>
-    <td><button type="button" onclick="removeDO(${i})">✕</button></td>
-  </tr>
-  `).join("")}
-  </table>
-  
-  <button type="button" onclick="addDO()">+ Add Digital Output</button>
-  
-  ${renderDBSettings("digital", di.db)}
-  
-  <br>
-  <button class="button-primary" type="submit">Save</button>
-  
-  </form>`;
-  }
-  
+
 
   html += `</div>`;
   document.getElementById("main-panel").innerHTML = html;
+  const mount = document.getElementById("io-tab-mount");
+if (!mount) {
+  console.error("io-tab-mount not found");
+  return;
+}
+
+
+  /* ================= SETTINGS ================= */
+  if (subTab === "Settings") {
+    mount.innerHTML = `
+      <form id="io-settings-form">
+        <label><input type="checkbox" name="modbus" ${io.settings.modbus ? "checked" : ""}> Modbus RTU</label>
+        <label><input type="checkbox" name="modbusTCP" ${io.settings.modbusTCP ? "checked" : ""}> Modbus TCP</label>
+        <label><input type="checkbox" name="analog" ${io.settings.analog ? "checked" : ""}> Analog I/O</label>
+        <label><input type="checkbox" name="digitalInput" ${io.settings.digitalInput ? "checked" : ""}> Digital I/O</label>
+        <br><br>
+        <button class="button-primary" type="submit">Save</button>
+      </form>
+    `;
+}
+
+/* ================= ANALOG ================= */
+if (subTab === "Analog I/O") {
+  const a = io.analog;
+
+    mount.innerHTML = `
+<form id="analog-form">
+<h3>Analog Input</h3>
+
+<label><input type="radio" name="intervalUnit" value="Sec" ${a.pollingIntervalUnit === "Sec" ? "checked" : ""}> Sec</label>
+<label><input type="radio" name="intervalUnit" value="Min" ${a.pollingIntervalUnit === "Min" ? "checked" : ""}> Min</label>
+<label><input type="radio" name="intervalUnit" value="Hour" ${a.pollingIntervalUnit === "Hour" ? "checked" : ""}> Hour</label>
+
+&nbsp; Polling:
+<input type="number" name="pollingInterval" value="${a.pollingInterval}" min="1" style="width:70px;">
+
+<br><br>
+
+<table class="channel-table">
+<tr>
+  <th>Channel</th>
+  <th>Name</th>
+  <th>Enable</th>
+  <th>Electrical Range</th>
+<th>Process Min</th>
+<th>Process Max</th>
+
+  <th>Address</th>
+  <th></th>
+</tr>
+
+${a.channels.map((ch, i) => `
+<tr>
+  <td>AI ${i + 1}</td>
+  <td><input name="ai_name_${i}" value="${ch.name}"></td>
+  <td><input type="checkbox" name="ai_enable_${i}" ${ch.enabled ? "checked" : ""}></td>
+
+  <td>
+    <select name="ai_mode_${i}" onchange="updateAnalogRange(${i})">
+      <option value="0.-2.048V" ${ch.mode === "0.-2.048V" ? "selected" : ""}>0–2.048V</option>
+      <option value="4-20mA" ${ch.mode === "4-20mA" ? "selected" : ""}>4–20mA</option>
+    </select>
+  </td>
+<td>
+<input type="number"
+  step="any"
+  name="ai_min_${i}"
+  value="${getAnalogMin(ch.range)}"
+  style="width:90px;">
+</td>
+
+<td>
+<input type="number"
+  step="any"
+  name="ai_max_${i}"
+  value="${getAnalogMax(ch.range)}"
+  style="width:90px;">
+</td>
+
+  <td>
+    <input name="ai_address_${i}" value="${ch.address ?? ""}" placeholder="Addr">
+  </td>
+
+  <td>
+    <button type="button" onclick="removeAI(${i})">✕</button>
+  </td>
+</tr>
+`).join("")}
+
+</table>
+
+<button type="button" onclick="addAI()">+ Add Analog Input</button>
+
+
+<h3 style="margin-top:20px;">Analog Output</h3>
+
+<table class="channel-table">
+<tr>
+<th>Channel</th>
+<th>Name</th>
+<th>Enable</th>
+<th>Electrical Range</th>
+<th>Process Min</th>
+<th>Process Max</th>
+<th>Address</th>
+<th></th>
+</tr>
+
+${io.analogOutput.channels.map((ch, i) => `
+<tr>
+<td>AO ${i + 1}</td>
+<td><input name="ao_name_${i}" value="${ch.name}"></td>
+<td><input type="checkbox" name="ao_enable_${i}" ${ch.enabled ? "checked" : ""}></td>
+
+<td>
+  <select name="ao_mode_${i}">
+    <option value="0-10V" ${ch.mode === "0-10V" ? "selected" : ""}>0–10V</option>
+    <option value="4-20mA" ${ch.mode === "4-20mA" ? "selected" : ""}>4–20mA</option>
+  </select>
+</td>
+
+<td><input type="number" step="any" name="ao_min_${i}" value="${getAnalogMin(ch.range)}"></td>
+<td><input type="number" step="any" name="ao_max_${i}" value="${getAnalogMax(ch.range)}"></td>
+
+<td><input name="ao_address_${i}" value="${ch.address || ""}"></td>
+
+<td><button type="button" onclick="removeAO(${i})">✕</button></td>
+</tr>
+`).join("")}
+</table>
+
+<button type="button" onclick="addAO()">+ Add Analog Output</button>
+
+
+${renderDBSettings("analog", a.db)}
+
+<br>
+<button class="button-primary" type="submit">Save</button>
+</form>`;
+}
+
+
+/* ================= DIGITAL ================= */
+if (subTab === "Digital I/O") {
+  const di = io.digitalInput;
+  const doo = io.digitalOutput;
+
+    mount.innerHTML = `
+<form id="digital-io-form">
+
+<h3>Digital Input</h3>
+
+<label>
+  Polling:
+  <input type="number" name="digitalPollingInterval"
+         value="${di.pollingInterval}" min="1" style="width:70px;">
+</label>
+
+<label>
+  <select name="digitalIntervalUnit">
+    <option value="Sec" ${di.pollingIntervalUnit === "Sec" ? "selected" : ""}>Sec</option>
+    <option value="Min" ${di.pollingIntervalUnit === "Min" ? "selected" : ""}>Min</option>
+    <option value="Hour" ${di.pollingIntervalUnit === "Hour" ? "selected" : ""}>Hour</option>
+  </select>
+</label>
+
+<br><br>
+
+<table class="channel-table">
+<tr><th>Channel</th><th>Name</th><th>Pin</th><th>Enable</th><th></th></tr>
+${di.channels.map((ch, i) => `
+<tr>
+  <td>DI ${i + 1}</td>
+  <td><input name="di_name_${i}" value="${ch.name}"></td>
+  <td><input name="di_pin_${i}" value="${ch.pin}" placeholder="GPIO"></td>
+  <td><input type="checkbox" name="di_enable_${i}" ${ch.enabled ? "checked" : ""}></td>
+  <td><button type="button" onclick="removeDI(${i})">✕</button></td>
+</tr>
+`).join("")}
+</table>
+
+<button type="button" onclick="addDI()">+ Add Digital I/O</button>
+
+<br><br>
+
+<h3>Digital Output</h3>
+
+<table class="channel-table">
+<tr><th>Channel</th><th>Name</th><th>Pin</th><th>State</th><th></th></tr>
+${doo.channels.map((ch, i) => `
+<tr>
+  <td>DO ${i + 1}</td>
+  <td><input name="do_name_${i}" value="${ch.name}"></td>
+  <td><input name="do_pin_${i}" value="${ch.pin}" placeholder="GPIO"></td>
+  <td>
+    <select name="do_state_${i}">
+      <option value="0" ${ch.state === 0 ? "selected" : ""}>LOW</option>
+      <option value="1" ${ch.state === 1 ? "selected" : ""}>HIGH</option>
+    </select>
+  </td>
+  <td><button type="button" onclick="removeDO(${i})">✕</button></td>
+</tr>
+`).join("")}
+</table>
+
+<button type="button" onclick="addDO()">+ Add Digital Output</button>
+
+
+
+<h3 style="margin-top:20px;">Relay Output</h3>
+
+<table class="channel-table">
+<tr>
+<th>Relay</th>
+<th>Name</th>
+<th>Pin</th>
+<th>Mode</th>
+<th>Enable</th>
+<th></th>
+</tr>
+
+${io.digitalRelay.channels.map((ch, i) => `
+<tr>
+<td>R${i + 1}</td>
+
+<td>
+  <input name="ro_name_${i}" value="${ch.name}">
+</td>
+
+<td>
+  <input name="ro_pin_${i}" value="${ch.pin}" placeholder="GPIO / Relay Addr">
+</td>
+
+<td>
+  <select name="ro_mode_${i}">
+    <option value="NO" ${ch.mode === "NO" ? "selected" : ""}>Normally Open</option>
+    <option value="NC" ${ch.mode === "NC" ? "selected" : ""}>Normally Closed</option>
+  </select>
+</td>
+
+<td>
+  <input type="checkbox" name="ro_enable_${i}" ${ch.enabled ? "checked" : ""}>
+</td>
+
+<td>
+  <button type="button" onclick="removeRelay(${i})">✕</button>
+</td>
+</tr>
+`).join("")}
+</table>
+
+<button type="button" onclick="addRelay()">+ Add Relay</button>
+
+
+${renderDBSettings("digital", di.db)}
+
+<br>
+<button class="button-primary" type="submit">Save</button>
+
+</form>`;
+}
+
+if (subTab === "Modbus RTU") {
+  mount.innerHTML = `<div id="modbus-rtu-root"></div>`;
+  renderModBusRTUPanel("Devices", null, null, "modbus-rtu-root");
+}
+
+if (subTab === "Modbus TCP") {
+  mount.innerHTML = `<div id="modbus-tcp-root"></div>`;
+  renderModbusTcpPanel("modbus-tcp-root");
+}
 
   /* ================= TAB CLICK (FIXED) ================= */
   document.querySelectorAll(".tab-btn").forEach((btn) => {
-    btn.onclick = (e) => {
-      if (btn.classList.contains("active")) return; // 🔥 prevent re-render loop
+    btn.onclick = () => {
+      if (btn.classList.contains("active")) return;
+      
+
       renderIOSettingsPanel(btn.dataset.tab);
     };
   });
   
+
   /* ================= SETTINGS SAVE HANDLER ================= */
   if (subTab === "Settings") {
     const f = document.getElementById("io-settings-form");
@@ -502,37 +701,82 @@ function renderIOSettingsPanel(subTab = "Settings") {
     }
   }
 
-  if (subTab === "Analog") {
+  if (subTab === "Analog I/O") {
     const a = config.ioSettings.analog;   // ✅ DEFINE IT HERE
     const f = document.getElementById("analog-form");
-  
+
     f.onsubmit = (e) => {
       e.preventDefault();
       const fd = new FormData(f);
-  
+
       a.pollingInterval = parseInt(fd.get("pollingInterval"), 10);
       a.pollingIntervalUnit = fd.get("intervalUnit");
-  
+
       a.channels = [];
+      config.ioSettings.analogOutput.channels = [];
+
+for (let i = 0; fd.get(`ai_name_${i}`) !== null; i++) {
+  const min = fd.get(`ai_min_${i}`);
+  const max = fd.get(`ai_max_${i}`);
+  const mode = fd.get(`ai_mode_${i}`)
+  let symbol = ""
+  if (mode.includes("mA")) symbol = "mA";
+  if (mode.includes("V")) symbol = "V";
   
-      for (let i = 0; fd.get(`ai_name_${i}`) !== null; i++) {
-        a.channels.push({
-          name: fd.get(`ai_name_${i}`).trim() || `AI${i + 1}`,
-          enabled: fd.get(`ai_enable_${i}`) === "on",
-          mode: fd.get(`ai_mode_${i}`),
-          range: fd.get(`ai_range_${i}`) || "",
-          address: fd.get(`ai_address_${i}`) || "",
-        });
-      }
-  
+  let range = "";
+  if (min !== "" && max !== "") {
+    if (Number(min) >= Number(max)) {
+      alert(`AI ${i + 1}: Process Min must be less than Process Max`);
+      return;
+    }
+    range = `${min}:${max}${symbol}`;
+  }
+
+  a.channels.push({
+    name: fd.get(`ai_name_${i}`).trim() || `AI${i + 1}`,
+    enabled: fd.get(`ai_enable_${i}`) === "on",
+    mode: mode,
+    range,          // 🔥 SAME FIELD AS BEFORE
+    address: fd.get(`ai_address_${i}`) || "",
+  });
+
+
+for (let i = 0; fd.get(`ao_name_${i}`) !== null; i++) {
+  const min = fd.get(`ao_min_${i}`);
+  const max = fd.get(`ao_max_${i}`);
+  const mode = fd.get(`ao_mode_${i}`);
+
+  let symbol = mode.includes("mA") ? "mA" : "V";
+  let range = "";
+
+  if (min !== "" && max !== "") {
+    if (Number(min) >= Number(max)) {
+      alert(`AO ${i + 1}: Process Min must be less than Process Max`);
+      return;
+    }
+    range = `${min}:${max}${symbol}`;
+  }
+
+  config.ioSettings.analogOutput.channels.push({
+    name: fd.get(`ao_name_${i}`) || `AO${i + 1}`,
+    enabled: fd.get(`ao_enable_${i}`) === "on",
+    mode,
+    range,
+    address: fd.get(`ao_address_${i}`) || ""
+  });
+}
+
+}
+
+
       a.db.upload_local = fd.get("analog_upload_local") === "on";
       a.db.upload_cloud = fd.get("analog_upload_cloud") === "on";
       a.db.db_name = fd.get("analog_db_name") || "";
       a.db.table_name = fd.get("analog_table_name") || "";
-  
+
       saveConfig();
     };
-  
+
     // ✅ SAFE: a is in scope here
     requestAnimationFrame(() => {
       a.channels.forEach((ch, i) => {
@@ -540,24 +784,24 @@ function renderIOSettingsPanel(subTab = "Settings") {
       });
     });
   }
-    
+
 
   if (subTab === "Digital I/O") {
     const f = document.getElementById("digital-io-form");
-  
+
     f.onsubmit = (e) => {
       e.preventDefault();
       const fd = new FormData(f);
-  
+
       const di = config.ioSettings.digitalInput;
       const doo = config.ioSettings.digitalOutput;
-  
+
       di.pollingInterval = parseInt(fd.get("digitalPollingInterval"), 10);
       di.pollingIntervalUnit = fd.get("digitalIntervalUnit");
-  
+
       di.channels = [];
       doo.channels = [];
-  
+
       for (let i = 0; fd.get(`di_name_${i}`) !== null; i++) {
         di.channels.push({
           name: fd.get(`di_name_${i}`).trim() || `DI${i + 1}`,
@@ -565,7 +809,7 @@ function renderIOSettingsPanel(subTab = "Settings") {
           pin: fd.get(`di_pin_${i}`) || "",
         });
       }
-  
+
       for (let i = 0; fd.get(`do_name_${i}`) !== null; i++) {
         doo.channels.push({
           name: fd.get(`do_name_${i}`).trim() || `DO${i + 1}`,
@@ -573,16 +817,30 @@ function renderIOSettingsPanel(subTab = "Settings") {
           pin: fd.get(`do_pin_${i}`) || "",
         });
       }
-  
+
       di.db.upload_local = fd.get("digital_upload_local") === "on";
       di.db.upload_cloud = fd.get("digital_upload_cloud") === "on";
       di.db.db_name = fd.get("digital_db_name") || "";
       di.db.table_name = fd.get("digital_table_name") || "";
-  
+
+      const ro = config.ioSettings.digitalRelay;
+ro.channels = [];
+
+for (let i = 0; fd.get(`ro_name_${i}`) !== null; i++) {
+  ro.channels.push({
+    name: fd.get(`ro_name_${i}`).trim() || `R${i + 1}`,
+    pin: fd.get(`ro_pin_${i}`) || "",
+    mode: fd.get(`ro_mode_${i}`) || "NO",
+    enabled: fd.get(`ro_enable_${i}`) === "on"
+  });
+}
+
       saveConfig();
     };
   }
+
   
+
 }
 
 function renderChangePasswordPanel() {
@@ -842,13 +1100,15 @@ function flashTick(id) {
   setTimeout(() => (el.style.display = "none"), 1200);
 }
 
-// Router (updated to keep tabs for PLC/Transmitter)
+
 
 async function renderModBusRTUPanel(
   activeTopTab = "Devices",
   brandKey = null,
   activeSlaveId = null,
+  containerId = "main-panel" 
 ) {
+  
   ensureBase();
   if (!renderModBusRTUPanel._roleFetched) {
     await fetchRole();
@@ -878,37 +1138,44 @@ async function renderModBusRTUPanel(
         `;
 
   if (activeTopTab === "Settings") {
-    renderSettings(topTabsHtml);
-    wireTopTabs(activeTopTab, brandKey, activeSlaveId);
+    renderSettings(topTabsHtml, containerId);
+    wireTopTabs(activeTopTab, brandKey, activeSlaveId, containerId);
     wireTabsActions();
     return;
   }
   if (activeTopTab === "Devices") {
-    renderModbusDevices(topTabsHtml, brandKey, activeSlaveId);
-    wireTopTabs(activeTopTab, brandKey, activeSlaveId);
+    renderModbusDevices(
+      topTabsHtml,
+      brandKey,
+      activeSlaveId,
+      containerId   // 🔥 REQUIRED
+    );
+    wireTopTabs(activeTopTab, brandKey, activeSlaveId, containerId);
     wireTabsActions();
     return;
   }
-  const panel = document.getElementById("main-panel");
+  const panel = document.getElementById(containerId);
   panel.innerHTML = `
           <div class="panel-header">${activeTopTab}</div>
           ${topTabsHtml}
           <div class="tab-content" role="tabpanel" style="margin-top:8px;">Coming soon…</div>
         `;
-  wireTopTabs(activeTopTab, brandKey, activeSlaveId);
+  wireTopTabs(activeTopTab, brandKey, activeSlaveId, containerId);
   wireTabsActions();
 }
 
-function wireTopTabs(activeTopTab, brandKey, activeSlaveId) {
+function wireTopTabs(activeTopTab, brandKey, activeSlaveId, containerId) {
   document.querySelectorAll('[role="tab"][data-top]').forEach((btn) => {
     btn.onclick = () =>
       renderModBusRTUPanel(
         btn.getAttribute("data-top"),
         brandKey,
         activeSlaveId,
+        containerId          // 🔥 KEEP IT
       );
   });
 }
+
 
 function wireTabsActions() {
   const btn = document.getElementById("tabs-actions-trigger");
@@ -941,7 +1208,7 @@ function wireTabsActions() {
 }
 
 // Settings
-function renderSettings(topTabsHtml) {
+function renderSettings(topTabsHtml, containerId = "main-panel") {
   const s = config.ModbusRTU.settings;
   const html = `
           <div class="panel-header">Settings</div>
@@ -1011,7 +1278,14 @@ function renderSettings(topTabsHtml) {
             </form>
           </div>
         `;
-  document.getElementById("main-panel").innerHTML = html;
+        const panel = document.getElementById(containerId);
+        if (!panel) {
+          console.error("RTU settings container missing:", containerId);
+          return;
+        }
+        panel.innerHTML = html;
+        
+
 
   const form = document.getElementById("rtu-settings-form");
   const paritySel = form.parity,
@@ -1106,12 +1380,17 @@ function normalizeRegisterRow(r) {
     divide: r.divide ?? 1,
     process_min: r.process_min ?? "",
     process_max: r.process_max ?? "",
+    sensor_type: r.sensor_type ?? "",
+    eng_symbol: r.eng_symbol ?? "",
+
     eng_unit: r.eng_unit ?? "4-20mA",   // ✅ NEW
     enabled: !!r.enabled,
   };
 }
 
 function slaveSettingsModal(slave) {
+  const rs485Ports = config.adminSettings?.rs485Ports || [];
+
   return `
 <div id="slave-settings-modal"
      class="modal"
@@ -1123,55 +1402,56 @@ function slaveSettingsModal(slave) {
 
     <fieldset>
       <legend><b>Communication</b></legend>
-<label>RS485 Port:
-  <select id="slave-rs485-port" style="width:260px;">
-    <option value="/dev/ttyACM0"
-      ${slave.rs485_port === "/dev/ttyACM0" ? "selected" : ""}>
-      RS4851 (/dev/ttyACM0)
-    </option>
 
-    <option value="/dev/ttyACM1"
-      ${slave.rs485_port === "/dev/ttyACM1" ? "selected" : ""}>
-      RS4852 (/dev/ttyACM1)
-    </option>
-  </select>
-</label>
-
+      <label>RS485 Port:
+        <select id="slave-rs485-port" style="width:260px;">
+          ${rs485Ports.length === 0
+      ? `<option disabled selected>No RS485 ports configured</option>`
+      : rs485Ports.map(p => `
+                <option value="${p.port}"
+                  ${slave.rs485_port === p.port ? "selected" : ""}>
+                  ${p.name}
+                </option>
+              `).join("")}
+        </select>
+      </label>
 
       <label>Baud Rate:
         <select id="slave-baud">
-          ${["300","600","1200","2400","4800","9600","19200","38400","57600","115200","230400"]
-            .map(b => `<option value="${b}" ${Number(slave.baudRate)==b?"selected":""}>${b}</option>`)
-            .join("")}
+          ${["300", "600", "1200", "2400", "4800", "9600", "19200", "38400", "57600", "115200", "230400"]
+      .map(b =>
+        `<option value="${b}" ${Number(slave.baudRate) == b ? "selected" : ""}>${b}</option>`
+      ).join("")}
         </select>
       </label>
 
       <label>Parity:
         <select id="slave-parity">
-          ${["Even","Odd","None"]
-            .map(p => `<option value="${p}" ${slave.parity===p?"selected":""}>${p}</option>`)
-            .join("")}
+          ${["Even", "Odd", "None"]
+      .map(p =>
+        `<option value="${p}" ${slave.parity === p ? "selected" : ""}>${p}</option>`
+      ).join("")}
         </select>
       </label>
 
       <label>Data Bits:
         <select id="slave-databits">
-          ${[5,6,7,8]
-            .map(d => `<option value="${d}" ${slave.dataBits===d?"selected":""}>${d}</option>`)
-            .join("")}
+          ${[5, 6, 7, 8]
+      .map(d =>
+        `<option value="${d}" ${slave.dataBits === d ? "selected" : ""}>${d}</option>`
+      ).join("")}
         </select>
       </label>
 
       <label>Stop Bits:
         <select id="slave-stopbits">
-          ${[1,2]
-            .map(s => `<option value="${s}" ${slave.stopBits===s?"selected":""}>${s}</option>`)
-            .join("")}
+          ${[1, 2]
+      .map(s =>
+        `<option value="${s}" ${slave.stopBits === s ? "selected" : ""}>${s}</option>`
+      ).join("")}
         </select>
       </label>
     </fieldset>
-
-
 
     <div class="toolbar" style="margin-top:14px;">
       <button id="slave-settings-save" class="button-primary">Save</button>
@@ -1180,6 +1460,7 @@ function slaveSettingsModal(slave) {
   </div>
 </div>`;
 }
+
 
 function openSlaveSettings(brandKey, slaveId) {
   const existing = document.getElementById("slave-settings-modal");
@@ -1202,28 +1483,28 @@ function openSlaveSettings(brandKey, slaveId) {
   document.getElementById("slave-settings-save").onclick = () => {
     slave.rs485_port =
       document.getElementById("slave-rs485-port").value.trim();
-  
+
     slave.baudRate =
       Number(document.getElementById("slave-baud").value);
-  
+
     slave.parity =
       document.getElementById("slave-parity").value;
-  
+
     slave.dataBits =
       Number(document.getElementById("slave-databits").value);
-  
+
     slave.stopBits =
       Number(document.getElementById("slave-stopbits").value);
-  
+
     slave.pollingInterval =
       Number(document.getElementById("slave-polling-interval").value) || 1;
 
-  
+
     saveConfig();
     modal.remove();
     renderModBusRTUPanel("Devices", brandKey, slaveId);
   };
-  
+
 }
 
 window.openSlaveSettings = openSlaveSettings; // ✅ REQUIRED
@@ -1233,7 +1514,11 @@ function renderModbusDevices(
   topTabsHtml,
   currentBrandKey = null,
   currentSlaveId = null,
+  containerId
 ) {
+  if (!containerId) {
+    throw new Error("renderModbusDevices called without containerId");
+  }
   const em = config.ModbusRTU.Devices;
   if (em.order.length === 0) {
     const k = "schneider_em6436h";
@@ -1430,10 +1715,13 @@ function renderModbusDevices(
                 <th>Name</th>
                 <th>Start Address</th>
                 <th>Offset</th>
-                <th>Type</th>
-                <th>Conversion</th>
-                <th>Signal</th>
-                <th>SQL Type</th>
+            <th style="display:none">Type of Register</th>
+                <th style="display:none">Conversion</th>
+                <th>Type of Sensor</th>
+<th>Engineering Symbol</th>
+
+                <th>Electrical Range</th>
+                <th>Data Type</th>
                 <th>Length</th>
                 <th>Multiply</th>
 <th>Divide</th>
@@ -1448,7 +1736,7 @@ function renderModbusDevices(
         `;
 
   const html = `
-          <div class="panel-header">Modbus RTU Devices</div>
+          <div class="panel-header" style="display:none">Modbus RTU Devices</div>
           ${topTabsHtml}
           <div class="tab-content" role="tabpanel" style="margin-top:8px;">
             ${brandTabs}
@@ -1459,12 +1747,13 @@ function renderModbusDevices(
           ${brandAddModal()}
           ${presetNameModal()}
         `;
-  document.getElementById("main-panel").innerHTML = html;
+  const panel = document.getElementById(containerId);
+  panel.innerHTML = html;
 
   // Brand handlers
   document.querySelectorAll('.brand-tab[role="tab"]').forEach((b) => {
     b.onclick = () =>
-      renderModbusDevices(topTabsHtml, b.getAttribute("data-brand"), null);
+      renderModbusDevices(topTabsHtml, b.getAttribute("data-brand"), null, containerId);
   });
   document.querySelectorAll(".em-brand-del").forEach((b) => {
     b.onclick = () => {
@@ -1483,7 +1772,7 @@ function renderModbusDevices(
       deleteModbusBrandAlarms(k);
       saveConfig();
       const next = em.order[0] || null;
-      renderModBusRTUPanel("Devices", next, null);
+      renderModBusRTUPanel("Devices", next, null,containerId);
     };
   });
   document.getElementById("em-add-brand")?.addEventListener("click", () => {
@@ -1503,7 +1792,7 @@ function renderModbusDevices(
         if (!em.order.includes(key)) em.order.push(key);
       }
       saveConfig();
-      renderModBusRTUPanel("Devices", key, null);
+      renderModBusRTUPanel("Devices", key, null, containerId);
     });
   });
 
@@ -1515,7 +1804,7 @@ function renderModbusDevices(
       const label = btn.querySelector(".slave-label");
       const input = btn.querySelector(".slave-input");
       if (!selected) {
-        renderModbusDevices(topTabsHtml, brandKey, id);
+        renderModbusDevices(topTabsHtml, brandKey, id, containerId);
         return;
       }
       // Inline edit
@@ -1567,7 +1856,7 @@ function renderModbusDevices(
         migrateModbusSlaveId(brandKey, oldId, String(n));
 
         saveConfig();
-        renderModbusDevices(topTabsHtml, brandKey, String(n));
+        renderModbusDevices(topTabsHtml, brandKey, String(n), containerId);
       };
 
       const onKey = (ev) => {
@@ -1591,7 +1880,7 @@ function renderModbusDevices(
       if (brand.registersBySlave) delete brand.registersBySlave[sid];
       saveConfig();
       const next = brand.slaves[0]?.id ?? null;
-      renderModbusDevices(topTabsHtml, brandKey, next);
+      renderModbusDevices(topTabsHtml, brandKey, next, containerId);
     };
   });
   document.getElementById("em-add-slave")?.addEventListener("click", () => {
@@ -1605,7 +1894,7 @@ function renderModbusDevices(
     brand.registersBySlave[String(nextId)] =
       brand.registersBySlave[String(nextId)] || [];
     saveConfig();
-    renderModbusDevices(topTabsHtml, brandKey, String(nextId));
+    renderModbusDevices(topTabsHtml, brandKey, String(nextId), containerId);
   });
 
   // Registers and presets
@@ -1624,6 +1913,16 @@ function renderModbusDevices(
         v = parseInt(v, 10);
       workingRows[idx] = workingRows[idx] || {};
       workingRows[idx][field] = v;
+      if (field === "sensor_type") {
+        const cfg = getEngineeringConfig()
+          .find(e => e.type === v);
+
+        workingRows[idx].eng_symbol =
+          cfg && cfg.symbols.length ? cfg.symbols[0] : "";
+
+        rerenderRegsTable(workingRows);
+      }
+
     });
     table?.addEventListener("click", (e) => {
       const btn = e.target.closest(".em-reg-remove");
@@ -1632,12 +1931,15 @@ function renderModbusDevices(
       if (idx >= 0 && idx < workingRows.length) workingRows.splice(idx, 1);
       rerenderRegsTable(workingRows);
     });
+
     document.getElementById("em-add-row")?.addEventListener("click", () => {
       workingRows.push({
         name: "",
         start: "",
         offset: 0,
         type: "Input Register",
+        sensor_type: "",
+        eng_unit: "",
         conversion: "Float: Big Endian",
         sql_type: "FLOAT", // 🔥 NEW
         length: 2,
@@ -1707,7 +2009,7 @@ function renderModbusDevices(
         }
 
         saveConfig();
-        renderModbusDevices(topTabsHtml, brandKey, slaveId);
+        renderModbusDevices(topTabsHtml, brandKey, slaveId, containerId);
       });
     });
 
@@ -1727,6 +2029,10 @@ function renderModbusDevices(
             Number(r.process_min) >= Number(r.process_max)
           ) {
             alert(`Row ${i + 1}: Process Min must be less than Process Max`);
+            return;
+          }
+          if (r.sensor_type && !r.eng_symbol) {
+            alert(`Row ${i + 1}: Engineering symbol is required for sensor type "${r.sensor_type}"`);
             return;
           }
         }
@@ -1766,6 +2072,10 @@ function renderModbusDevices(
 
         for (let i = 0; i < workingRows.length; i++) {
           const r = workingRows[i];
+          if (r.sensor_type && !r.eng_symbol) {
+            alert(`Row ${i + 1}: Engineering symbol is required for sensor type "${r.sensor_type}"`);
+            return;
+          }
           if (
             r.process_min !== "" &&
             r.process_max !== "" &&
@@ -1820,6 +2130,11 @@ function deleteModbusBrandAlarms(brandKey) {
   }
 }
 
+function getEngineeringConfig() {
+  return config.adminSettings.engineeringUnits || [];
+}
+
+
 function rowHtml(r, i) {
   return `
           <tr>
@@ -1834,7 +2149,7 @@ function rowHtml(r, i) {
     r.offset,
     0,
   )}" data-field="offset" data-index="${i}" style="width:70px;"></td>
-            <td>
+            <td style="display:none">
               <select data-field="type" data-index="${i}">
                 <option value="Holding Register" ${r.type === "Holding Register" ? "selected" : ""
     }>Holding Register</option>
@@ -1842,8 +2157,8 @@ function rowHtml(r, i) {
     }>Input Register</option>
               </select>
             </td>
-            <td>
-              <select data-field="conversion" data-index="${i}">
+            <td style="display:none">
+              <select data-field="conversion" data-index="${i} ">
                 <option value="Raw Hex" ${r.conversion === "Raw Hex" ? "selected" : ""
     }>Raw Hex</option>
                 <option value="Integer" ${r.conversion === "Integer" ? "selected" : ""
@@ -1854,6 +2169,39 @@ function rowHtml(r, i) {
     }>Float: Big Endian</option>
               </select>
             </td>
+<td>
+  <select data-field="sensor_type" data-index="${i}">
+    <option value="">— Select —</option>
+    ${getEngineeringConfig().map(e => `
+      <option value="${e.type}" ${r.sensor_type === e.type ? "selected" : ""}>
+        ${e.type}
+      </option>
+    `).join("")}
+  </select>
+</td>
+
+
+<td>
+  ${(() => {
+      const cfg = getEngineeringConfig()
+        .find(e => e.type === r.sensor_type);
+
+      if (!cfg || !cfg.symbols.length) return "";
+
+      return `
+        <select data-field="eng_symbol" data-index="${i}">
+          ${cfg.symbols.map(sym => `
+            <option value="${sym}" ${r.eng_symbol === sym ? "selected" : ""}>
+              ${sym}
+            </option>
+          `).join("")}
+        </select>
+      `;
+    })()
+    }
+</td>
+
+
             <td>
   <select data-field="eng_unit" data-index="${i}">
     <option value="4-20mA" ${r.eng_unit === "4-20mA" ? "selected" : ""}>4–20 mA</option>
@@ -1936,11 +2284,13 @@ function rerenderRegsTable(rows) {
             <th>Name</th>
             <th>Start Address</th>
             <th>Offset</th>
-            <th>Type</th>
-            <th>Conversion</th>
-            <th>Signal</th>
+            <th style="display:none">Type of Register</th>
+                <th style="display:none">Conversion</th>
+                <th>Type of Sensor</th>
+<th>Engineering Symbol</th>
 
-            <th> SQL Type</th>
+            <th>Electrical Range</th>
+            <th>Data Type</th>
             <th>Length</th>
             <th>Multiply</th>
 <th>Divide</th>
@@ -2411,7 +2761,7 @@ function renderRtuSiemensForm(plcData, index) {
           <table>
             <thead>
               <tr>
-                <th>Type</th><th>Content</th><th>Address</th><th>Length</th><th>Datatype</th><th>Read</th><th>Write</th><th>Remove</th>
+                <th>Data Type</th><th>Content</th><th>Address</th><th>Length</th><th>Datatype</th><th>Read</th><th>Write</th><th>Remove</th>
               </tr>
             </thead>
             <tbody class="siemens-read-tbody">${readRows}</tbody>
@@ -2450,7 +2800,7 @@ function renderRtuSiemensRow(item, rowIndex) {
         <td><input type="number" data-field="length" value="${item.length || 1}" min="1"></td>
         <td>
           <select data-field="datatype">
-            ${["int", "real", "dint", "bool"].map((d) => `<option value="${d}" ${item.datatype === d ? "selected" : ""}>${d.toUpperCase()}</option>`).join("")}
+            ${["float", "int", "real", "bool"].map((d) => `<option value="${d}" ${item.datatype === d ? "selected" : ""}>${d.toUpperCase()}</option>`).join("")}
           </select>
         </td>
         <td><input type="checkbox" data-field="read" ${item.read !== false ? "checked" : ""}></td>
@@ -2633,7 +2983,7 @@ function renderRtuAllenBradleyForm(plcData, index) {
           <table>
             <thead>
               <tr>
-                <th>Type</th><th>Content</th><th>Address</th><th>length</th><th>Datatype</th><th>Read</th><th>Write</th><th>Remove</th>
+                <th>Data Type</th><th>Content</th><th>Address</th><th>length</th><th>Datatype</th><th>Read</th><th>Write</th><th>Remove</th>
               </tr>
             </thead>
             <tbody class="siemens-read-tbody">${readRows}</tbody>
@@ -3013,11 +3363,11 @@ document.addEventListener("DOMContentLoaded", () => {
   MODBUS TCP PANEL
 ========================= */
 
-function renderModbusTcpPanel() {
+function renderModbusTcpPanel(containerId = "main-panel") {
   config.plc_configurations ??= [];
 
   const html = `
-      <div class="panel-header">Modbus TCP Configuration</div>
+      <div class="panel-header" style="display:none">Modbus TCP Configuration</div>
 
       <div id="plc-entries-container">
         ${config.plc_configurations.map(renderPlcEntry).join("")}
@@ -3027,7 +3377,8 @@ function renderModbusTcpPanel() {
       <button id="save-all-configs" class="button-primary">Save</button>
     `;
 
-  document.getElementById("main-panel").innerHTML = html;
+  document.getElementById(containerId).innerHTML = html;
+
 
   document.getElementById("add-plc-entry").onclick = () => {
     config.plc_configurations.push({
@@ -3043,6 +3394,19 @@ function renderModbusTcpPanel() {
 
   config.plc_configurations.forEach((_, i) => bindEventsForPlcEntry(i));
 }
+
+function convertToSec(val, unit) {
+  if (unit === "min") return val * 60;
+  if (unit === "hour") return val * 3600;
+  return val;
+}
+
+function convertFromSec(sec, unit) {
+  if (unit === "min") return sec / 60;
+  if (unit === "hour") return sec / 3600;
+  return sec;
+}
+
 
 /* =========================
   PLC CARD
@@ -3123,6 +3487,7 @@ function renderSiemensForm(plc, index) {
   plc.cred ??= { ip: "192.168.0.1", rack: 0, slot: 2 };
   plc.address_access ??= { read: [] };
   plc.data_freq_sec ??= 1;
+  plc.data_freq_unit ??= "sec";
   plc.Database ??= {
     upload_local: true,
     upload_cloud: false,
@@ -3150,20 +3515,31 @@ function renderSiemensForm(plc, index) {
           <input type="number" data-cred-field="slot" value="${plc.cred.slot}">
         </label>
       </fieldset>
+<fieldset>
+  <legend>Polling</legend>
 
-      <fieldset>
-        <legend>Polling</legend>
-        <input type="number" step="0.1"
-              data-freq-field="data_freq_sec"
-              value="${plc.data_freq_sec}">
-      </fieldset>
+  <div style="display:flex; gap:8px; align-items:center;">
+    <input type="number"
+           min="0.1"
+           step="0.1"
+           data-freq-value
+           value="${convertFromSec(plc.data_freq_sec, plc.data_freq_unit)}">
+
+    <select data-freq-unit>
+      <option value="sec" ${plc.data_freq_unit === "sec" ? "selected" : ""}>Sec</option>
+      <option value="min" ${plc.data_freq_unit === "min" ? "selected" : ""}>Min</option>
+      <option value="hour" ${plc.data_freq_unit === "hour" ? "selected" : ""}>Hour</option>
+    </select>
+  </div>
+</fieldset>
+
 
       ${renderDBSettings(`plc_${index}`, plc.Database)}
 
       <table>
         <thead>
           <tr>
-            <th>Tag</th><th>DB</th><th>Addr</th><th>Type</th>
+            <th>Tag</th><th>DB</th><th>Addr</th><th>Data Type</th>
             <th>Size</th><th>Min</th><th>Max</th><th>Value</th>
             <th>Read</th><th>Write</th><th></th>
           </tr>
@@ -3191,7 +3567,7 @@ function renderSiemensRow(r, i) {
 
     <td>
       <select data-field="type">
-        ${["int", "dint", "real", "bool", "string"]
+        ${["float", "int", "real", "bool", "string"]
       .map((t) => `<option ${r.type === t ? "selected" : ""}>${t}</option>`)
       .join("")}
       </select>
@@ -3226,20 +3602,33 @@ function renderSiemensRow(r, i) {
 function bindSiemensFormEvents(index) {
   const plc = config.plc_configurations[index].PLC;
   const form = document.getElementById(`siemens-form-${index}`);
+  if (!form) return; // 🔒 FIRST
+
   const tbody = form.querySelector(".siemens-tbody");
+  if (!tbody) return;
 
   plc.cred ??= {};
   bindCredFields(form, plc.cred);
-
-  // Polling
-  form.querySelector("[data-freq-field]").oninput = (e) =>
-    (plc.data_freq_sec = Number(e.target.value));
-
-  // DB SETTINGS 🔥
   bindDBSettings(`plc_${index}`, plc.Database);
 
+  /* ===== POLLING ===== */
+  const freqInput = form.querySelector("[data-freq-value]");
+  const unitSelect = form.querySelector("[data-freq-unit]");
 
-  // Rows
+  if (freqInput && unitSelect) {
+    const updateFreq = () => {
+      const val = Number(freqInput.value) || 0;
+      const unit = unitSelect.value;
+
+      plc.data_freq_unit = unit;
+      plc.data_freq_sec = convertToSec(val, unit);
+    };
+
+    freqInput.oninput = updateFreq;
+    unitSelect.onchange = updateFreq;
+  }
+
+  /* ===== ROW HANDLING ===== */
   tbody.oninput = (e) => {
     const row = e.target.closest("tr");
     if (!row) return;
@@ -3253,11 +3642,11 @@ function bindSiemensFormEvents(index) {
   };
 
   tbody.onclick = (e) => {
-    if (e.target.classList.contains("remove-siemens-row")) {
-      const i = Number(e.target.closest("tr").dataset.rowIndex);
-      plc.address_access.read.splice(i, 1);
-      renderModbusTcpPanel();
-    }
+    if (!e.target.classList.contains("remove-siemens-row")) return;
+
+    const i = Number(e.target.closest("tr").dataset.rowIndex);
+    plc.address_access.read.splice(i, 1);
+    renderModbusTcpPanel();
   };
 
   form.querySelector(".add-siemens-row").onclick = () => {
@@ -3265,7 +3654,7 @@ function bindSiemensFormEvents(index) {
       content: "",
       DB_no: 1,
       address: 0,
-      type: "int",
+      type: "float",
       size: "",
       min: 0,
       max: 100,
@@ -3277,6 +3666,7 @@ function bindSiemensFormEvents(index) {
 }
 
 
+
 /* =========================
   ALLEN BRADLEY
 ========================= */
@@ -3285,6 +3675,7 @@ function renderAllenBradleyForm(plc, index) {
   plc.cred ??= { ip: "192.168.1.200", port: 44818 };
   plc.address_access ??= { read: [] };
   plc.data_freq_sec ??= 1;
+  plc.data_freq_unit ??= "sec";
   plc.Database ??= {
     upload_local: true,
     upload_cloud: false,
@@ -3308,19 +3699,31 @@ function renderAllenBradleyForm(plc, index) {
         </label>
       </fieldset>
 
-      <fieldset>
-        <legend>Polling</legend>
-        <input type="number" step="0.1"
-              data-freq-field="data_freq_sec"
-              value="${plc.data_freq_sec}">
-      </fieldset>
+<fieldset>
+  <legend>Polling</legend>
+
+  <div style="display:flex; gap:8px; align-items:center;">
+    <input type="number"
+           min="0.1"
+           step="0.1"
+           data-freq-value
+           value="${convertFromSec(plc.data_freq_sec, plc.data_freq_unit)}">
+
+    <select data-freq-unit>
+      <option value="sec" ${plc.data_freq_unit === "sec" ? "selected" : ""}>Sec</option>
+      <option value="min" ${plc.data_freq_unit === "min" ? "selected" : ""}>Min</option>
+      <option value="hour" ${plc.data_freq_unit === "hour" ? "selected" : ""}>Hour</option>
+    </select>
+  </div>
+</fieldset>
+
 
       ${renderDBSettings(`plc_${index}`, plc.Database)}
 
       <table>
         <thead>
           <tr>
-            <th>Tag</th><th>Addr</th><th>Type</th><th>Len</th>
+            <th>Tag</th><th>Addr</th><th>Data Type</th><th>Len</th>
             <th>Min</th><th>Max</th><th>Control output %</th>
             <th>Read</th><th>Write</th><th></th>
           </tr>
@@ -3347,7 +3750,7 @@ function renderAllenBradleyRow(r, i) {
 
     <td>
       <select data-field="datatype">
-        ${["INT", "DINT", "REAL", "BOOL", "STRING"]
+        ${["FLOAT", "INT", "REAL", "BOOL", "STRING"]
       .map(
         (t) => `<option ${r.datatype === t ? "selected" : ""}>${t}</option>`
       )
@@ -3384,20 +3787,33 @@ function renderAllenBradleyRow(r, i) {
 function bindAllenBradleyFormEvents(index) {
   const plc = config.plc_configurations[index].PLC;
   const form = document.getElementById(`ab-form-${index}`);
+  if (!form) return; // 🔒 FIRST
+
   plc.cred ??= {};
   bindCredFields(form, plc.cred);
   bindDBSettings(`plc_${index}`, plc.Database);
 
-  if (!form) return;
+  /* ===== POLLING (SEC / MIN / HOUR) ===== */
+  const freqInput = form.querySelector("[data-freq-value]");
+  const unitSelect = form.querySelector("[data-freq-unit]");
 
+  if (freqInput && unitSelect) {
+    const updateFreq = () => {
+      const val = Number(freqInput.value) || 0;
+      const unit = unitSelect.value;
+
+      plc.data_freq_unit = unit;
+      plc.data_freq_sec = convertToSec(val, unit);
+    };
+
+    freqInput.oninput = updateFreq;
+    unitSelect.onchange = updateFreq;
+  }
+
+  /* ===== TAG TABLE ===== */
   const tbody = form.querySelector(".ab-tbody");
+  if (!tbody) return;
 
-  // Polling
-  form.querySelector("[data-freq-field]").oninput = (e) => {
-    plc.data_freq_sec = Number(e.target.value);
-  };
-
-  // INPUT HANDLER
   tbody.oninput = (e) => {
     const row = e.target.closest("tr");
     if (!row) return;
@@ -3406,48 +3822,28 @@ function bindAllenBradleyFormEvents(index) {
     const field = e.target.dataset.field;
     let val = e.target.value;
 
-    // Enforce constraint on "value" field
     if (field === "value") {
-      val = Number(val);
-
-      if (Number.isNaN(val)) {
-        val = 0;
-      }
-
-      if (val > 100) {
-        val = 100;
-        e.target.value = 100; // reflect correction in UI
-      }
-
-      if (val < 0) {
-        val = 0;
-        e.target.value = 0;
-      }
+      val = Math.min(100, Math.max(0, Number(val) || 0));
+      e.target.value = val;
     }
 
     plc.address_access.read[i][field] =
       e.target.type === "checkbox" ? e.target.checked : val;
   };
 
-
-  // 🔥 DELETE HANDLER (THIS WAS MISSING)
   tbody.onclick = (e) => {
     if (!e.target.classList.contains("remove-ab-row")) return;
 
-    const row = e.target.closest("tr");
-    const i = Number(row.dataset.rowIndex);
-
+    const i = Number(e.target.closest("tr").dataset.rowIndex);
     plc.address_access.read.splice(i, 1);
-
     renderModbusTcpPanel();
   };
 
-  // ADD ROW
   form.querySelector(".add-ab-row").onclick = () => {
     plc.address_access.read.push({
       tag: "",
       address: "",
-      datatype: "DINT",
+      datatype: "FLOAT",
       length: 1,
       min: 0,
       max: 100,
@@ -3458,6 +3854,7 @@ function bindAllenBradleyFormEvents(index) {
     renderModbusTcpPanel();
   };
 }
+
 
 
 /* =========================
@@ -3675,62 +4072,80 @@ function pickFirstPlcBrandAndSlave() {
 // setupTabHandlers should continue to attach listeners for Digital I/O and Analog cases,
 // and it will not interfere with Modbus because Modbus uses its own containers and forms.
 
+
 function setupTabHandlers(mainTab, subTab) {
   setTimeout(() => {
     // Digital I/O handlers
+    // ---------------- DIGITAL INPUT HANDLERS ----------------
+    // ---------------- DIGITAL INPUT HANDLERS ----------------
     if (mainTab === "Digital I/O") {
+      let channelIndex = Number(subTab);
+      if (!Number.isInteger(channelIndex)) {
+        console.warn("Digital I/O subTab not numeric, forcing 0:", subTab);
+        channelIndex = 0;
+      }
+
+
+      // 🔒 HARD INIT (this was missing)
+      config.alarmSettings ??= {};
+      config.alarmSettings["Digital I/O"] ??= {};
+      if (!config.alarmSettings["Digital I/O"][channelIndex]) {
+        config.alarmSettings["Digital I/O"][channelIndex] = { alerts: [] };
+      }
+
+      const store = config.alarmSettings["Digital I/O"][channelIndex];
+
+
+      // Add
       const addBtn = document.getElementById("add-digital-alert-btn");
       if (addBtn) {
         addBtn.onclick = () => {
-          const channelStore = config.alarmSettings["Digital I/O"][subTab];
-          channelStore.alerts.push({
-            trigger: "High",
+          store.alerts.push({
+            trigger: "HIGH",
+            delay: 0,
+            email: "",
             contact: "",
             message: "",
             enabled: false,
           });
-          renderAlarmSettings("Digital I/O", subTab);
+          renderAlarmSettings("Digital I/O", channelIndex);
         };
       }
 
       const form = document.getElementById("digital-io-alerts-form");
-      if (form) {
-        // Delete row via event delegation
-        form.addEventListener("click", (e) => {
-          const btn = e.target.closest(".del-alert");
-          if (!btn) return;
-          const idx = Number(btn.getAttribute("data-index"));
-          if (!Number.isInteger(idx)) return;
-          const channelStore = config.alarmSettings["Digital I/O"][subTab];
-          if (idx >= 0 && idx < channelStore.alerts.length) {
-            channelStore.alerts.splice(idx, 1);
-            renderAlarmSettings("Digital I/O", subTab);
-          }
-        });
+      if (!form) return;
 
-        // Save alerts
-        form.onsubmit = (ev) => {
-          ev.preventDefault();
-          const channelStore = config.alarmSettings["Digital I/O"][subTab];
-          const rows = channelStore.alerts;
+      // Delete
+      form.addEventListener("click", (e) => {
+        const btn = e.target.closest(".del-alert");
+        if (!btn) return;
+
+        const idx = Number(btn.dataset.index);
+        if (!Number.isInteger(idx)) return;
+
+        store.alerts.splice(idx, 1);
+        renderAlarmSettings("Digital I/O", channelIndex);
+      });
+
+      // Save
+      const saveBtn = document.getElementById("save-digital-alerts");
+      if (saveBtn) {
+        saveBtn.onclick = () => {
+          const rows = store.alerts;
 
           for (let i = 0; i < rows.length; i++) {
-            const trigger = form[`trigger_${i}`]?.value;
-            const contact = form[`contact_${i}`]?.value;
-            const email = form[`email_${i}`]?.value;
-            const message = form[`message_${i}`]?.value;
-            const enabled = form[`enabled_${i}`]?.checked;
-
             rows[i] = {
-              trigger: trigger || "High",
-              contact: contact || "",
-              email: email || "",
-              message: message || "",
-              enabled: !!enabled,
+              trigger: form[`trigger_${i}`]?.value || "HIGH",
+              delay: Number(form[`delay_${i}`]?.value) || 0,
+              email: form[`email_${i}`]?.value || "",
+              contact: form[`contact_${i}`]?.value || "",
+              message: form[`message_${i}`]?.value || "",
+              enabled: !!form[`enabled_${i}`]?.checked,
             };
           }
 
           saveConfig();
+
           const tick = document.getElementById("digital-io-alerts-tick");
           if (tick) {
             tick.style.display = "inline";
@@ -3738,7 +4153,15 @@ function setupTabHandlers(mainTab, subTab) {
           }
         };
       }
+
+      // Sub-tabs
+      document.querySelectorAll(".sub-tab-btn").forEach((btn) => {
+        btn.onclick = () => {
+          renderAlarmSettings("Digital I/O", Number(btn.dataset.channel));
+        };
+      });
     }
+
 
     // Modbus handlers
     if (mainTab === "Modbus") {
@@ -3815,71 +4238,100 @@ function setupTabHandlers(mainTab, subTab) {
     }
 
     // Analog handlers
-    if (mainTab === "Analog") {
+    // Analog handlers (RANGE-BASED)
+    // ---------------- ANALOG HANDLERS ----------------
+    if (mainTab === "Analog I/O") {
+      const channelIndex = Number(subTab);
+      if (!Number.isInteger(channelIndex)) return;
+
+      config.alarmSettings ??= {};
+      config.alarmSettings.Analog ??= {};
+      config.alarmSettings.Analog[channelIndex] ??= { alerts: [] };
+
+      const channelStore = config.alarmSettings.Analog[channelIndex];
+
+      const channel = config.ioSettings.analog?.channels?.[channelIndex];
+      if (!channel) {
+        console.error("Invalid analog channel:", channelIndex);
+        return;
+      }
+
+      const [min, max] = channel.range.split("-").map(Number);
+
+      // ---- ADD ALERT ----
       const addBtn = document.getElementById("add-analog-alert-btn");
       if (addBtn) {
         addBtn.onclick = () => {
-          const channelStore = config.alarmSettings.Analog[subTab];
           channelStore.alerts.push({
             condition: "<=",
-            threshold: "",
-            delay: "",
+            threshold: min,   // valid default
+            delay: 0,
+            email: "",
             contact: "",
             message: "",
             enabled: false,
           });
-          renderAlarmSettings("Analog", subTab);
+
+          renderAlarmSettings("Analog I/O", channelIndex);
         };
       }
 
       const form = document.getElementById("analog-alerts-form");
-      if (form) {
-        // Delete row via event delegation
-        form.addEventListener("click", (e) => {
-          const btn = e.target.closest(".del-alert");
-          if (!btn) return;
-          const idx = Number(btn.getAttribute("data-index"));
-          if (!Number.isInteger(idx)) return;
-          const channelStore = config.alarmSettings.Analog[subTab];
-          if (idx >= 0 && idx < channelStore.alerts.length) {
-            channelStore.alerts.splice(idx, 1);
-            renderAlarmSettings("Analog", subTab);
-          }
-        });
+      if (!form) return;
 
-        // Save alerts
-        form.onsubmit = (ev) => {
-          ev.preventDefault();
-          const channelStore = config.alarmSettings.Analog[subTab];
+      // ---- DELETE ALERT ----
+      form.addEventListener("click", (e) => {
+        const btn = e.target.closest(".del-alert");
+        if (!btn) return;
+
+        const idx = Number(btn.dataset.index);
+        if (!Number.isInteger(idx)) return;
+
+        channelStore.alerts.splice(idx, 1);
+        renderAlarmSettings("Analog I/O", channelIndex);
+      });
+
+      // ---- SAVE ALERTS ----
+      const saveBtn = document.getElementById("save-analog-alerts");
+      if (saveBtn) {
+        saveBtn.onclick = () => {
           const rows = channelStore.alerts;
 
           for (let i = 0; i < rows.length; i++) {
             const cond = form[`condition_${i}`]?.value;
-            const thr = form[`threshold_${i}`]?.value;
-            const delay = form[`delay_${i}`]?.value;
-            const contact = form[`contact_${i}`]?.value;
-            const msg = form[`message_${i}`]?.value;
-            const en = form[`enabled_${i}`]?.checked;
+            const thrRaw = form[`threshold_${i}`]?.value;
+            const delayRaw = form[`delay_${i}`]?.value;
 
+            let thr = Number(thrRaw);
+            if (Number.isNaN(thr)) thr = min;
+            if (thr < min) {
+              thr = min;
+              alert("Threshold can't be less than Minimum value of range");
+              return;
+            }
+            if (thr > max) {
+              thr = max;
+              alert("Threshold can't be Greater than Maximum value of range");
+              return;
+            }
+            if (cond == "<" && thr == min) thr = min + 1;
+            if (cond == ">" && thr == max) thr = max - 1;
             rows[i] = {
               condition: cond || "<=",
-              threshold:
-                thr !== undefined && thr !== "" && !Number.isNaN(Number(thr))
-                  ? Number(thr)
-                  : "",
+              threshold: thr,
               delay:
-                delay !== undefined &&
-                  delay !== "" &&
-                  !Number.isNaN(Number(delay))
-                  ? Number(delay)
-                  : "",
-              contact: contact || "",
-              message: msg || "",
-              enabled: !!en,
+                delayRaw !== "" && !Number.isNaN(Number(delayRaw))
+                  ? Number(delayRaw)
+                  : 0,
+              email: form[`email_${i}`]?.value || "",
+              contact: form[`contact_${i}`]?.value || "",
+              message: form[`message_${i}`]?.value || "",
+              enabled: !!form[`enabled_${i}`]?.checked,
             };
           }
 
-          saveConfig();
+          saveConfig();   // now it WILL persist
+
           const tick = document.getElementById("analog-alerts-tick");
           if (tick) {
             tick.style.display = "inline";
@@ -3887,15 +4339,41 @@ function setupTabHandlers(mainTab, subTab) {
           }
         };
       }
+
     }
+
+
   }, 50);
 }
+
+function isAlarmReadOnly() {
+  return uiState.role === "admin" || uiState.role === "user" || uiState.role === "guest";
+}
+
+function lockPanelViewOnly(container) {
+  if (!isAlarmReadOnly()) return;
+
+  container.querySelectorAll(
+    "input, select, textarea, button"
+  ).forEach(el => {
+    // allow tab navigation
+    if (el.classList.contains("main-tab-btn")) return;
+    if (el.classList.contains("tcp-tab")) return;
+
+    el.disabled = true;
+    el.readOnly = true;
+    el.style.pointerEvents = "none";
+    el.style.opacity = "0.6";
+  });
+}
+
+
 // ===================== Modbus composite UI: Energy + PLC =====================
 function renderAlarmSettings(mainTab = "Modbus RTU", subTab = "Channel 1") {
   migrateModbusAlertsToNested();
 
-  // const MainTabs = ["Digital I/O", "Modbus", "Analog", "SMS Settings"];
-  const MainTabs = ["Modbus RTU", "Modbus TCP", "Analog", "Digital I/O"];
+  // const MainTabs = ["Digital I/O", "Modbus", "Analog I/O", "SMS Settings"];
+  const MainTabs = ["Modbus RTU", "Modbus TCP", "Analog I/O", "Digital I/O"];
   const mainTabsHtml = MainTabs.map(
     (t) =>
       `<button class="main-tab-btn${t === mainTab ? " active" : ""
@@ -3926,7 +4404,7 @@ function renderAlarmSettings(mainTab = "Modbus RTU", subTab = "Channel 1") {
   if (mainTab === "Modbus TCP") {
     const body = document.getElementById("modbus-tcp-body");
     if (!body) return;
-
+    initTcpAlarmDraft();
     const types = getPlcTypes();
     const defaultType = types[0];
     body.innerHTML = renderModbusTcpPlcList(defaultType);
@@ -3967,14 +4445,18 @@ function renderAlarmSettings(mainTab = "Modbus RTU", subTab = "Channel 1") {
     (btn.onclick = () => {
       const newMainTab = btn.dataset.tab;
       let defaultSub = subTab;
-      if (newMainTab === "Digital I/O") defaultSub = "Channel 1";
-      if (newMainTab === "Analog") defaultSub = "A1";
+      if (newMainTab === "Digital I/O") defaultSub = "0";
+      if (newMainTab === "Analog I/O") defaultSub = "0";
       if (newMainTab === "Modbus RTU") defaultSub = "Energy Meter";
       renderAlarmSettings(newMainTab, defaultSub);
     }),
   );
 
   setupTabHandlers(mainTab, subTab);
+
+  // 🔒 FINAL LINE — THIS IS THE KEY
+  lockPanelViewOnly(panel);
+
 }
 
 let tcpHandlersBound = false;
@@ -3996,13 +4478,15 @@ function getPlcTypes() {
 }
 
 function ensureTcpAlerts(plcType, plcKey, tagName) {
-  config.alarmSettings ??= {};
-  config.alarmSettings["Modbus TCP"] ??= {};
-  config.alarmSettings["Modbus TCP"][plcType] ??= {};
-  config.alarmSettings["Modbus TCP"][plcType][plcKey] ??= {};
-  config.alarmSettings["Modbus TCP"][plcType][plcKey][tagName] ??= [];
-  return config.alarmSettings["Modbus TCP"][plcType][plcKey][tagName];
+  tcpAlarmDraft ??= {};
+
+  tcpAlarmDraft[plcType] ??= {};
+  tcpAlarmDraft[plcType][plcKey] ??= {};
+  tcpAlarmDraft[plcType][plcKey][tagName] ??= [];
+
+  return tcpAlarmDraft[plcType][plcKey][tagName];
 }
+
 
 function renderTcpBody(plcType) {
   const body = document.getElementById("modbus-tcp-body");
@@ -4120,6 +4604,15 @@ function validateTcpThreshold(tag, cond, value) {
     throw new Error(`Threshold ${value} > max ${tag.max}`);
 }
 
+
+
+let tcpAlarmDraft = null;
+
+function initTcpAlarmDraft() {
+  tcpAlarmDraft = deepClone(config.alarmSettings?.ModbusTCP || {});
+}
+
+
 function bindTcpAlarmHandlers() {
   if (tcpHandlersBound) return;
   tcpHandlersBound = true;
@@ -4132,15 +4625,20 @@ function bindTcpAlarmHandlers() {
     const saveBtn = e.target.closest(".tcp-save");
     if (saveBtn) {
       try {
-        saveConfig?.();
+        config.alarmSettings ??= {};
+        config.alarmSettings.ModbusTCP = deepClone(tcpAlarmDraft);
+
+        saveConfig();
+
         saveBtn.textContent = "Saved ✓";
         setTimeout(() => (saveBtn.textContent = "Save"), 900);
       } catch (err) {
-        console.error("Save failed", err);
-        alert("Failed to save configuration");
+        console.error(err);
+        alert("Failed to save Modbus TCP alarms");
       }
       return;
     }
+
 
     /* ================= TAG-LEVEL ACTIONS ================= */
     const tagDiv = e.target.closest(".tcp-tag");
@@ -4162,7 +4660,6 @@ function bindTcpAlarmHandlers() {
         message: `${plcKey} ${tagName}`,
         enabled: true,
       });
-
       renderTcpBody(plcType);
       return;
     }
@@ -4231,6 +4728,9 @@ function bindTcpAlarmHandlers() {
           : null;
 
       // 🔥 VALIDATION
+      if (thr < min || thr > max) {
+        throw new Error(`Threshold ${thr} is not between  ${min} & ${max}`);
+      }
       if ((cond === "<" || cond === "<=") && min !== null && thr < min) {
         throw new Error(`Threshold ${thr} is less than minimum ${min}`);
       }
@@ -4239,6 +4739,7 @@ function bindTcpAlarmHandlers() {
         throw new Error(`Threshold ${thr} is greater than maximum ${max}`);
       }
 
+
       // ✅ ONLY UPDATE IF VALID
       alertObj.condition = cond;
       alertObj.threshold = thrRaw;
@@ -4246,6 +4747,7 @@ function bindTcpAlarmHandlers() {
       alertObj.contact = tr.querySelector(".contact")?.value || "";
       alertObj.message = tr.querySelector(".msg")?.value || "";
       alertObj.enabled = !!tr.querySelector(".en")?.checked;
+
 
     } catch (err) {
       alert(err.message);
@@ -4306,12 +4808,15 @@ function renderAlarmSettingsContent(mainTab, subTab) {
   if (mainTab === "Digital I/O") {
     return renderDigitalIOAlertsForm(subTab);
   }
-  if (mainTab === "Analog") {
-    return renderAnalogAlertsForm(subTab);
+  if (mainTab === "Analog I/O") {
+    const chIndex = typeof subTab === "number" ? subTab : 0;
+    return renderAnalogAlertsForm(chIndex);
   }
+
   if (mainTab === "Modbus TCP") {
     const types = getPlcTypes();
     const defaultType = types[0];
+    initTcpAlarmDraft();
 
     return `
     ${renderTcpTabs(defaultType)}
@@ -4334,151 +4839,237 @@ function renderAlarmSettingsContent(mainTab, subTab) {
   return `<div style="padding: 20px;">Please select a tab</div>`;
 }
 
-function renderDigitalIOAlertsForm(channel) {
-  // Ensure store exists
-  config.alarmSettings = config.alarmSettings || {};
-  config.alarmSettings["Digital I/O"] =
-    config.alarmSettings["Digital I/O"] || {};
-  config.alarmSettings["Digital I/O"][channel] = config.alarmSettings[
-    "Digital I/O"
-  ][channel] || { alerts: [] };
+function renderDigitalIOChannelTabs(activeChannel) {
+  const channels = config.ioSettings.digitalInput?.channels || [];
 
-  const channelStore = config.alarmSettings["Digital I/O"][channel];
-  channelStore.alerts = Array.isArray(channelStore.alerts)
-    ? channelStore.alerts
-    : [];
+  return `
+    <div class="tabs-line" style="margin-bottom:10px;">
+      ${channels
+      .map(
+        (ch, i) => `
+        <button class="sub-tab-btn${activeChannel === i ? " active" : ""}"
+                data-channel="${i}">
+          ${ch.name || `DI${i + 1}`}
+        </button>
+      `
+      )
+      .join("")}
+    </div>
+  `;
+}
 
-  const rows = channelStore.alerts
+
+function renderDigitalIOAlertsForm(channelIndex) {
+  if (!config.ioSettings.digitalInput || !Array.isArray(config.ioSettings.digitalInput.channels)) {
+    return `<div style="padding:16px;color:#c00;">Digital Input not configured</div>`;
+  }
+
+  channelIndex = Number(channelIndex);
+  if (!Number.isInteger(channelIndex)) channelIndex = 0;
+
+  const channel = config.ioSettings.digitalInput.channels[channelIndex];
+  if (!channel) {
+    return `<div style="padding:16px;color:#c00;">Invalid channel ${channelIndex}</div>`;
+  }
+
+  config.alarmSettings ??= {};
+  config.alarmSettings["Digital I/O"] ??= {};
+  if (!config.alarmSettings["Digital I/O"][channelIndex]) {
+    config.alarmSettings["Digital I/O"][channelIndex] = { alerts: [] };
+  }
+
+  const store = config.alarmSettings["Digital I/O"][channelIndex];
+
+  const rows = store.alerts
     .map(
       (row, i) => `
-            <tr>
-              <td>${i + 1}</td>
-              <td>
-                <select name="trigger_${i}">
-                  <option ${row.trigger === "High" ? "selected" : ""
-        }>High</option>
-                  <option ${row.trigger === "Low" ? "selected" : ""}>Low</option>
-                </select>
-              </td>
-              <td><input type="text" name="contact_${i}" value="${row.contact ?? ""
-        }" style="width:140px"></td>
-              
-          <td>
-            <input type="email"
-                   name="email_${i}"
-                   value="${row.email ?? ""}"
-                   placeholder="user@example.com"
-                   style="width:160px">
-          </td>
-              <td><input type="text" name="message_${i}" value="${row.message ?? ""
-        }" style="width:160px"></td>
-              <td style="text-align:center;"><input type="checkbox" name="enabled_${i}" ${row.enabled ? "checked" : ""
-        }></td>
-              <td style="text-align:center;"><button type="button" class="del-alert" data-index="${i}" title="Remove" style="color:#c00;background:transparent;border:none;font-size:18px;cursor:pointer;">×</button></td>
-            </tr>
-          `,
+      <tr>
+        <td>${i + 1}</td>
+
+        <td>
+          <select name="trigger_${i}">
+            <option value="HIGH" ${row.trigger === "HIGH" ? "selected" : ""}>
+              HIGH
+            </option>
+            <option value="LOW" ${row.trigger === "LOW" ? "selected" : ""}>
+              LOW
+            </option>
+          </select>
+        </td>
+
+        <td><input type="number" name="delay_${i}" value="${row.delay ?? 0}" style="width:80px"></td>
+        <td><input type="email" name="email_${i}" value="${row.email ?? ""}" style="width:140px"></td>
+        <td><input type="text" name="contact_${i}" value="${row.contact ?? ""}" style="width:140px"></td>
+        <td><input type="text" name="message_${i}" value="${row.message ?? ""}" style="width:160px"></td>
+
+        <td style="text-align:center">
+          <input type="checkbox" name="enabled_${i}" ${row.enabled ? "checked" : ""}>
+        </td>
+
+        <td style="text-align:center">
+          <button type="button" class="del-alert" data-index="${i}">×</button>
+        </td>
+      </tr>
+    `
     )
     .join("");
 
   return `
-          <form id="digital-io-alerts-form">
-            <div style="margin-bottom:10px;">
-              <button type="button" class="button-primary" id="add-digital-alert-btn">+ Add Alert</button>
-            </div>
-            <div style="overflow-x:auto;">
-              <table class="channel-table" style="width:100%; background:#fff;">
-                <tr>
-                  <th>#</th>
-                  <th>Trigger</th>
-                  <th>Contact</th>
-                  <th>Email</th>
-                  <th>Message</th>
-                  <th>Enabled</th>
-                  <th>Delete</th>
-                </tr>
-                ${rows}
-              </table>
-            </div>
-            <div style="margin-top:12px;">
-              <button type="submit" class="button-primary">Save</button>
-              <span class="success-tick" id="digital-io-alerts-tick" style="display:none;">✔</span>
-            </div>
-          </form>
-        `;
+    ${renderDigitalIOChannelTabs(channelIndex)}
+
+    <form id="digital-io-alerts-form">
+      <button type="button" class="button-primary" id="add-digital-alert-btn">
+        + Add Alert
+      </button>
+
+      <table class="channel-table" style="width:100%; background:#fff; margin-top:10px;">
+        <tr>
+          <th>#</th>
+          <th>Trigger</th>
+          <th>Delay (s)</th>
+          <th>Email</th>
+          <th>Contact</th>
+          <th>Message</th>
+          <th>Enabled</th>
+          <th>Delete</th>
+        </tr>
+        ${rows}
+      </table>
+
+      <div style="margin-top:12px;">
+        <button type="button" class="button-primary" id="save-digital-alerts">
+          Save
+        </button>
+        <span class="success-tick" id="digital-io-alerts-tick" style="display:none;">✔</span>
+      </div>
+    </form>
+  `;
 }
 
-function renderAnalogAlertsForm(channel) {
-  // Ensure store exists
-  config.alarmSettings = config.alarmSettings || {};
-  config.alarmSettings.Analog = config.alarmSettings.Analog || {};
-  config.alarmSettings.Analog[channel] = config.alarmSettings.Analog[
-    channel
-  ] || { alerts: [] };
 
-  const channelStore = config.alarmSettings.Analog[channel];
-  channelStore.alerts = Array.isArray(channelStore.alerts)
-    ? channelStore.alerts
-    : [];
+function renderAnalogChannelTabs(activeChannel) {
+  const channels = config.ioSettings.analog?.channels || [];
 
-  const rows = channelStore.alerts
+  return `
+    <div class="tabs-line" style="margin-bottom:10px;">
+      ${channels
+      .map(
+        (ch, i) => `
+        <button class="sub-tab-btn${activeChannel === i ? " active" : ""}"
+                data-channel="${i}">
+          ${ch.name || `A${i + 1}`}
+        </button>
+      `,
+      )
+      .join("")}
+    </div>
+  `;
+}
+
+
+function renderAnalogAlertsForm(channelIndex) {
+  if (!config.ioSettings.analog || !Array.isArray(config.ioSettings.analog.channels)) {
+    return `<div style="padding:16px;color:#c00;">Analog not configured</div>`;
+  }
+
+  channelIndex = Number(channelIndex);
+  if (!Number.isInteger(channelIndex)) channelIndex = 0;
+
+  const channel = config.ioSettings.analog.channels[channelIndex];
+  if (!channel) {
+    return `<div style="padding:16px;color:#c00;">Invalid channel ${channelIndex}</div>`;
+  }
+
+  const [min, max] = channel.range
+  .match(/-?\d+(\.\d+)?/g)
+  ?.map(Number) || [];
+
+
+  config.alarmSettings ??= {};
+  config.alarmSettings.Analog ??= {};
+  if (!config.alarmSettings.Analog[channelIndex]) {
+    config.alarmSettings.Analog[channelIndex] = { alerts: [] };
+  }
+
+  const store = config.alarmSettings.Analog[channelIndex];
+
+  const rows = store.alerts
     .map(
       (row, i) => `
-            <tr>
-              <td>${i + 1}</td>
-              <td>
-                <select name="condition_${i}">
-                  <option ${row.condition === "<=" ? "selected" : ""}><=</option>
-                  <option ${row.condition === "<" ? "selected" : ""}><</option>
-                  <option ${row.condition === ">=" ? "selected" : ""}>>=</option>
-                  <option ${row.condition === ">" ? "selected" : ""}>></option>
-                </select>
-              </td>
-              <td><input type="number" step="any" name="threshold_${i}" value="${row.threshold ?? ""
-        }" style="width:80px"></td>
-              <td><input type="number" name="delay_${i}" value="${row.delay ?? ""
-        }" placeholder="seconds" style="width:80px"></td>
-              <td><input type="email" name="email_${i}" value="${row.email ?? ""
-        }" placeholder="email@example.com" style="width:140px"></td>
-              <td><input type="text" name="contact_${i}" value="${row.contact ?? ""
-        }" style="width:140px"></td>
-              <td><input type="text" name="message_${i}" value="${row.message ?? ""
-        }" style="width:160px"></td>
-              <td style="text-align:center;"><input type="checkbox" name="enabled_${i}" ${row.enabled ? "checked" : ""
-        }></td>
-              <td style="text-align:center;"><button type="button" class="del-alert" data-index="${i}" title="Remove" style="color:#c00;background:transparent;border:none;font-size:18px;cursor:pointer;">×</button></td>
-            </tr>
-          `,
+      <tr>
+        <td>${i + 1}</td>
+
+        <td>
+          <select name="condition_${i}">
+            <option value="<"  ${row.condition === "<" ? "selected" : ""}>&lt;</option>
+            <option value="<=" ${row.condition === "<=" ? "selected" : ""}>&le;</option>
+            <option value=">"  ${row.condition === ">" ? "selected" : ""}>&gt;</option>
+            <option value=">=" ${row.condition === ">=" ? "selected" : ""}>&ge;</option>
+          </select>
+        </td>
+
+        <td>
+          <input type="number"
+                 name="threshold_${i}"
+                 step="any"
+                 min="${min}"
+                 max="${max}"
+                 value="${row.threshold ?? min}"
+                 style="width:80px">
+          <div style="font-size:11px;color:#888;">Range: ${min} – ${max}</div>
+        </td>
+
+        <td><input type="number" name="delay_${i}" value="${row.delay ?? 0}" style="width:80px"></td>
+        <td><input type="email" name="email_${i}" value="${row.email ?? ""}" style="width:140px"></td>
+        <td><input type="text" name="contact_${i}" value="${row.contact ?? ""}" style="width:140px"></td>
+        <td><input type="text" name="message_${i}" value="${row.message ?? ""}" style="width:160px"></td>
+
+        <td style="text-align:center">
+          <input type="checkbox" name="enabled_${i}" ${row.enabled ? "checked" : ""}>
+        </td>
+
+        <td style="text-align:center">
+          <button type="button" class="del-alert" data-index="${i}">×</button>
+        </td>
+      </tr>
+    `
     )
     .join("");
 
   return `
-          <form id="analog-alerts-form">
-            <div style="margin-bottom:10px;">
-              <button type="button" class="button-primary" id="add-analog-alert-btn">+ Add Alert</button>
-            </div>
-            <div style="overflow-x:auto;">
-              <table class="channel-table" style="width:100%; background:#fff;">
-                <tr>
-                  <th>#</th>
-                  <th>Condition</th>
-                  <th>Threshold</th>
-                  <th>Delay (s)</th>
-                  <th>Email</th>
-                  <th>Contact</th>
-                  <th>Message</th>
-                  <th>Enabled</th>
-                  <th>Delete</th>
-                </tr>
-                ${rows}
-              </table>
-            </div>
-            <div style="margin-top:12px;">
-              <button type="submit" class="button-primary">Save</button>
-              <span class="success-tick" id="analog-alerts-tick" style="display:none;">✔</span>
-            </div>
-          </form>
-        `;
+    ${renderAnalogChannelTabs(channelIndex)}
+
+    <form id="analog-alerts-form">
+      <button type="button" class="button-primary" id="add-analog-alert-btn">
+        + Add Alert
+      </button>
+
+      <table class="channel-table" style="width:100%;background:#fff;margin-top:10px;">
+        <tr>
+          <th>#</th>
+          <th>Condition</th>
+          <th>Threshold</th>
+          <th>Delay (s)</th>
+          <th>Email</th>
+          <th>Contact</th>
+          <th>Message</th>
+          <th>Enabled</th>
+          <th>Delete</th>
+        </tr>
+        ${rows}
+      </table>
+
+      <div style="margin-top:12px;">
+        <button type="button" class="button-primary" id="save-analog-alerts">
+          Save
+        </button>
+        <span class="success-tick" id="analog-alerts-tick" style="display:none;">✔</span>
+      </div>
+    </form>
+  `;
 }
+
+
 
 // Updated helper functions for Energy Meter registers and alerts
 function getEnergyBrandRegisters(brandKey, slaveId) {
@@ -4525,6 +5116,12 @@ function migrateModbusAlertsIfNeeded() {
 
 
 // ===================== Updated Energy Meter with Register Tabs =====================
+function renderModbusRTUInner() {
+  return `
+    <div class="panel-header">Modbus RTU</div>
+    <div id="modbus-rtu-root"></div>
+  `;
+}
 function renderModbusRTUDeviceSection(
   selectedBrand = "",
   selectedSlave = "",
@@ -5136,14 +5733,16 @@ function renderNetworkPanel() {
     other: "",
   };
 
+  const $ = (id) => document.getElementById(id);
+
+  // ---------- PANEL GUARD ----------
+  const panel = $("main-panel");
+  if (!panel) return;
+
   // ---------- HARD GUARANTEES ----------
   if (!config.network) config.network = {};
-
-  if (!config.network.wifi)
-    config.network.wifi = { ssid: "", password: "" };
-
-  if (!config.network.sim4g)
-    config.network.sim4g = { provider: "", apn: "" };
+  if (!config.network.wifi) config.network.wifi = { ssid: "", password: "" };
+  if (!config.network.sim4g) config.network.sim4g = { provider: "", apn: "" };
 
   if (!config.network.static) {
     config.network.static = {
@@ -5172,7 +5771,7 @@ function renderNetworkPanel() {
   const net = config.network;
 
   // ---------- UI ----------
-  document.getElementById("main-panel").innerHTML = `
+  panel.innerHTML = `
     <div class="panel-header">Network Configuration</div>
 
     <div class="tab-list">
@@ -5185,15 +5784,11 @@ function renderNetworkPanel() {
     <!-- Wi-Fi -->
     <div class="tab-content" id="wifi-tab">
       <fieldset class="net-fieldset">
-        <legend>Wi-Fi Credentials</legend>
-
         <label>SSID</label>
-        <input type="text" id="wifi-ssid" value="${net.wifi.ssid}">
-
+        <input id="wifi-ssid" value="${net.wifi.ssid}">
         <label>Password</label>
-        <input type="password" id="wifi-password" value="${net.wifi.password}">
+        <input id="wifi-password" type="password" value="${net.wifi.password}">
       </fieldset>
-
       <button class="button-primary" id="save-wifi">Save Wi-Fi</button>
       <span class="checkmark" id="wifi-tick" style="display:none">✔</span>
     </div>
@@ -5201,120 +5796,96 @@ function renderNetworkPanel() {
     <!-- SIM -->
     <div class="tab-content" id="sim-tab" style="display:none">
       <fieldset class="net-fieldset">
-        <legend>4G SIM (APN)</legend>
-
         <label>Provider</label>
         <select id="apn-provider">
           <option value="">Select provider</option>
-          ${Object.keys(APN_MAP)
-            .map(
-              (p) =>
-                `<option value="${p}" ${
-                  net.sim4g.provider === p ? "selected" : ""
-                }>${p.toUpperCase()}</option>`
-            )
-            .join("")}
+          ${Object.keys(APN_MAP).map(
+    p => `<option value="${p}" ${net.sim4g.provider === p ? "selected" : ""}>${p.toUpperCase()}</option>`
+  ).join("")}
         </select>
-
         <label>APN</label>
-        <input type="text" id="apn-value" value="${net.sim4g.apn}">
+        <input id="apn-value" value="${net.sim4g.apn}">
       </fieldset>
-
       <button class="button-primary" id="save-sim">Save SIM</button>
       <span class="checkmark" id="sim-tick" style="display:none">✔</span>
     </div>
 
-    <!-- Ethernet 1 -->
-    <div class="tab-content" id="static-tab" style="display:none">
-      <fieldset class="net-fieldset">
-        <legend>Static IP Configuration</legend>
+<!-- Ethernet 1 -->
+<div class="tab-content" id="static-tab" style="display:none">
+  <fieldset class="net-fieldset">
+    <label>
+      <input type="checkbox" id="static1-enable">
+      Enable Static IP
+    </label>
 
-        <label>Interface</label>
-        <select id="static-iface">
-          <option value="Wired connection 1" ${net.static.iface === "Wired connection 1" ? "selected" : ""}>eth0</option>
-          <option value="Wired connection 2" ${net.static.iface === "Wired connection 2" ? "selected" : ""}>eth1</option>
-        </select>
+    <label for="static1-ip">IP Address</label>
+    <input id="static1-ip" value="${net.static.ip}">
 
-        <label>
-          <input type="checkbox" id="static-enable" ${net.static.enabled ? "checked" : ""}>
-          Enable Static IP
-        </label>
+    <label for="static1-subnet">Subnet Mask</label>
+    <input id="static1-subnet" value="${net.static.subnet}">
 
-        <label>IP Address</label>
-        <input type="text" id="static-ip" value="${net.static.ip}">
+    <label for="static1-gw">Gateway</label>
+    <input id="static1-gw" value="${net.static.gateway}">
 
-        <label>Subnet Mask</label>
-        <input type="text" id="static-subnet" value="${net.static.subnet}">
+    <label for="static1-dns1">Primary DNS</label>
+    <input id="static1-dns1" value="${net.static.dns_primary}">
 
-        <label>Gateway</label>
-        <input type="text" id="static-gw" value="${net.static.gateway}">
+    <label for="static1-dns2">Secondary DNS</label>
+    <input id="static1-dns2" value="${net.static.dns_secondary}">
+  </fieldset>
 
-        <label>Preferred DNS Server</label>
-        <input type="text" id="static-dns1" value="${net.static.dns_primary}">
+  <button class="button-primary" id="save-static">Save Static IP</button>
+  <span class="checkmark" id="static1-tick" style="display:none">✔</span>
+</div>
 
-        <label>Alternate DNS Server</label>
-        <input type="text" id="static-dns2" value="${net.static.dns_secondary}">
-      </fieldset>
 
-      <button class="button-primary" id="save-static">Save Static IP</button>
-      <span class="checkmark" id="static-tick" style="display:none">✔</span>
-    </div>
+<!-- Ethernet 2 -->
+<div class="tab-content" id="static2-tab" style="display:none">
+  <fieldset class="net-fieldset">
+    <label>
+      <input type="checkbox" id="static2-enable">
+      Enable Static IP
+    </label>
 
-    <!-- Ethernet 2 -->
-    <div class="tab-content" id="static2-tab" style="display:none">
-      <fieldset class="net-fieldset">
-        <legend>Static IP Configuration</legend>
+    <label for="static2-ip">IP Address</label>
+    <input id="static2-ip" value="${net.static2.ip}">
 
-        <label>Interface</label>
-        <select id="static-iface">
-          <option value="Wired connection 1" ${net.static2.iface === "Wired connection 1" ? "selected" : ""}>eth0</option>
-          <option value="Wired connection 2" ${net.static2.iface === "Wired connection 2" ? "selected" : ""}>eth1</option>
-        </select>
+    <label for="static2-subnet">Subnet Mask</label>
+    <input id="static2-subnet" value="${net.static2.subnet}">
 
-        <label>
-          <input type="checkbox" id="static2-enable" ${net.static2.enabled ? "checked" : ""}>
-          Enable Static IP
-        </label>
+    <label for="static2-gw">Gateway</label>
+    <input id="static2-gw" value="${net.static2.gateway}">
 
-        <label>IP Address</label>
-        <input type="text" id="static2-ip" value="${net.static2.ip}">
+    <label for="static2-dns1">Primary DNS</label>
+    <input id="static2-dns1" value="${net.static2.dns_primary}">
 
-        <label>Subnet Mask</label>
-        <input type="text" id="static2-subnet" value="${net.static2.subnet}">
+    <label for="static2-dns2">Secondary DNS</label>
+    <input id="static2-dns2" value="${net.static2.dns_secondary}">
+  </fieldset>
 
-        <label>Gateway</label>
-        <input type="text" id="static2-gw" value="${net.static2.gateway}">
+  <button class="button-primary" id="save-static2">Save Static IP</button>
+  <span class="checkmark" id="static2-tick" style="display:none">✔</span>
+</div>
 
-        <label>Preferred DNS Server</label>
-        <input type="text" id="static2-dns1" value="${net.static2.dns_primary}">
-
-        <label>Alternate DNS Server</label>
-        <input type="text" id="static2-dns2" value="${net.static2.dns_secondary}">
-      </fieldset>
-
-      <button class="button-primary" id="save-static2">Save Static IP</button>
-      <span class="checkmark" id="static2-tick" style="display:none">✔</span>
-    </div>
   `;
 
-  // ---------- Tabs ----------
-  document.querySelectorAll(".tab-list button").forEach((btn) => {
+  // ---------- TABS ----------
+  document.querySelectorAll(".tab-list button").forEach(btn => {
     btn.onclick = () => {
-      document
-        .querySelectorAll(".tab-list button")
-        .forEach((b) => b.classList.remove("active"));
+      document.querySelectorAll(".tab-list button")
+        .forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
 
-      ["wifi", "sim", "static", "static2"].forEach((t) => {
-        document.getElementById(`${t}-tab`).style.display =
+      ["wifi", "sim", "static", "static2"].forEach(t => {
+        $(`${t}-tab`).style.display =
           btn.dataset.tab === t ? "block" : "none";
       });
     };
   });
 
-  // ---------- APN logic ----------
-  const providerSel = document.getElementById("apn-provider");
-  const apnInput = document.getElementById("apn-value");
+  // ---------- APN ----------
+  const providerSel = $("apn-provider");
+  const apnInput = $("apn-value");
 
   providerSel.onchange = () => {
     if (!providerSel.value) {
@@ -5330,67 +5901,64 @@ function renderNetworkPanel() {
   };
   providerSel.onchange();
 
-  // ---------- Static enable toggle (Ethernet 1) ----------
-  const toggleStatic1 = () => {
-    const en = document.getElementById("static-enable").checked;
-    ["static-ip", "static-subnet", "static-gw", "static-dns1", "static-dns2"]
-      .forEach(id => document.getElementById(id).disabled = !en);
-  };
-  document.getElementById("static-enable").onchange = toggleStatic1;
-  toggleStatic1();
+  // ---------- STATIC TOGGLES ----------
+  function toggle(prefix) {
+    const en = $(`${prefix}-enable`).checked;
+    ["ip", "subnet", "gw", "dns1", "dns2"]
+      .forEach(f => $(`${prefix}-${f}`).disabled = !en);
+  }
 
-  // ---------- Static enable toggle (Ethernet 2) ----------
-  const toggleStatic2 = () => {
-    const en = document.getElementById("static2-enable").checked;
-    ["static2-ip", "static2-subnet", "static2-gw", "static2-dns1", "static2-dns2"]
-      .forEach(id => document.getElementById(id).disabled = !en);
-  };
-  document.getElementById("static2-enable").onchange = toggleStatic2;
-  toggleStatic2();
+  $("static1-enable").checked = net.static.enabled;
+  $("static2-enable").checked = net.static2.enabled;
 
-  // ---------- Save handlers ----------
-  document.getElementById("save-wifi").onclick = async () => {
-    net.wifi.ssid = wifi-ssid.value.trim();
-    net.wifi.password = wifi-password.value;
+  toggle("static1");
+  toggle("static2");
+
+  $("static1-enable").onchange = () => toggle("static1");
+  $("static2-enable").onchange = () => toggle("static2");
+
+  // ---------- SAVE ----------
+  $("save-wifi").onclick = async () => {
+    net.wifi.ssid = $("wifi-ssid").value.trim();
+    net.wifi.password = $("wifi-password").value;
     await saveConfig();
     showTick("wifi-tick");
   };
 
-  document.getElementById("save-sim").onclick = async () => {
+  $("save-sim").onclick = async () => {
     net.sim4g.provider = providerSel.value;
     net.sim4g.apn = apnInput.value.trim();
     await saveConfig();
     showTick("sim-tick");
   };
 
-  document.getElementById("save-static").onclick = async () => {
+  $("save-static").onclick = async () => {
     Object.assign(net.static, {
-      iface: static-iface.value,
-      enabled: static-enable.checked,
-      ip: static-ip.value.trim(),
-      subnet: static-subnet.value.trim(),
-      gateway: static-gw.value.trim(),
-      dns_primary: static-dns1.value.trim(),
-      dns_secondary: static-dns2.value.trim(),
+      enabled: $("static1-enable").checked,
+      ip: $("static1-ip").value.trim(),
+      subnet: $("static1-subnet").value.trim(),
+      gateway: $("static1-gw").value.trim(),
+      dns_primary: $("static1-dns1").value.trim(),
+      dns_secondary: $("static1-dns2").value.trim(),
     });
     await saveConfig();
-    showTick("static-tick");
+    showTick("static1-tick");
   };
 
-  document.getElementById("save-static2").onclick = async () => {
+  $("save-static2").onclick = async () => {
     Object.assign(net.static2, {
-      iface: static2-iface.value,
-      enabled: static2-enable.checked,
-      ip: static2-ip.value.trim(),
-      subnet: static2-subnet.value.trim(),
-      gateway: static2-gw.value.trim(),
-      dns_primary: static2-dns1.value.trim(),
-      dns_secondary: static2-dns2.value.trim(),
+      enabled: $("static2-enable").checked,
+      ip: $("static2-ip").value.trim(),
+      subnet: $("static2-subnet").value.trim(),
+      gateway: $("static2-gw").value.trim(),
+      dns_primary: $("static2-dns1").value.trim(),
+      dns_secondary: $("static2-dns2").value.trim(),
     });
     await saveConfig();
     showTick("static2-tick");
   };
 }
+
 
 
 function renderOfflineDataPanel() {
@@ -6487,6 +7055,24 @@ function renderAdminSettingsPanel() {
     };
   }
 
+  if (!Array.isArray(config.adminSettings.rs485Ports)) {
+    config.adminSettings.rs485Ports = [];
+  }
+  if (!Array.isArray(config.adminSettings.engineeringUnits)) {
+    config.adminSettings.engineeringUnits = [
+      { type: "temperature", symbols: ["°C", "°F"] },
+      { type: "flow", symbols: ["L/min", "m³/h"] },
+      { type: "pressure", symbols: ["bar", "psi", "Pa"] },
+      { type: "level", symbols: ["%", "m"] },
+      { type: "energy", symbols: ["kWh", "Wh"] },
+      { type: "voltage", symbols: ["V"] },
+      { type: "current", symbols: ["A", "mA"] }
+    ];
+  }
+
+
+
+
   document.getElementById("main-panel").innerHTML = `
     <div style="
       font-family: Segoe UI, Arial;
@@ -6506,18 +7092,19 @@ function renderAdminSettingsPanel() {
       </div>
 
       <div style="display:flex; gap:8px; margin-bottom:12px;">
-        ${["analog", "digital", "modbus_rtu", "plc", "smtp"].map(t => `
-          <button onclick="renderAdminTab('${t}')"
-            style="
-              padding:8px 14px;
-              border:1px solid #c5c9ce;
-              background:#e8ebef;
-              cursor:pointer;
-              border-radius:4px;
-            ">
-            ${t.replace("_", " ").toUpperCase()}
-          </button>
-        `).join("")}
+      ${["analog", "digital", "modbus_rtu", "plc", "smtp"].map(t => `
+        <button onclick="renderAdminTab('${t}')"
+          style="
+            padding:8px 14px;
+            border:1px solid #c5c9ce;
+            background:#e8ebef;
+            cursor:pointer;
+            border-radius:4px;
+          ">
+          ${t.replace("_", " ").toUpperCase()}
+        </button>
+      `).join("")}
+      
       </div>
 
       <div id="admin-tab-content"
@@ -6547,6 +7134,172 @@ function renderAdminSettingsPanel() {
   `;
 
   renderAdminTab("analog");
+}
+
+function addEngineeringUnit() {
+  config.adminSettings.engineeringUnits.push({
+    type: "",
+    symbols: []
+  });
+  renderModbusSubTab("engineering");
+}
+
+function removeEngineeringUnit(i) {
+  config.adminSettings.engineeringUnits.splice(i, 1);
+  renderModbusSubTab("engineering");
+}
+
+
+function renderModbusSubTab(sub) {
+  const el = document.getElementById("modbus-subtab-content");
+
+  if (sub === "rs485") {
+    const ports = config.adminSettings.rs485Ports;
+
+    el.innerHTML = `
+      <div style="margin-bottom:10px; font-weight:600;">
+        RS485 Ports
+      </div>
+
+      <div id="rs485-list">
+        ${ports.map((p, i) => `
+<div style="
+  display:grid;
+  grid-template-columns:150px 1fr auto;
+  gap:8px;
+  margin-bottom:6px;
+  align-items:center;
+">
+  <label>Port Name</label>
+  <input
+    value="${p.name}"
+    onchange="updateRS485(${i}, 'name', this.value)"
+  >
+  <button onclick="removeRS485(${i})">✖</button>
+
+  <label>Device</label>
+  <input
+    value="${p.port}"
+    onchange="updateRS485(${i}, 'port', this.value)"
+  >
+  <span></span>
+</div>
+
+        `).join("")}
+      </div>
+
+      <button onclick="addRS485()" style="margin-top:8px;">
+        + Add RS485 Port
+      </button>
+    `;
+  }
+
+  if (sub === "mail") {
+    const key = "modbus_rtu";
+    el.innerHTML = `
+    <div style="margin-top:15px;">
+      <label style="display:block; font-weight:600; margin-bottom:6px;">
+        Mail Body
+      </label>
+      <textarea rows="5"
+        style="
+          width:100%;
+          border:1px solid #c5c9ce;
+          padding:8px;
+          font-family: monospace;
+          border-radius:4px;
+        "
+        onchange="config.adminSettings.mailBody['${key}'] = this.value"
+      >${config.adminSettings.mailBody[key] || ""}</textarea>
+    </div>
+    `;
+  }
+  if (sub === "random") {
+    const brands = config.ModbusRTU?.Devices?.brands || {};
+    let html = "";
+
+    Object.entries(brands).forEach(([brand, data]) => {
+      data.slaves.forEach((slave, idx) => {
+        html += `
+          <label style="display:block; margin-bottom:6px;">
+            <input type="checkbox"
+              ${slave.generate_random ? "checked" : ""}
+              onchange="
+                config.ModbusRTU.Devices.brands['${brand}']
+                .slaves[${idx}].generate_random = this.checked
+              ">
+            ${data.label} – Slave ${slave.id} (Random)
+          </label>
+        `;
+      });
+    });
+
+    el.innerHTML = `
+      <div style="font-weight:600; margin-bottom:10px;">
+        Modbus RTU – Random Value Control
+      </div>
+      ${html || "<i>No Modbus slaves configured</i>"}
+    `;
+  }
+
+  if (sub === "engineering") {
+    const list = config.adminSettings.engineeringUnits;
+
+    el.innerHTML = `
+      <div style="font-weight:600; margin-bottom:10px;">
+        Engineering Units (Sensor → Symbols)
+      </div>
+  
+      ${list.map((row, i) => `
+        <div style="
+          display:grid;
+          grid-template-columns:180px 1fr auto;
+          gap:8px;
+          margin-bottom:6px;
+          align-items:center;
+        ">
+          <input
+            placeholder="Sensor Type (e.g. temperature)"
+            value="${row.type}"
+            onchange="config.adminSettings.engineeringUnits[${i}].type = this.value"
+          >
+  
+          <input
+            placeholder="Symbols (comma separated, e.g. °C,°F)"
+            value="${row.symbols.join(',')}"
+            onchange="
+              config.adminSettings.engineeringUnits[${i}].symbols =
+                this.value.split(',').map(s => s.trim()).filter(Boolean)
+            "
+          >
+  
+          <button onclick="removeEngineeringUnit(${i})">✖</button>
+        </div>
+      `).join("")}
+  
+      <button onclick="addEngineeringUnit()" style="margin-top:8px;">
+        + Add Sensor Type
+      </button>
+    `;
+  }
+
+}
+
+function addRS485() {
+  config.adminSettings.rs485Ports.push({
+    name: "",
+    port: ""
+  });
+  renderModbusSubTab("rs485");
+}
+
+function removeRS485(index) {
+  config.adminSettings.rs485Ports.splice(index, 1);
+  renderModbusSubTab("rs485");
+}
+
+function updateRS485(index, field, value) {
+  config.adminSettings.rs485Ports[index][field] = value;
 }
 
 
@@ -6587,10 +7340,17 @@ function renderAdminTab(tab) {
 
   if (tab === "modbus_rtu") {
     container.innerHTML = `
-      <h3>Modbus RTU</h3>
-      ${renderModbusRTURandom()}
-      ${renderMailBody("modbus_rtu")}
+      <div style="margin-bottom:12px;">
+        <button onclick="renderModbusSubTab('mail')">MAIL BODY</button>
+        <button onclick="renderModbusRTURandom()">Generate Random Values</button>
+        <button onclick="renderModbusSubTab('rs485')">RS485</button>
+        <button onclick="renderModbusSubTab('engineering')">ENGINEERING UNITS</button>
+      </div>
+  
+      <div id="modbus-subtab-content"></div>
     `;
+
+    renderModbusSubTab("mail");
   }
 
   if (tab === "plc") {
@@ -6670,8 +7430,7 @@ function renderMailBody(key) {
   `;
 }
 
-
-function renderModbusRTURandom() {
+function renderModbusRTURandom1() {
   const brands = config.ModbusRTU.Devices.brands;
   let html = "";
 
@@ -6690,6 +7449,11 @@ function renderModbusRTURandom() {
 
   return html;
 }
+
+function renderModbusRTURandom() {
+  renderModbusSubTab("random");
+}
+
 
 function renderPLCRandom() {
   return config.plc_configurations.map((plc, i) => `
@@ -6794,10 +7558,31 @@ function logoutUser() {
     });
 }
 
+function lockViewOnly(container = document) {
+  if (!isReadOnly()) return;
+
+  container.querySelectorAll(
+    "input, select, textarea, button"
+  ).forEach(el => {
+    // allow side navigation
+    if (el.closest("#side-nav")) return;
+
+    // allow logout & help
+    if (el.id === "logout" || el.dataset.allow === "true") return;
+
+    el.disabled = true;
+    el.readOnly = true;
+    el.style.pointerEvents = "none";
+    el.style.opacity = "0.6";
+  });
+}
+
+
 function applyRoleBasedMenu(role) {
   const adminItems = [
     document.getElementById("nav-database"),
     document.getElementById("nav-admin-settings"),
+    // document.getElementById("nav-alarms")
   ];
 
   if (role === "admin" || role === "superadmin") {
@@ -6882,18 +7667,20 @@ function downloadConfig() {
 }
 
 // Initial panel
-window.onload = loadConfig;
-
 window.onload = () => {
   fetch("/whoami")
     .then(res => res.json())
     .then(data => {
       applyRoleBasedMenu(data.role);
       loadConfig();
+
+      if (data.role === "user") {
+        applyViewOnlyMode();
+      }
     })
     .catch(() => {
-      // default = safest
       applyRoleBasedMenu(null);
       loadConfig();
     });
 };
+

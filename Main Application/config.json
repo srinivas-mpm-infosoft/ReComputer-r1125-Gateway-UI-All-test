@@ -15,9 +15,9 @@
         {
           "address": "0x48",
           "enabled": true,
-          "mode": "0-10V",
+          "mode": "0.-2.048V",
           "name": "Analog input",
-          "range": "0-5"
+          "range": "0:10V"
         }
       ],
       "db": {
@@ -30,6 +30,17 @@
       "name": "Analog Input",
       "pollingInterval": 5,
       "pollingIntervalUnit": "Sec"
+    },
+    "analogOutput": {
+      "channels": [
+        {
+          "address": "",
+          "enabled": false,
+          "mode": "0-10V",
+          "name": "AO1",
+          "range": ""
+        }
+      ]
     },
     "digitalInput": {
       "channels": [
@@ -47,12 +58,12 @@
       "db": {
         "db_name": "test",
         "table_name": "digital_reading",
-        "upload_cloud": true,
+        "upload_cloud": false,
         "upload_local": true
       },
-      "generate_random": false,
+      "generate_random": true,
       "name": "Digital Input",
-      "pollingInterval": 1,
+      "pollingInterval": 5,
       "pollingIntervalUnit": "Sec"
     },
     "digitalOutput": {
@@ -64,7 +75,7 @@
         },
         {
           "name": "Digital Output 2",
-          "state": 0,
+          "state": 1,
           "pin": "533"
         }
       ]
@@ -74,6 +85,16 @@
       "digitalInput": true,
       "modbus": true,
       "modbusTCP": false
+    },
+    "digitalRelay": {
+      "channels": [
+        {
+          "name": "R1",
+          "pin": "",
+          "mode": "NO",
+          "enabled": false
+        }
+      ]
     }
   },
   "wireless": {
@@ -202,7 +223,7 @@
           "read": [
             {
               "address": "100",
-              "datatype": "INT",
+              "datatype": "FLOAT",
               "length": 1,
               "max": "4000",
               "min": 0,
@@ -213,11 +234,11 @@
             },
             {
               "address": "6",
-              "datatype": "INT",
+              "datatype": "FLOAT",
               "length": 1,
               "max": 100,
               "min": 0,
-              "read": false,
+              "read": true,
               "tag": "Read register",
               "value": "",
               "write": false
@@ -228,7 +249,8 @@
           "ip": "192.168.1.5",
           "port": 502
         },
-        "data_freq_sec": 1
+        "data_freq_sec": 10,
+        "data_freq_unit": "sec"
       },
       "enabled": true,
       "isExpanded": true,
@@ -270,40 +292,45 @@
   },
   "alarmSettings": {
     "Analog": {
-      "A1": {
+      "0": {
         "alerts": [
           {
-            "condition": "<=",
-            "threshold": 1.5,
-            "delay": 1,
-            "contact": "",
-            "message": "Value very low",
-            "enabled": false
-          },
-          {
-            "condition": ">=",
-            "threshold": 5,
-            "delay": 1,
-            "contact": "",
-            "message": "Value very high",
-            "enabled": false
-          }
-        ]
-      },
-      "Channel 1": {
-        "alerts": [
-          {
-            "condition": "<=",
-            "contact": "",
-            "delay": "",
-            "enabled": false,
-            "message": "",
-            "threshold": ""
+            "condition": "<",
+            "contact": "9999999999",
+            "delay": 0,
+            "email": "vasus4990@gmail.com",
+            "enabled": true,
+            "message": "Analog Input",
+            "threshold": 5
           }
         ]
       }
     },
     "Digital I/O": {
+      "0": {
+        "alerts": [
+          {
+            "contact": "",
+            "delay": 0,
+            "email": "vasus4990@gmail.com",
+            "enabled": true,
+            "message": "Digital Input",
+            "trigger": "HIGH"
+          }
+        ]
+      },
+      "1": {
+        "alerts": [
+          {
+            "contact": "",
+            "delay": 0,
+            "email": "",
+            "enabled": false,
+            "message": "",
+            "trigger": "LOW"
+          }
+        ]
+      },
       "Channel 1": {
         "alerts": [
           {
@@ -339,6 +366,16 @@
                   "enabled": true,
                   "message": "analog_acquisition_module S2",
                   "threshold": "5"
+                }
+              ],
+              "1|-1|Input Register|1": [
+                {
+                  "condition": ">=",
+                  "contact": "9999999999",
+                  "email": "vasus4990@gmail.com",
+                  "enabled": true,
+                  "message": "analog_acquisition_module S1",
+                  "threshold": "1"
                 }
               ]
             }
@@ -398,10 +435,10 @@
             {
               "condition": "<=",
               "contact": "",
-              "email": "",
+              "email": "vasus4990@gmail.com",
               "enabled": true,
               "message": "delta_plc Read register",
-              "threshold": ""
+              "threshold": "100"
             }
           ]
         }
@@ -419,6 +456,22 @@
               "enabled": true,
               "message": "siemens_test1 test",
               "threshold": "5"
+            }
+          ]
+        }
+      }
+    },
+    "ModbusTCP": {
+      "Delta": {
+        "delta_plc": {
+          "Read register": [
+            {
+              "condition": "<=",
+              "threshold": "100",
+              "email": "vasus4990@gmail.com",
+              "contact": "",
+              "message": "delta_plc Read register",
+              "enabled": true
             }
           ]
         }
@@ -488,124 +541,140 @@
           "registersBySlave": {
             "1": [
               {
+                "conversion": "Float: Big Endian",
+                "divide": 1,
+                "enabled": true,
+                "eng_symbol": "\u00b0C",
+                "eng_unit": "4-20mA",
+                "length": 1,
+                "multiply": 1,
                 "name": "Analog Input 1",
-                "start": 1,
                 "offset": -1,
-                "type": "Input Register",
-                "conversion": "Float: Big Endian",
-                "sql_type": "FLOAT",
-                "length": 1,
-                "multiply": 1,
-                "divide": 1,
-                "process_min": "-20",
                 "process_max": "100",
-                "eng_unit": "4-20mA",
-                "enabled": false
+                "process_min": "-20",
+                "sensor_type": "temperature",
+                "sql_type": "FLOAT",
+                "start": 1,
+                "type": "Input Register"
               },
               {
+                "conversion": "Float: Big Endian",
+                "divide": 1,
+                "enabled": true,
+                "eng_symbol": "L/min",
+                "eng_unit": "4-20mA",
+                "length": 1,
+                "multiply": 1,
                 "name": "Analog Input 2",
+                "offset": -1,
+                "process_max": "10",
+                "process_min": "0",
+                "sensor_type": "flow",
+                "sql_type": "FLOAT",
                 "start": 2,
-                "offset": -1,
-                "type": "Input Register",
-                "conversion": "Float: Big Endian",
-                "sql_type": "FLOAT",
-                "length": 1,
-                "multiply": 1,
-                "divide": 1,
-                "process_min": "0",
-                "process_max": "10",
-                "eng_unit": "4-20mA",
-                "enabled": false
+                "type": "Input Register"
               },
               {
+                "conversion": "Float: Big Endian",
+                "divide": 1,
+                "enabled": true,
+                "eng_symbol": "kWh",
+                "eng_unit": "4-20mA",
+                "length": 1,
+                "multiply": 1,
                 "name": "Analog Input 3",
-                "start": 3,
                 "offset": -1,
-                "type": "Input Register",
-                "conversion": "Float: Big Endian",
-                "sql_type": "FLOAT",
-                "length": 1,
-                "multiply": 1,
-                "divide": 1,
-                "process_min": "0",
                 "process_max": "10",
-                "eng_unit": "4-20mA",
-                "enabled": true
+                "process_min": "0",
+                "sensor_type": "energy",
+                "sql_type": "FLOAT",
+                "start": 3,
+                "type": "Input Register"
               },
               {
+                "conversion": "Float: Big Endian",
+                "divide": 1,
+                "enabled": true,
+                "eng_symbol": "m",
+                "eng_unit": "4-20mA",
+                "length": 1,
+                "multiply": 1,
                 "name": "Analog Input 4",
+                "offset": -1,
+                "process_max": "",
+                "process_min": "",
+                "sensor_type": "Level",
+                "sql_type": "FLOAT",
                 "start": 4,
-                "offset": -1,
-                "type": "Input Register",
-                "conversion": "Float: Big Endian",
-                "sql_type": "FLOAT",
-                "length": 1,
-                "multiply": 1,
-                "divide": 1,
-                "process_min": "",
-                "process_max": "",
-                "eng_unit": "4-20mA",
-                "enabled": false
+                "type": "Input Register"
               },
               {
+                "conversion": "Float: Big Endian",
+                "divide": 1,
+                "enabled": true,
+                "eng_symbol": "",
+                "eng_unit": "4-20mA",
+                "length": 1,
+                "multiply": 1,
                 "name": "Analog Input 5",
+                "offset": -1,
+                "process_max": "",
+                "process_min": "",
+                "sensor_type": "",
+                "sql_type": "FLOAT",
                 "start": 5,
-                "offset": -1,
-                "type": "Input Register",
-                "conversion": "Float: Big Endian",
-                "sql_type": "FLOAT",
-                "length": 1,
-                "multiply": 1,
-                "divide": 1,
-                "process_min": "",
-                "process_max": "",
-                "eng_unit": "4-20mA",
-                "enabled": false
+                "type": "Input Register"
               },
               {
+                "conversion": "Float: Big Endian",
+                "divide": 1,
+                "enabled": true,
+                "eng_symbol": "",
+                "eng_unit": "4-20mA",
+                "length": 1,
+                "multiply": 1,
                 "name": "Analog Input 6",
+                "offset": -1,
+                "process_max": "",
+                "process_min": "",
+                "sensor_type": "",
+                "sql_type": "FLOAT",
                 "start": 6,
-                "offset": -1,
-                "type": "Input Register",
-                "conversion": "Float: Big Endian",
-                "sql_type": "FLOAT",
-                "length": 1,
-                "multiply": 1,
-                "divide": 1,
-                "process_min": "",
-                "process_max": "",
-                "eng_unit": "4-20mA",
-                "enabled": false
+                "type": "Input Register"
               },
               {
+                "conversion": "Float: Big Endian",
+                "divide": 1,
+                "enabled": true,
+                "eng_symbol": "",
+                "eng_unit": "4-20mA",
+                "length": 1,
+                "multiply": 1,
                 "name": "Analog Input 7",
-                "start": 7,
                 "offset": -1,
-                "type": "Input Register",
-                "conversion": "Float: Big Endian",
-                "sql_type": "FLOAT",
-                "length": 1,
-                "multiply": 1,
-                "divide": 1,
-                "process_min": "",
                 "process_max": "",
-                "eng_unit": "4-20mA",
-                "enabled": false
+                "process_min": "",
+                "sensor_type": "",
+                "sql_type": "FLOAT",
+                "start": 7,
+                "type": "Input Register"
               },
               {
-                "name": "Analog Input 8",
-                "start": 8,
-                "offset": -1,
-                "type": "Input Register",
                 "conversion": "Float: Big Endian",
-                "sql_type": "FLOAT",
+                "divide": 1,
+                "enabled": true,
+                "eng_symbol": "",
+                "eng_unit": "4-20mA",
                 "length": 1,
                 "multiply": 1,
-                "divide": 1,
-                "process_min": "",
+                "name": "Analog Input 8",
+                "offset": -1,
                 "process_max": "",
-                "eng_unit": "4-20mA",
-                "enabled": false
+                "process_min": "",
+                "sensor_type": "",
+                "sql_type": "FLOAT",
+                "start": 8,
+                "type": "Input Register"
               }
             ]
           },
@@ -634,203 +703,204 @@
           "registersBySlave": {
             "2": [
               {
+                "conversion": "Float: Big Endian",
+                "divide": 1,
+                "enabled": true,
+                "eng_unit": "none",
+                "length": 2,
+                "multiply": 1,
                 "name": "Current L1",
+                "offset": 0,
+                "process_max": "",
+                "process_min": "",
+                "sql_type": "FLOAT",
                 "start": 2998,
-                "offset": 0,
-                "type": "Input Register",
-                "conversion": "Float: Big Endian",
-                "sql_type": "FLOAT",
-                "length": 2,
-                "multiply": 1,
-                "divide": 1,
-                "process_min": "",
-                "process_max": "",
-                "eng_unit": "none",
-                "enabled": true
+                "type": "Input Register"
               },
               {
+                "conversion": "Float: Big Endian",
+                "divide": 1,
+                "enabled": true,
+                "eng_unit": "none",
+                "length": 2,
+                "multiply": 1,
                 "name": "Current L2",
+                "offset": 0,
+                "process_max": "",
+                "process_min": "",
+                "sql_type": "FLOAT",
                 "start": 3000,
-                "offset": 0,
-                "type": "Input Register",
-                "conversion": "Float: Big Endian",
-                "sql_type": "FLOAT",
-                "length": 2,
-                "multiply": 1,
-                "divide": 1,
-                "process_min": "",
-                "process_max": "",
-                "eng_unit": "none",
-                "enabled": true
+                "type": "Input Register"
               },
               {
+                "conversion": "Float: Big Endian",
+                "divide": 1,
+                "enabled": true,
+                "eng_unit": "none",
+                "length": 2,
+                "multiply": 1,
                 "name": "Current L3",
+                "offset": 0,
+                "process_max": "",
+                "process_min": "",
+                "sql_type": "FLOAT",
                 "start": 3002,
-                "offset": 0,
-                "type": "Input Register",
-                "conversion": "Float: Big Endian",
-                "sql_type": "FLOAT",
-                "length": 2,
-                "multiply": 1,
-                "divide": 1,
-                "process_min": "",
-                "process_max": "",
-                "eng_unit": "none",
-                "enabled": true
+                "type": "Input Register"
               },
               {
+                "conversion": "Float: Big Endian",
+                "divide": 1,
+                "enabled": true,
+                "eng_unit": "none",
+                "length": 2,
+                "multiply": 1,
                 "name": "Voltage L1-L2",
+                "offset": 0,
+                "process_max": "",
+                "process_min": "",
+                "sql_type": "FLOAT",
                 "start": 3018,
-                "offset": 0,
-                "type": "Input Register",
-                "conversion": "Float: Big Endian",
-                "sql_type": "FLOAT",
-                "length": 2,
-                "multiply": 1,
-                "divide": 1,
-                "process_min": "",
-                "process_max": "",
-                "eng_unit": "none",
-                "enabled": true
+                "type": "Input Register"
               },
               {
+                "conversion": "Float: Big Endian",
+                "divide": 1,
+                "enabled": true,
+                "eng_unit": "none",
+                "length": 2,
+                "multiply": 1,
                 "name": "Voltage L2-L3",
+                "offset": 0,
+                "process_max": "",
+                "process_min": "",
+                "sql_type": "FLOAT",
                 "start": 3020,
-                "offset": 0,
-                "type": "Input Register",
-                "conversion": "Float: Big Endian",
-                "sql_type": "FLOAT",
-                "length": 2,
-                "multiply": 1,
-                "divide": 1,
-                "process_min": "",
-                "process_max": "",
-                "eng_unit": "none",
-                "enabled": true
+                "type": "Input Register"
               },
               {
+                "conversion": "Float: Big Endian",
+                "divide": 1,
+                "enabled": true,
+                "eng_unit": "none",
+                "length": 2,
+                "multiply": 1,
                 "name": "Voltage L3-L1",
+                "offset": 0,
+                "process_max": "",
+                "process_min": "",
+                "sql_type": "FLOAT",
                 "start": 3022,
-                "offset": 0,
-                "type": "Input Register",
-                "conversion": "Float: Big Endian",
-                "sql_type": "FLOAT",
-                "length": 2,
-                "multiply": 1,
-                "divide": 1,
-                "process_min": "",
-                "process_max": "",
-                "eng_unit": "none",
-                "enabled": true
+                "type": "Input Register"
               },
               {
+                "conversion": "Float: Big Endian",
+                "divide": 1,
+                "enabled": true,
+                "eng_unit": "none",
+                "length": 2,
+                "multiply": 1,
                 "name": "Voltage L1-N",
+                "offset": 0,
+                "process_max": "",
+                "process_min": "",
+                "sql_type": "FLOAT",
                 "start": 3026,
-                "offset": 0,
-                "type": "Input Register",
-                "conversion": "Float: Big Endian",
-                "sql_type": "FLOAT",
-                "length": 2,
-                "multiply": 1,
-                "divide": 1,
-                "process_min": "",
-                "process_max": "",
-                "eng_unit": "none",
-                "enabled": true
+                "type": "Input Register"
               },
               {
+                "conversion": "Float: Big Endian",
+                "divide": 1,
+                "enabled": true,
+                "eng_unit": "none",
+                "length": 2,
+                "multiply": 1,
                 "name": "Voltage L2-N",
+                "offset": 0,
+                "process_max": "",
+                "process_min": "",
+                "sql_type": "FLOAT",
                 "start": 3028,
-                "offset": 0,
-                "type": "Input Register",
-                "conversion": "Float: Big Endian",
-                "sql_type": "FLOAT",
-                "length": 2,
-                "multiply": 1,
-                "divide": 1,
-                "process_min": "",
-                "process_max": "",
-                "eng_unit": "none",
-                "enabled": true
+                "type": "Input Register"
               },
               {
+                "conversion": "Float: Big Endian",
+                "divide": 1,
+                "enabled": true,
+                "eng_unit": "none",
+                "length": 2,
+                "multiply": 1,
                 "name": "Voltage L3-N",
+                "offset": 0,
+                "process_max": "",
+                "process_min": "",
+                "sql_type": "FLOAT",
                 "start": 3030,
-                "offset": 0,
-                "type": "Input Register",
-                "conversion": "Float: Big Endian",
-                "sql_type": "FLOAT",
-                "length": 2,
-                "multiply": 1,
-                "divide": 1,
-                "process_min": "",
-                "process_max": "",
-                "eng_unit": "none",
-                "enabled": true
+                "type": "Input Register"
               },
               {
+                "conversion": "Float: Big Endian",
+                "divide": 1,
+                "enabled": true,
+                "eng_unit": "4-20mA",
+                "length": 2,
+                "multiply": 1,
                 "name": "Power Factor",
+                "offset": 0,
+                "process_max": "",
+                "process_min": "",
+                "sql_type": "FLOAT",
                 "start": 3082,
-                "offset": 0,
-                "type": "Input Register",
-                "conversion": "Float: Big Endian",
-                "sql_type": "FLOAT",
-                "length": 2,
-                "multiply": 1,
-                "divide": 1,
-                "process_min": "",
-                "process_max": "",
-                "eng_unit": "4-20mA",
-                "enabled": false
+                "type": "Input Register"
               },
               {
+                "conversion": "Float: Big Endian",
+                "divide": 1,
+                "enabled": true,
+                "eng_unit": "4-20mA",
+                "length": 2,
+                "multiply": 1,
                 "name": "Frequency",
-                "start": 3108,
                 "offset": 0,
-                "type": "Input Register",
-                "conversion": "Float: Big Endian",
-                "sql_type": "FLOAT",
-                "length": 2,
-                "multiply": 1,
-                "divide": 1,
-                "process_min": "",
                 "process_max": "",
-                "eng_unit": "4-20mA",
-                "enabled": false
+                "process_min": "",
+                "sql_type": "FLOAT",
+                "start": 3108,
+                "type": "Input Register"
               },
               {
-                "name": "KWH",
-                "start": 3204,
-                "offset": 0,
-                "type": "Input Register",
                 "conversion": "Float: Big Endian",
-                "sql_type": "FLOAT",
+                "divide": 1,
+                "enabled": true,
+                "eng_unit": "4-20mA",
                 "length": 2,
                 "multiply": 1,
-                "divide": 1,
-                "process_min": "",
+                "name": "KWH",
+                "offset": 0,
                 "process_max": "",
-                "eng_unit": "4-20mA",
-                "enabled": false
+                "process_min": "",
+                "sql_type": "FLOAT",
+                "start": 3204,
+                "type": "Input Register"
               }
             ]
           },
           "slaves": [
             {
-              "id": 2,
-              "enabled": true,
-              "rs485_port": "/dev/ttyACM1",
               "baudRate": 9600,
-              "parity": "None",
               "dataBits": 8,
-              "stopBits": 2,
+              "db_name": "test",
+              "enabled": false,
+              "generate_random": true,
+              "id": 2,
+              "parity": "None",
               "pollingInterval": 5,
               "pollingIntervalUnit": "Sec",
-              "use_usb": false,
-              "upload_local": true,
+              "rs485_port": "/dev/ttyACM1",
+              "stopBits": 2,
+              "table_name": "energy_meter",
               "upload_cloud": false,
-              "db_name": "test",
-              "table_name": "energy_meter"
+              "upload_local": true,
+              "use_usb": false
             }
           ]
         }
@@ -984,7 +1054,7 @@
     "password": "uael gnyc rsvy dgxx",
     "port": 587,
     "server": "smtp.gmail.com",
-    "user": "munjalhopperalerts@gmail.com"
+    "user": "murali.igc@gmail.com"
   },
   "network": {
     "sim4g": {
@@ -999,28 +1069,192 @@
       "ip": "192.168.1.10",
       "subnet": "255.255.255.0"
     },
+    "static2": {
+      "dns_primary": "",
+      "dns_secondary": "",
+      "enabled": false,
+      "gateway": "",
+      "iface": "eth1",
+      "ip": "",
+      "subnet": ""
+    },
     "wifi": {
       "password": "",
       "ssid": ""
-    },
-    "static2": {
-      "iface": "eth1",
-      "enabled": false,
-      "ip": "",
-      "subnet": "",
-      "gateway": "",
-      "dns_primary": "",
-      "dns_secondary": ""
     }
   },
   "adminSettings": {
+    "engineeringUnits": [
+      {
+        "type": "temperature",
+        "symbols": [
+          "\u00b0C",
+          "\u00b0F",
+          "K"
+        ]
+      },
+      {
+        "type": "flow",
+        "symbols": [
+          "L/min",
+          "m\u00b3/hr",
+          "m\u00b3/s"
+        ]
+      },
+      {
+        "type": "pressure",
+        "symbols": [
+          "bar",
+          "psi",
+          "Pa",
+          "kPa",
+          "MPa"
+        ]
+      },
+      {
+        "type": "level",
+        "symbols": [
+          "%",
+          "m",
+          "cm",
+          "mm"
+        ]
+      },
+      {
+        "type": "moisture",
+        "symbols": [
+          "%",
+          "g/kg"
+        ]
+      },
+      {
+        "type": "humidity",
+        "symbols": [
+          "%RH"
+        ]
+      },
+      {
+        "type": "ph",
+        "symbols": [
+          "pH"
+        ]
+      },
+      {
+        "type": "turbidity",
+        "symbols": [
+          "NTU"
+        ]
+      },
+      {
+        "type": "density",
+        "symbols": [
+          "kg/m\u00b3",
+          "g/cm\u00b3"
+        ]
+      },
+      {
+        "type": "air_pollution",
+        "symbols": [
+          "AQI",
+          "\u00b5g/m\u00b3",
+          "ppm"
+        ]
+      },
+      {
+        "type": "velocity",
+        "symbols": [
+          "m/s",
+          "km/h"
+        ]
+      },
+      {
+        "type": "volume",
+        "symbols": [
+          "L",
+          "m\u00b3",
+          "cm\u00b3"
+        ]
+      },
+      {
+        "type": "area",
+        "symbols": [
+          "m\u00b2",
+          "cm\u00b2"
+        ]
+      },
+      {
+        "type": "mass",
+        "symbols": [
+          "kg",
+          "g",
+          "ton"
+        ]
+      },
+      {
+        "type": "energy",
+        "symbols": [
+          "Wh",
+          "kWh",
+          "MJ"
+        ]
+      },
+      {
+        "type": "power",
+        "symbols": [
+          "W",
+          "kW",
+          "MW"
+        ]
+      },
+      {
+        "type": "voltage",
+        "symbols": [
+          "V",
+          "mV"
+        ]
+      },
+      {
+        "type": "current",
+        "symbols": [
+          "A",
+          "mA",
+          "\u00b5A"
+        ]
+      },
+      {
+        "type": "frequency",
+        "symbols": [
+          "Hz",
+          "kHz"
+        ]
+      },
+      {
+        "type": "time",
+        "symbols": [
+          "s",
+          "ms",
+          "min",
+          "hr"
+        ]
+      }
+    ],
     "mailBody": {
       "analog": "",
       "digital": "",
       "modbus_rtu": "",
       "plc": "",
       "smtp": ""
-    }
+    },
+    "rs485Ports": [
+      {
+        "name": "RS485_1 (/dev/ttyACM0)",
+        "port": "/dev/ttyACM0"
+      },
+      {
+        "name": "RS485_2 (/dev/ttyACM1)",
+        "port": "/dev/ttyACM1"
+      }
+    ]
   },
   "mysqlConfig": {
     "database": "test",

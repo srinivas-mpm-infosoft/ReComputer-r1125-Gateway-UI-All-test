@@ -1835,6 +1835,7 @@ def start_enabled_threads():
             log_info(f"[THREAD] {name} started")
 
         start("NetworkWatcher", network_watcher_loop)
+        
         start("SystemStatus", system_status_monitor)
 
         if ANALOG_ENABLED:
