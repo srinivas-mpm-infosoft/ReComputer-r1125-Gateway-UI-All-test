@@ -17,13 +17,13 @@ FILES = [
     # "process_experiment_data.py",
     # "save_calculations.py",
     # "merge_etl_plc.py"
-    # "main_linux_gateway_ui.py",
+    "main_linux_gateway_ui.py",
     # "main_program.py",
     #"main_linux_innodose_sql_alchemy.py",
     # "main_linux_no_db.py",
     # "inodose_service_scheduler.py",
     #"alerts_grafana.py",
-    "network_apply.py",
+    # "network_apply.py",
     # "smb_final.py"
     # "ssl_test.py"
 ]

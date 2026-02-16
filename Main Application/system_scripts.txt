@@ -6,10 +6,10 @@ Description=Main Program Service
 After=network.target
 
 [Service]
-User=gateway
-Group=gateway
-WorkingDirectory=/home/gateway/executablefiles
-ExecStart=/home/gateway/executablefiles/main_program
+User=recomputer
+Group=recomputer
+WorkingDirectory=/home/recomputer/Gateway-UI/executablefiles
+ExecStart=/home/recomputer/Gateway-UI/executablefiles/main_program_priority
 Restart=always
 RestartSec=2
 
@@ -73,10 +73,10 @@ Description=Main Linux Gateway UI
 After=network.target
 
 [Service]
-User=gateway
-Group=gateway
-WorkingDirectory=/home/gateway/executablefiles
-ExecStart=/home/gateway/executablefiles/main_linux_gateway_ui
+User=recomputer
+Group=recomputer
+WorkingDirectory=/home/recomputer/Gateway-UI/
+ExecStart=/home/recomputer/Gateway-UI/executablefiles/main_linux_gateway_ui
 Restart=always
 RestartSec=2
 
@@ -125,6 +125,8 @@ sudo systemctl start network_apply.service
 sudo systemctl start grafana_custom.service
 
 sudo systemctl restart grafana_custom.service
+sudo systemctl restart main_linux_gateway_ui
+sudo systemctl restart main_program
 
 
 sudo systemctl stop main_program_phase2.service

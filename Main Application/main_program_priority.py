@@ -369,7 +369,7 @@ class S7_protocol:
                     plc_type="Siemens",
                     plc_key=self.db_targets[next(iter(self.db_targets))]["table_name"],
                     data=self.data,
-                    config=config
+                    config=self.config
                 )
 
             except Exception as e:
@@ -397,6 +397,7 @@ class ModbusTCPProtocol:
 
         plc_cfg = config["PLC"]
 
+        self.config = config
         self.generate_random = bool(config.get("generate_random", False))
 
         # ---------------- PLC ----------------
@@ -456,10 +457,10 @@ class ModbusTCPProtocol:
             password=db_cred["password"],
             database=database,
             port=db_cred.get("port", 3306),
-            charset=db_cred.get("charset", "utf8mb4"),
             autocommit=False,
-            connection_timeout=5
+            connect_timeout=5
         )
+
 
     # --------------------------------------------------
     # TABLE MANAGEMENT (IDENTICAL TO S7)
@@ -520,6 +521,25 @@ class ModbusTCPProtocol:
     def read_all_data(self):
         data = {}
 
+        # ---------------- RANDOM MODE ----------------
+        if self.generate_random:
+            for item in self.read_items:
+                if not item.get("read", True):
+                    continue
+
+                tag = item["tag"]
+                min_v = safe_float(item.get("min"), 0)
+                max_v = safe_float(item.get("max"), 100)
+
+                if min_v > max_v:
+                    min_v, max_v = max_v, min_v
+
+                value = random.randint(int(min_v), int(max_v))
+                data[tag] = value
+
+            return data   # 🔥 EXIT EARLY, NO MODBUS
+
+        # ---------------- REAL DEVICE MODE ----------------
         if not self.client.connect():
             raise ConnectionError(
                 f"Modbus TCP connection failed {self.ip}:{self.port}"
@@ -558,30 +578,17 @@ class ModbusTCPProtocol:
             if not item.get("read", True):
                 continue
 
-            tag = item["tag"]
+            res = self.client.read_holding_registers(
+                address=int(item["address"]),
+                count=int(item.get("length", 1))
+            )
 
-            if self.generate_random:
-                min_v = safe_float(item.get("min"), 0)
-                max_v = safe_float(item.get("max"), 100)
-                if min_v > max_v:
-                    min_v, max_v = max_v, min_v
-
-                value = random.randint(min_v, max_v)
-
-            else:
-                res = self.client.read_holding_registers(
-                    address=int(item["address"]),
-                    count=int(item.get("length", 1))
+            if res.isError():
+                raise RuntimeError(
+                    f"Modbus read failed @ {item['address']}"
                 )
 
-                if res.isError():
-                    raise RuntimeError(
-                        f"Modbus read failed @ {item['address']}"
-                    )
-
-                value = res.registers[0]
-
-            data[tag] = value
+            data[item["tag"]] = res.registers[0]
 
         self.client.close()
         return data
@@ -655,10 +662,9 @@ class ModbusTCPProtocol:
 
                 # ---- Alarms (same philosophy as S7) ----
                 process_modbus_tcp_alarms(
-                    plc_type="Allen Bradley",
+                    plc_type="Delta",
                     plc_key=next(iter(self.db_targets.values()))["table_name"],
                     data=data,
-                    config=config
                 )
 
             except Exception as e:
@@ -4050,7 +4056,6 @@ def process_modbus_tcp_alarms(
     plc_type: str,
     plc_key: str,
     data: dict,
-    config: dict
 ):
     """
     Evaluate Modbus TCP alarms for one PLC cycle
@@ -4059,16 +4064,25 @@ def process_modbus_tcp_alarms(
     tcp_cfg = (
         config
         .get("alarmSettings", {})
-        .get("Modbus TCP", {})
+        .get("ModbusTCP", {})
         .get(plc_type, {})
         .get(plc_key, {})
     )
 
     if not tcp_cfg:
+        log_warn(f"[WARN] No tcp configuration")
         return
+
+    log_info(f"[INFO] Modbus TCP Alarms config: {tcp_cfg}")
 
     for tag_name, alerts in tcp_cfg.items():
         if tag_name not in data:
+            continue
+
+        value = data[tag_name]
+
+
+        if value is None:
             continue
 
         value = data[tag_name]
@@ -4501,43 +4515,93 @@ def read_digital_inputs_gpio(di_channels, generate=False):
     return readings
 
 
+ENERGY_ALARM_STATE = {}   # {(slave_id, tag_key, idx): bool}
+ENERGY_ALARM_TIMER = {}  # {(slave_id, tag_key, idx): first_trigger_time}
+
+
 def check_energy_alarms(readings):
-    alerts_cfg = config.get("alarmSettings", {}).get("Modbus", {})
+    now = time.time()
+    alerts_cfg = config.get("alarmSettings", {}).get("ModbusRTU", {})
 
-    for brand, brand_cfg in alerts_cfg.items():
-        slaves = brand_cfg.get("slaves", {})
-        for slave_id, slave_cfg in slaves.items():
-            alerts = slave_cfg.get("alerts", {})
-            for tag_key, alert_list in alerts.items():
-                for alert in alert_list:
-                    if not alert.get("enabled"):
-                        continue
+    for alert_key, alert_list in alerts_cfg.items():
 
-                    threshold = float(alert["threshold"])
-                    cond = alert["condition"]
-                    email = alert.get("email")
-                    contact = alert.get("contact")
-                    message = alert.get("message", "")
+        # Reading must exist with EXACT SAME KEY
+        if alert_key not in readings:
+            continue
 
-                    for key, value in readings.items():
-                        if f"S{slave_id}_" not in key:
-                            continue
-                        if value is None:
-                            continue
+        value = readings[alert_key]
 
-                        triggered = (
-                            (cond == "<=" and value <= threshold)
-                            or (cond == "<" and value < threshold)
-                            or (cond == ">=" and value >= threshold)
-                            or (cond == ">" and value > threshold)
+        for idx, alert in enumerate(alert_list):
+            state_key = (alert_key, idx)
+
+            if not alert.get("enabled", False):
+                ENERGY_ALARM_STATE.pop(state_key, None)
+                ENERGY_ALARM_TIMER.pop(state_key, None)
+                continue
+
+            raw_threshold = alert.get("threshold")
+            try:
+                threshold = float(raw_threshold)
+            except (TypeError, ValueError):
+                log_error(
+                    f"[ENERGY ALARM] Invalid threshold "
+                    f"key={alert_key} value={raw_threshold!r}"
+                )
+                continue
+
+            cond = alert.get("condition")
+            delay = int(alert.get("delay", 0))
+            email = alert.get("email")
+            contact = alert.get("contact")
+            message = alert.get("message", "")
+
+            triggered = (
+                (cond == "<=" and value <= threshold) or
+                (cond == "<"  and value <  threshold) or
+                (cond == ">=" and value >= threshold) or
+                (cond == ">"  and value >  threshold)
+            )
+
+            prev_state = ENERGY_ALARM_STATE.get(state_key, False)
+
+            if triggered:
+                if state_key not in ENERGY_ALARM_TIMER:
+                    ENERGY_ALARM_TIMER[state_key] = now
+                    log_info(
+                        f"[ENERGY ALARM] {alert_key} trigger detected "
+                        f"(delay {delay}s)"
+                    )
+
+                if now - ENERGY_ALARM_TIMER[state_key] < delay:
+                    continue
+
+                # 🔴 Rising edge
+                if not prev_state:
+                    ENERGY_ALARM_STATE[state_key] = True
+                    ENERGY_ALARM_TIMER.pop(state_key, None)
+
+                    text = (
+                        f"{message}\n"
+                        f"Tag: {alert_key}\n"
+                        f"Value: {value}\n"
+                        f"Threshold: {cond} {threshold}"
+                    )
+
+                    log_warn(f"[ENERGY ALARM] {text}")
+
+                    if contact:
+                        send_sms(contact, text=text)
+                    if email:
+                        send_email(
+                            email,
+                            subject="Energy Alarm",
+                            body=text
                         )
 
-                        if triggered:
-                            text = f"{message}: value={value}"
-                            if contact:
-                                send_sms(contact, text=text)
-                            if email:
-                                send_email(email, subject="Energy Alert", body=text)
+            else:
+                # Condition cleared → reset latch
+                ENERGY_ALARM_STATE.pop(state_key, None)
+                ENERGY_ALARM_TIMER.pop(state_key, None)
 
 
 def send_energy_alert(alert_info):
@@ -4610,7 +4674,7 @@ def modbus_db_writer_loop():
         try:
             ts, reading = MODBUS_DB_QUEUE.get(timeout=0.5)
             insert_energy_data(ts, reading)
-            check_modbus_alarms(reading)
+            check_energy_alarms(reading)
             MODBUS_DB_QUEUE.task_done()
 
         except queue.Empty:
@@ -4862,23 +4926,35 @@ def transfer_offline_data():
         log_error(f"[ERROR] FTP transfer failed: {e}")
 
 
-def poll_plc(plc_config, plc_type):
+def poll_plc(plc_config, plc_type, thread_id):
+    log_info(f"[PLC THREAD STARTED] {thread_id}")
+    local_version = CONFIG_VERSION
 
     try:
         if plc_type == "Siemens":
             plc_obj = S7_protocol(plc_config)
-            plc_obj.plc_to_db()   # existing infinite loop
 
-        elif plc_type in ["Allen Bradley","Delta"]:
-            log_info("Combined PLC detected")
+        elif plc_type in ["Allen Bradley", "Delta"]:
             plc_obj = ModbusTCPProtocol(plc_config)
-            plc_obj.plc_to_db()   # ONE synchronous execution
 
         else:
             raise ValueError(f"Unsupported PLC type: {plc_type}")
 
+        while not STOP_EVENT.is_set():
+            # Detect config change
+            if local_version != CONFIG_VERSION:
+                log_info(f"[{thread_id}] Config version changed. Exiting thread.")
+                break
+
+            plc_obj.plc_to_db()   # MUST be single-cycle
+            time.sleep(1)
+
     except Exception as e:
-        log_error(f"Error in PLC polling: {e}")
+        log_error(f"[{thread_id}] PLC polling error: {e}")
+
+    finally:
+        log_info(f"[PLC THREAD STOPPED] {thread_id}")
+
 
 
 """
@@ -5668,7 +5744,9 @@ def fix_routes():
 # ---------------- 4G ----------------
 def setup_4g(apn):
     if not apn:
-        log.warning("SIM present but APN not configured — skipping attach")
+        log.warning("APN not configured — skipping attach")
+        subprocess.run(["sudo","ip","link","set","usb0","down"],check=False)
+        time.sleep(2)
         return
     log_info("[4G] Starting CFUN-based attach (Jio-safe)")
     if not modem_present():

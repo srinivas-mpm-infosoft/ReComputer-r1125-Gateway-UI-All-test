@@ -45,13 +45,13 @@
     "digitalInput": {
       "channels": [
         {
-          "name": "Digital Input 1",
           "enabled": true,
+          "name": "Digital Input 1",
           "pin": "530"
         },
         {
-          "name": "Digital Input 2",
           "enabled": true,
+          "name": "Digital Input 2",
           "pin": "531"
         }
       ],
@@ -70,13 +70,23 @@
       "channels": [
         {
           "name": "Digital Output 1",
-          "state": 0,
-          "pin": "532"
+          "pin": "532",
+          "state": 0
         },
         {
           "name": "Digital Output 2",
-          "state": 1,
-          "pin": "533"
+          "pin": "533",
+          "state": 0
+        }
+      ]
+    },
+    "digitalRelay": {
+      "channels": [
+        {
+          "enabled": false,
+          "mode": "NO",
+          "name": "R1",
+          "pin": ""
         }
       ]
     },
@@ -85,16 +95,6 @@
       "digitalInput": true,
       "modbus": true,
       "modbusTCP": false
-    },
-    "digitalRelay": {
-      "channels": [
-        {
-          "name": "R1",
-          "pin": "",
-          "mode": "NO",
-          "enabled": false
-        }
-      ]
     }
   },
   "wireless": {
@@ -254,7 +254,8 @@
       },
       "enabled": true,
       "isExpanded": true,
-      "plcType": "Delta"
+      "plcType": "Delta",
+      "generate_random": true
     }
   ],
   "fileToDb": {
@@ -296,12 +297,12 @@
         "alerts": [
           {
             "condition": "<",
-            "contact": "9999999999",
+            "threshold": 5,
             "delay": 0,
             "email": "vasus4990@gmail.com",
-            "enabled": true,
+            "contact": "9999999999",
             "message": "Analog Input",
-            "threshold": 5
+            "enabled": false
           }
         ]
       }
@@ -313,7 +314,7 @@
             "contact": "",
             "delay": 0,
             "email": "vasus4990@gmail.com",
-            "enabled": true,
+            "enabled": false,
             "message": "Digital Input",
             "trigger": "HIGH"
           }
@@ -322,12 +323,12 @@
       "1": {
         "alerts": [
           {
-            "contact": "",
+            "trigger": "LOW",
             "delay": 0,
-            "email": "",
-            "enabled": false,
-            "message": "",
-            "trigger": "LOW"
+            "email": "vasus4990@gmail.com",
+            "contact": "",
+            "message": "Digital Input",
+            "enabled": false
           }
         ]
       },
@@ -343,135 +344,31 @@
         ]
       }
     },
-    "Modbus": {
-      "analog_acquisition_module": {
-        "slaves": {
-          "1": {
-            "alerts": {
-              "0|0|Input Register|1": [
-                {
-                  "condition": "<=",
-                  "contact": "",
-                  "email": "",
-                  "enabled": true,
-                  "message": "analog_acquisition_module S1",
-                  "threshold": ""
-                }
-              ],
-              "0|1|Input Register|2": [
-                {
-                  "condition": "<=",
-                  "contact": "9999999999",
-                  "email": "abc@gmail.com",
-                  "enabled": true,
-                  "message": "analog_acquisition_module S2",
-                  "threshold": "5"
-                }
-              ],
-              "1|-1|Input Register|1": [
-                {
-                  "condition": ">=",
-                  "contact": "9999999999",
-                  "email": "vasus4990@gmail.com",
-                  "enabled": true,
-                  "message": "analog_acquisition_module S1",
-                  "threshold": "1"
-                }
-              ]
-            }
-          }
+    "Modbus": {},
+    "ModbusRTU": {
+      "analog_acquisition_module_S1_Analog Input 1": [
+        {
+          "condition": ">=",
+          "threshold": "1",
+          "email": "vasus4990@gmail.com",
+          "contact": "",
+          "message": "analog_acquisition_module S1",
+          "enabled": false
         }
-      },
-      "schneider": {
-        "slaves": {
-          "2": {
-            "alerts": {
-              "2998|0|Holding Register|2": [
-                {
-                  "condition": "<=",
-                  "contact": "",
-                  "email": "",
-                  "enabled": true,
-                  "message": "schneider S2",
-                  "threshold": ""
-                }
-              ],
-              "3028|0|Input Register|2": [
-                {
-                  "condition": "<=",
-                  "contact": "",
-                  "email": "abc@gmail.com",
-                  "enabled": false,
-                  "message": "schneider S2",
-                  "threshold": "120"
-                }
-              ]
-            }
-          }
-        }
-      }
-    },
-    "Modbus TCP": {
-      "Allen Bradley": {
-        "allen": {
-          "allen_test_reading": []
-        },
-        "allen_test": {
-          "allen_test_reading": [
-            {
-              "condition": "<=",
-              "email": "",
-              "enabled": true,
-              "message": "allen_test allen_test_reading",
-              "threshold": "19"
-            }
-          ],
-          "undefined": []
-        }
-      },
-      "Delta": {
-        "delta_plc": {
-          "Read register": [
-            {
-              "condition": "<=",
-              "contact": "",
-              "email": "vasus4990@gmail.com",
-              "enabled": true,
-              "message": "delta_plc Read register",
-              "threshold": "100"
-            }
-          ]
-        }
-      },
-      "Siemens": {
-        "siemens": {
-          "test": []
-        },
-        "siemens_test1": {
-          "test": [
-            {
-              "condition": "<=",
-              "contact": "",
-              "email": "abc@gmail.com",
-              "enabled": true,
-              "message": "siemens_test1 test",
-              "threshold": "5"
-            }
-          ]
-        }
-      }
+      ],
+      "schneider_S2_Current L1": []
     },
     "ModbusTCP": {
       "Delta": {
         "delta_plc": {
           "Read register": [
             {
-              "condition": "<=",
-              "threshold": "100",
-              "email": "vasus4990@gmail.com",
+              "condition": ">=",
               "contact": "",
+              "email": "vasus4990@gmail.com",
+              "enabled": false,
               "message": "delta_plc Read register",
-              "enabled": true
+              "threshold": "1"
             }
           ]
         }
@@ -545,13 +442,13 @@
                 "divide": 1,
                 "enabled": true,
                 "eng_symbol": "\u00b0C",
-                "eng_unit": "4-20mA",
+                "eng_unit": "0-10V",
                 "length": 1,
                 "multiply": 1,
                 "name": "Analog Input 1",
                 "offset": -1,
                 "process_max": "100",
-                "process_min": "-20",
+                "process_min": "0",
                 "sensor_type": "temperature",
                 "sql_type": "FLOAT",
                 "start": 1,
@@ -562,7 +459,7 @@
                 "divide": 1,
                 "enabled": true,
                 "eng_symbol": "L/min",
-                "eng_unit": "4-20mA",
+                "eng_unit": "0-10V",
                 "length": 1,
                 "multiply": 1,
                 "name": "Analog Input 2",
@@ -680,20 +577,21 @@
           },
           "slaves": [
             {
-              "id": 1,
-              "enabled": true,
-              "rs485_port": "/dev/ttyACM1",
               "baudRate": 9600,
-              "parity": "None",
               "dataBits": 8,
-              "stopBits": 1,
+              "db_name": "test",
+              "enabled": true,
+              "id": 1,
+              "parity": "None",
               "pollingInterval": 5,
               "pollingIntervalUnit": "Sec",
-              "use_usb": false,
-              "upload_local": true,
+              "rs485_port": "/dev/ttyACM1",
+              "stopBits": 1,
+              "table_name": "analog_sensors",
               "upload_cloud": false,
-              "db_name": "test",
-              "table_name": "analog_sensors"
+              "upload_local": true,
+              "use_usb": false,
+              "generate_random": true
             }
           ]
         },
@@ -706,6 +604,7 @@
                 "conversion": "Float: Big Endian",
                 "divide": 1,
                 "enabled": true,
+                "eng_symbol": "",
                 "eng_unit": "none",
                 "length": 2,
                 "multiply": 1,
@@ -713,6 +612,7 @@
                 "offset": 0,
                 "process_max": "",
                 "process_min": "",
+                "sensor_type": "",
                 "sql_type": "FLOAT",
                 "start": 2998,
                 "type": "Input Register"
@@ -721,6 +621,7 @@
                 "conversion": "Float: Big Endian",
                 "divide": 1,
                 "enabled": true,
+                "eng_symbol": "",
                 "eng_unit": "none",
                 "length": 2,
                 "multiply": 1,
@@ -728,6 +629,7 @@
                 "offset": 0,
                 "process_max": "",
                 "process_min": "",
+                "sensor_type": "",
                 "sql_type": "FLOAT",
                 "start": 3000,
                 "type": "Input Register"
@@ -736,6 +638,7 @@
                 "conversion": "Float: Big Endian",
                 "divide": 1,
                 "enabled": true,
+                "eng_symbol": "",
                 "eng_unit": "none",
                 "length": 2,
                 "multiply": 1,
@@ -743,6 +646,7 @@
                 "offset": 0,
                 "process_max": "",
                 "process_min": "",
+                "sensor_type": "",
                 "sql_type": "FLOAT",
                 "start": 3002,
                 "type": "Input Register"
@@ -751,6 +655,7 @@
                 "conversion": "Float: Big Endian",
                 "divide": 1,
                 "enabled": true,
+                "eng_symbol": "",
                 "eng_unit": "none",
                 "length": 2,
                 "multiply": 1,
@@ -758,6 +663,7 @@
                 "offset": 0,
                 "process_max": "",
                 "process_min": "",
+                "sensor_type": "",
                 "sql_type": "FLOAT",
                 "start": 3018,
                 "type": "Input Register"
@@ -766,6 +672,7 @@
                 "conversion": "Float: Big Endian",
                 "divide": 1,
                 "enabled": true,
+                "eng_symbol": "",
                 "eng_unit": "none",
                 "length": 2,
                 "multiply": 1,
@@ -773,6 +680,7 @@
                 "offset": 0,
                 "process_max": "",
                 "process_min": "",
+                "sensor_type": "",
                 "sql_type": "FLOAT",
                 "start": 3020,
                 "type": "Input Register"
@@ -781,6 +689,7 @@
                 "conversion": "Float: Big Endian",
                 "divide": 1,
                 "enabled": true,
+                "eng_symbol": "",
                 "eng_unit": "none",
                 "length": 2,
                 "multiply": 1,
@@ -788,6 +697,7 @@
                 "offset": 0,
                 "process_max": "",
                 "process_min": "",
+                "sensor_type": "",
                 "sql_type": "FLOAT",
                 "start": 3022,
                 "type": "Input Register"
@@ -796,6 +706,7 @@
                 "conversion": "Float: Big Endian",
                 "divide": 1,
                 "enabled": true,
+                "eng_symbol": "",
                 "eng_unit": "none",
                 "length": 2,
                 "multiply": 1,
@@ -803,6 +714,7 @@
                 "offset": 0,
                 "process_max": "",
                 "process_min": "",
+                "sensor_type": "",
                 "sql_type": "FLOAT",
                 "start": 3026,
                 "type": "Input Register"
@@ -811,6 +723,7 @@
                 "conversion": "Float: Big Endian",
                 "divide": 1,
                 "enabled": true,
+                "eng_symbol": "",
                 "eng_unit": "none",
                 "length": 2,
                 "multiply": 1,
@@ -818,6 +731,7 @@
                 "offset": 0,
                 "process_max": "",
                 "process_min": "",
+                "sensor_type": "",
                 "sql_type": "FLOAT",
                 "start": 3028,
                 "type": "Input Register"
@@ -826,6 +740,7 @@
                 "conversion": "Float: Big Endian",
                 "divide": 1,
                 "enabled": true,
+                "eng_symbol": "",
                 "eng_unit": "none",
                 "length": 2,
                 "multiply": 1,
@@ -833,6 +748,7 @@
                 "offset": 0,
                 "process_max": "",
                 "process_min": "",
+                "sensor_type": "",
                 "sql_type": "FLOAT",
                 "start": 3030,
                 "type": "Input Register"
@@ -840,14 +756,16 @@
               {
                 "conversion": "Float: Big Endian",
                 "divide": 1,
-                "enabled": true,
-                "eng_unit": "4-20mA",
+                "enabled": false,
+                "eng_symbol": "",
+                "eng_unit": "none",
                 "length": 2,
                 "multiply": 1,
                 "name": "Power Factor",
                 "offset": 0,
                 "process_max": "",
                 "process_min": "",
+                "sensor_type": "",
                 "sql_type": "FLOAT",
                 "start": 3082,
                 "type": "Input Register"
@@ -856,13 +774,15 @@
                 "conversion": "Float: Big Endian",
                 "divide": 1,
                 "enabled": true,
-                "eng_unit": "4-20mA",
+                "eng_symbol": "",
+                "eng_unit": "none",
                 "length": 2,
                 "multiply": 1,
                 "name": "Frequency",
                 "offset": 0,
                 "process_max": "",
                 "process_min": "",
+                "sensor_type": "",
                 "sql_type": "FLOAT",
                 "start": 3108,
                 "type": "Input Register"
@@ -871,13 +791,15 @@
                 "conversion": "Float: Big Endian",
                 "divide": 1,
                 "enabled": true,
-                "eng_unit": "4-20mA",
+                "eng_symbol": "",
+                "eng_unit": "none",
                 "length": 2,
                 "multiply": 1,
                 "name": "KWH",
                 "offset": 0,
                 "process_max": "",
                 "process_min": "",
+                "sensor_type": "",
                 "sql_type": "FLOAT",
                 "start": 3204,
                 "type": "Input Register"
@@ -889,8 +811,7 @@
               "baudRate": 9600,
               "dataBits": 8,
               "db_name": "test",
-              "enabled": false,
-              "generate_random": true,
+              "enabled": true,
               "id": 2,
               "parity": "None",
               "pollingInterval": 5,
@@ -900,7 +821,8 @@
               "table_name": "energy_meter",
               "upload_cloud": false,
               "upload_local": true,
-              "use_usb": false
+              "use_usb": false,
+              "generate_random": true
             }
           ]
         }
@@ -1054,7 +976,7 @@
     "password": "uael gnyc rsvy dgxx",
     "port": 587,
     "server": "smtp.gmail.com",
-    "user": "murali.igc@gmail.com"
+    "user": "munjalhopperalerts@gmail.com"
   },
   "network": {
     "sim4g": {
@@ -1064,9 +986,9 @@
     "static": {
       "dns_primary": "8.8.8.8",
       "dns_secondary": "8.8.4.4",
-      "enabled": false,
+      "enabled": true,
       "gateway": "",
-      "ip": "192.168.1.10",
+      "ip": "192.168.1.15",
       "subnet": "255.255.255.0"
     },
     "static2": {

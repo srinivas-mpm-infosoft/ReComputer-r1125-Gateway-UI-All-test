@@ -5237,7 +5237,6 @@ function getRegisterProcessRange(brandKey, slaveId, registerKey) {
   return { min, max };
 }
 
-
 function getModbusAlerts(brandKey, slaveId, registerKey) {
   return (
     config.alarmSettings?.Modbus?.[brandKey]
@@ -5246,8 +5245,19 @@ function getModbusAlerts(brandKey, slaveId, registerKey) {
   );
 }
 
+function getColumnNameFromRegister(registerKey) {
+  const [start, offset, type, length] = registerKey.split("|");
+  return `${type}_${start}_${offset}`; // OR whatever your DB column rule is
+}
+
+
 function renderEnergyAlertsTable(brandKey, slaveId, registerKey) {
-  const alerts = getModbusAlerts(brandKey, slaveId, registerKey);
+  const regs = getEnergyBrandRegisters(brandKey, slaveId);
+  const reg = regs.find(r => getRegisterKey(r) === registerKey);
+  if (!reg) return "<div>Invalid register</div>";
+  
+  const alertKey = buildRtuAlertKey(brandKey, slaveId, reg);
+  const alerts = getRtuAlerts(alertKey);
 
   const rowsHtml = alerts.length
     ? alerts
@@ -5360,7 +5370,6 @@ function renderEnergyAlertsTable(brandKey, slaveId, registerKey) {
   `;
 }
 
-
 function getRegisterKey(reg) {
   return `${reg.start}|${reg.offset}|${reg.type}|${reg.length}`;
 }
@@ -5389,10 +5398,38 @@ function setModbusAlerts(brandKey, slaveId, registerKey, alerts) {
     .alerts[registerKey] = alerts;
 }
 
+function buildRtuAlertKey(brandKey, slaveId, reg) {
+  return `${brandKey}_S${slaveId}_${reg.name}`;
+}
+
+function ensureRtuAlerts(alertKey) {
+  config.alarmSettings ??= {};
+  config.alarmSettings.ModbusRTU ??= {};
+
+  if (!Array.isArray(config.alarmSettings.ModbusRTU[alertKey])) {
+    config.alarmSettings.ModbusRTU[alertKey] = [];
+  }
+  return config.alarmSettings.ModbusRTU[alertKey];
+}
+
+function getRtuAlerts(alertKey) {
+  return config.alarmSettings?.ModbusRTU?.[alertKey] || [];
+}
+
+function setRtuAlerts(alertKey, alerts) {
+  config.alarmSettings.ModbusRTU[alertKey] = alerts;
+}
 
 function setupEnergyHandlers(brandKey, slaveId, registerKey) {
   const form = document.getElementById("em-form");
   if (!form) return;
+
+  const regs = getEnergyBrandRegisters(brandKey, slaveId);
+const reg = regs.find(r => getRegisterKey(r) === registerKey);
+if (!reg) return;
+
+const alertKey = buildRtuAlertKey(brandKey, slaveId, reg);
+
 
   form.querySelectorAll("input, select, textarea").forEach(el => {
     el.addEventListener("click", e => e.stopPropagation());
@@ -5401,7 +5438,10 @@ function setupEnergyHandlers(brandKey, slaveId, registerKey) {
 
   form.onclick = (e) => {
     if (e.target.id === "em-add") {
-      ensureModbusAlerts(brandKey, slaveId, registerKey).push({
+      //const columnName = getColumnNameFromRegister(registerKey);
+      const alertKey = buildRtuAlertKey(brandKey, slaveId, reg);
+      
+      ensureRtuAlerts(alertKey).push({
         condition: "<=",
         threshold: "",
         email: "",
@@ -5409,13 +5449,14 @@ function setupEnergyHandlers(brandKey, slaveId, registerKey) {
         message: `${brandKey} S${slaveId}`,
         enabled: true,
       });
+      
       saveConfig();
       renderModbusRTUDeviceSection(brandKey, slaveId, registerKey);
     }
 
     if (e.target.classList.contains("em-del")) {
       const i = Number(e.target.dataset.idx);
-      ensureModbusAlerts(brandKey, slaveId, registerKey).splice(i, 1);
+      ensureRtuAlerts(alertKey).splice(i, 1);
       saveConfig();
       renderModbusRTUDeviceSection(brandKey, slaveId, registerKey);
     }
@@ -5523,7 +5564,7 @@ function setupEnergyHandlers(brandKey, slaveId, registerKey) {
       return;
     }
 
-    setModbusAlerts(brandKey, slaveId, registerKey, alerts);
+    setRtuAlerts(alertKey, alerts);
     saveConfig();
 
     const tick = document.getElementById("em-tick");

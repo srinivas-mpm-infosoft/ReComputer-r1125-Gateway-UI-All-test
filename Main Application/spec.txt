@@ -7,7 +7,7 @@ from pathlib import Path
 # STRICT SSL LOCATION ENFORCEMENT
 # --------------------------------------------------
 
-ssl_path = Path("/usr/lib/python3.13/lib-dynload/_ssl.cpython-313-aarch64-linux-gnu.so")
+ssl_path = Path("/usr/lib/python3.11/lib-dynload/_ssl.cpython-311-aarch64-linux-gnu.so")
 
 if not ssl_path.exists():
     sys.exit(
@@ -21,10 +21,10 @@ a = Analysis(
     ["main_program.py"],
     pathex=["."],
     # ONLY system _ssl
-    binaries=[(str(ssl_path), "python3.13/lib-dynload")],
+    binaries=[(str(ssl_path), "python3.11/lib-dynload")],
     datas=[
         (
-            "/home/gateway/GATEWAY-COMPLETE/Demo application/Main Application/static",
+            "/home/recomputer/Gateway-UI/Main Application/static",
             "static",
         ),
     ],
@@ -94,4 +94,4 @@ exe = EXE(
 
 
 
-pyinstaller main_program.spec --distpath dist_new --workpath build_new
+pyinstaller main_program_priority.spec --distpath dist_new --workpath build_new

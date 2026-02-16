@@ -1,27 +1,10 @@
 {
+  "wifi": {
+    "password": "SANDman_2020",
+    "ssid": "mpminfosoft_airtel_5GHz"
+  },
   "sim4g": {
     "apn": "",
     "provider": ""
-  },
-  "static": {
-    "dns_primary": "8.8.8.8",
-    "dns_secondary": "8.8.4.4",
-    "enabled": false,
-    "gateway": "",
-    "ip": "192.168.1.10",
-    "subnet": "255.255.255.0"
-  },
-  "wifi": {
-    "password": "",
-    "ssid": ""
-  },
-  "static2": {
-    "iface": "eth1",
-    "enabled": false,
-    "ip": "",
-    "subnet": "",
-    "gateway": "",
-    "dns_primary": "",
-    "dns_secondary": ""
   }
 }

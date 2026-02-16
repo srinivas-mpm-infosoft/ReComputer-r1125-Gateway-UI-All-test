@@ -344,6 +344,58 @@ def login():
     log.info("LOGIN_SUCCESS user=%s role=%s", user.username, user.role)
     return jsonify(status="success")
 
+@app.route("/reset-password", methods=["POST"])
+def reset_password():
+    # Must be logged in
+    if "user" not in session:
+        log.warning("RESET_PASSWORD_UNAUTHORIZED ip=%s", request.remote_addr)
+        return jsonify(error="Unauthorized"), 401
+
+    data = request.json or {}
+
+    old_password = data.get("oldPassword", "")
+    new_password = data.get("newPassword", "")
+    login_req = data.get("login_req", False)
+
+    if not old_password or not new_password:
+        return jsonify(error="Old and new password required"), 400
+
+    username = session["user"]["username"]
+
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        log.error("RESET_PASSWORD_NOUSER session_user=%s", session.get("user"))
+        return jsonify(error="User not found"), 404
+
+    # Verify old password
+    if not bcrypt.checkpw(
+        old_password.encode(),
+        user.password_hash.encode()
+    ):
+        log.warning("RESET_PASSWORD_BAD_OLD user=%s", username)
+        return jsonify(error="Old password is incorrect"), 401
+
+    # OPTIONAL: basic sanity check
+    if len(new_password) < 6:
+        return jsonify(error="Password too short"), 400
+
+    # Hash new password
+    new_hash = bcrypt.hashpw(
+        new_password.encode(),
+        bcrypt.gensalt()
+    ).decode()
+
+    user.password_hash = new_hash
+    db.session.commit()
+
+    log.info("PASSWORD_CHANGED user=%s", username)
+
+    # Optional: force re-login if requested
+    if login_req:
+        session.clear()
+
+    return jsonify(status="password_updated")
+
 @app.route("/logout", methods=["POST"])
 def logout():
     log.info("LOGOUT user=%s", session.get("user"))

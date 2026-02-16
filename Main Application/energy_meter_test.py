@@ -30,7 +30,8 @@ def regs_to_float(reg1, reg2, byte_order='big', word_order='little'):
     return struct.unpack('>f', raw_bytes)[0]
 
 # --- Modbus Instrument Configuration ---
-port = "/dev/energy_meter_usb"  # Change to your serial port, e.g., 'COM3' on Windows
+# port = "/dev/energy_meter_usb"  # Change to your serial port, e.g., 'COM3' on Windows
+port = "/dev/ttyACM1"  # Change to your serial port, e.g., 'COM3' on Windows
 slave_id = 2           # Change to your Modbus slave ID
 
 instrument = minimalmodbus.Instrument(port, slave_id)
@@ -67,10 +68,10 @@ while True:
         print(f"Error reading L-L voltages: {e}")
 
     try:
-        voltages_ln = read_floats(3026, 2)
+        voltages_ln = read_floats(3026, 6)
         print(f"Voltage A-N: {voltages_ln[0]:.3f} V")
-        # print(f"Voltage B-N: {voltages_ln[1]:.3f} V")
-        # print(f"Voltage C-N: {voltages_ln[2]:.3f} V")
+        print(f"Voltage B-N: {voltages_ln[1]:.3f} V")
+        print(f"Voltage C-N: {voltages_ln[2]:.3f} V")
     except Exception as e:
         print(f"Error reading L-N voltages: {e}")
 
@@ -79,6 +80,14 @@ while True:
         print(f"Raw power factor registers: {pf_regs}")
         power_factor = regs_to_float(pf_regs[0], pf_regs[1], byte_order='big', word_order='little')
         print(f"Power Factor: {power_factor:.3f}")
+    except Exception as e:
+        print(f"Error reading power factor: {e}")
+
+    try:
+        freq = instrument.read_registers(3108, 2)
+        print(f"Raw Frequency registers: {freq}")
+        frequency = regs_to_float(freq[0], freq[1], byte_order='big', word_order='little')
+        print(f"Frequenct: {frequency:.3f}")
     except Exception as e:
         print(f"Error reading power factor: {e}")
 
