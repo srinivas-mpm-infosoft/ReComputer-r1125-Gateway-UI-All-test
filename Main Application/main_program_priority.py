@@ -2899,6 +2899,7 @@ def read_modbus_devices(instruments):
 
 def read_modbus_devices_setup_every_time(instruments):
     readings = {}
+    channel_meta = {}  # 🔥 NEW
 
     devices = (
         config.get("ModbusRTU", {})
@@ -3043,12 +3044,17 @@ def read_modbus_devices_setup_every_time(instruments):
                                 value = None
                         
                     readings[key] = value
+                    channel_meta[key] = {
+                        "column": name,
+                        "sensor_type": reg.get("sensor_type"),
+                        "eng_symbol": reg.get("eng_symbol")
+                    }
                     log_info(f"[INFO] The reading for {slave_id} after conversion is {value} for sid {slave_id}")
 
                 except Exception as e:
                     log_error(f"[ENERGY] Failed {key}: {e}")
     
-    return readings
+    return readings, channel_meta
 
 
 def safe_float(val, default):
@@ -3069,7 +3075,7 @@ def infer_sql_type(value):
     return "VARCHAR(255)"
 
 
-def insert_energy_data(timestamp, readings):
+def insert_energy_data(timestamp, readings, channel_meta):
     """
     Insert energy readings into per-slave DB & table
     using ONLY tag name as column.
@@ -3133,6 +3139,7 @@ def insert_energy_data(timestamp, readings):
                     db_name,
                     timestamp,
                     values,
+                    channel_meta
                 )
             except Exception as e:
                 log_error(f"[ENERGY][LOCAL] Insert failed: {e}")
@@ -3151,12 +3158,13 @@ def insert_energy_data(timestamp, readings):
                     db_name,
                     timestamp,
                     values,
+                    channel_meta
                 )
             except Exception as e:
                 log_error(f"[ENERGY][CLOUD] Insert failed: {e}")
 
 
-def insert_energy_into_single_db(db_cred, table, database, timestamp, values):
+def insert_energy_into_single_db(db_cred, table, database, timestamp, values,  channel_meta):
     conn = None
     try:
         conn = get_db_connection(db_cred, timeout=3)
@@ -3174,6 +3182,17 @@ def insert_energy_into_single_db(db_cred, table, database, timestamp, values):
             ) ENGINE=InnoDB;
         """)
 
+        meta_table = f"{table}_channels"
+        cur.execute(f"""
+            CREATE TABLE IF NOT EXISTS `{meta_table}` (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                column_name VARCHAR(64) NOT NULL,
+                sensor_type VARCHAR(32),
+                eng_unit VARCHAR(32),
+                UNIQUE KEY uniq_col (column_name)
+            ) ENGINE=InnoDB;
+        """)
+
         cur.execute(f"SHOW COLUMNS FROM `{table}`")
         existing = {r[0] for r in cur.fetchall()}
 
@@ -3183,6 +3202,24 @@ def insert_energy_into_single_db(db_cred, table, database, timestamp, values):
                     f"ALTER TABLE `{table}` ADD COLUMN `{col}` DOUBLE DEFAULT NULL"
                 )
 
+        for key, meta in channel_meta.items():
+            if meta["column"] not in values:
+                continue
+
+            cur.execute(f"""
+                INSERT INTO `{meta_table}`
+                (column_name, sensor_type, eng_unit)
+                VALUES (%s,%s,%s)
+                ON DUPLICATE KEY UPDATE
+                    sensor_type=VALUES(sensor_type),
+                    eng_unit=VALUES(eng_unit)
+            """, (
+                meta["column"],
+                meta["sensor_type"],
+                meta["eng_symbol"]
+            ))
+
+        
         cols = ["ts"] + list(values.keys())
         placeholders = ", ".join(["%s"] * len(cols))
         cols_sql = ", ".join(f"`{c}`" for c in cols)
@@ -4672,8 +4709,8 @@ def modbus_db_writer_loop():
 
     while not STOP_EVENT.is_set():
         try:
-            ts, reading = MODBUS_DB_QUEUE.get(timeout=0.5)
-            insert_energy_data(ts, reading)
+            ts, reading, channel_meta = MODBUS_DB_QUEUE.get(timeout=0.5)
+            insert_energy_data(ts, reading,  channel_meta)
             check_energy_alarms(reading)
             MODBUS_DB_QUEUE.task_done()
 
@@ -4704,11 +4741,11 @@ def modbus_reader_loop():
 
 
                 with RS485_LOCK:
-                    readings = read_modbus_devices_setup_every_time(
+                    readings, channel_meta = read_modbus_devices_setup_every_time(
                         instruments
                     )
-                    MODBUS_DB_QUEUE.put((ts, readings))
-                    log_info(f"[INFO] Readings: {readings}")
+                    MODBUS_DB_QUEUE.put((ts, readings,  channel_meta))
+                    log_info(f"[INFO] Readings: {readings} with channel_meta: {channel_meta}")
 
                 last_poll = time.time()
 

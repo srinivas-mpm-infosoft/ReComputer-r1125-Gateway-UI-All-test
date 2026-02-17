@@ -10014,5 +10014,186 @@
     "fields": [
       "network"
     ]
+  },
+  {
+    "ts": "2026-02-17T10:46:14.712169",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-17T11:12:39.314407",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-17T11:13:25.673837",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "adminSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-17T11:13:39.504592",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-17T11:13:47.352114",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "adminSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-17T11:14:25.944411",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "adminSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-17T11:14:52.666771",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "adminSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-17T11:15:36.363980",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-17T11:59:07.455133",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-17T11:59:13.284226",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-17T12:01:01.267019",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "network"
+    ]
+  },
+  {
+    "ts": "2026-02-17T12:13:20.495308",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-17T12:13:44.635120",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-17T14:51:55.005582",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-17T14:52:02.244464",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-17T14:52:09.256583",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-17T14:55:24.749611",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-17T14:55:33.158647",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
   }
 ]

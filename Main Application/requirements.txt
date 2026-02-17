@@ -5,13 +5,11 @@ qrcode
 pyotp
 bcrypt
 itsdangerous
-mysql-connector-python
 dotenv
 python-multipart
 psutil
 pyserial
 requests
-mysql-connector-python
 pymysql
 mariadb
 minimalmodbus
