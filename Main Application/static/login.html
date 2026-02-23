@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Gateway Login</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      :root {
+        --panel-bg: #ffffff;
+        --panel-radius: 12px;
+        --panel-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+        --input-border: #dcdfe4;
+        --input-bg: #fff;
+        --text: #1f2937;
+        --muted: #6b7280;
+        --primary: #4e7ac7; /* Subtle blue login button */
+        --primary-hover: #436da8;
+        --accent: #6c63ff; /* secondary action (Forgot) */
+        --accent-hover: #5a52ff;
+        --danger: #e11d48;
+        --focus: #80a7ff66;
+      }
+      /* Background similar to Grafana login (soft vignette + diagonal blend) */
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        margin: 0;
+        font-family: Frutiger;
+        color: var(--text);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(
+            1200px 700px at 50% 30%,
+            #ffffff 0%,
+            #e9edf3 40%,
+            #dfe3ea 60%,
+            #cfd6e2 78%,
+            #c7cedc 100%
+          ),
+          linear-gradient(135deg, #f5f7fb 0%, #6ec522 40%, #dbe2ee 100%);
+        background-attachment: fixed;
+      }
+      /* Login card */
+      .login-box {
+        width: min(480px, 92vw);
+        background: var(--panel-bg);
+        padding: 10px 56px;
+        border-radius: var(--panel-radius);
+        box-shadow: var(--panel-shadow);
+        text-align: center;
+      }
+      /* Branding/logo slot (use image above form) */
+      .brand {
+        margin-bottom: -3%;
+        overflow: hidden;
+      }
+      .brand img {
+        height: 20vh;
+        width: auto;
+        object-fit: contain;
+        display: block;
+        margin: -10px auto auto auto;
+      }
+      h2 {
+        margin: 0 0 26px 0;
+        font-size: 36px;
+        font-weight: 700;
+        color: #111827;
+        letter-spacing: 0.2px;
+      }
+      .field {
+        text-align: left;
+        margin: 10px 0 14px 0;
+      }
+      .field label {
+        display: block;
+        font-size: 16px;
+        color: rgba(0, 0, 0, 0.795);
+        margin: 0 0 6px 2px;
+        font-weight: 900;
+      }
+      input {
+        width: 100%;
+        padding: 12px 14px;
+        border: 1px solid var(--input-border);
+        background: var(--input-bg);
+        border-radius: 8px;
+        font-size: 15px;
+        outline: none;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        box-sizing: border-box; /* Crucial for consistent width */
+      }
+      input:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 4px var(--focus);
+      }
+      .actions {
+        margin-top: 12px;
+      }
+      button {
+        width: 100%;
+        padding: 12px 16px;
+        border: 0;
+        border-radius: 8px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.18s ease, box-shadow 0.18s ease,
+          transform 0.02s ease;
+        box-sizing: border-box;
+      }
+      button:active {
+        transform: translateY(0.5px);
+      }
+      .btn-primary {
+        background: var(--primary);
+        color: #fff;
+      }
+      .btn-primary:hover {
+        background: var(--primary-hover);
+      }
+
+      /* New styles for "Forgot Password" link */
+      .forgot-link-container {
+        text-align: right;
+        margin-top: 19px;
+      }
+      .forgot-link {
+        color: rgba(0, 0, 255, 0.767);
+        text-decoration: none;
+        font-size: 16px;
+        transition: color 0.15s ease;
+        font-weight:bold;
+      }
+      .forgot-link:hover {
+        color: var(--primary);
+        text-decoration: underline;
+      }
+
+      .error {
+        color: var(--danger);
+        margin-top: 10px;
+        font-size: 14px;
+        min-height: 18px;
+      }
+      /* Link-like subtle footer (optional) */
+      .aux {
+        margin-top: 16px;
+        font-size: 14px;
+        color: var(--muted);
+      }
+      .aux a {
+        color: #2563eb;
+        text-decoration: none;
+      }
+      .aux a:hover {
+        text-decoration: underline;
+      }
+      /* Modals */
+      .modal-bg {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(17, 24, 39, 0.45);
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        z-index: 50;
+        backdrop-filter: blur(4px);
+      }
+      .modal {
+        width: min(420px, 92vw);
+        background: #fff;
+        padding: 28px 28px 24px;
+        border-radius: 12px;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.28);
+        text-align: center;
+        position: relative;
+      }
+      .modal h3 {
+        margin: 0 0 16px 0;
+        font-size: 22px;
+        color: #111827;
+        font-weight: 600;
+      }
+      .modal .field {
+        margin: 8px 0 12px;
+      }
+      .modal button {
+        margin-top: 6px;
+      }
+
+      /* New close button styles */
+      .modal-close {
+        position: absolute;
+        top: 10px;
+        right: 20px;
+        text-align: right;
+        background: none;
+        border: none;
+        font-size: 30px;
+        color: var(--muted);
+        cursor: pointer;
+        padding: 5px;
+        width: 25px;
+        transition: color 0.15s ease;
+      }
+      .modal-close:hover {
+        color: var(--danger);
+      }
+
+      /* Small helper for stacked layout on very narrow viewports */
+      @media (max-width: 420px) {
+        .login-box {
+          padding: 36px 22px;
+        }
+        h2 {
+          font-size: 28px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+  <div class="login-box">
+
+    <h2 style="padding-top: 15%;">Gateway Login</h2>
+
+    <div class="field">
+      <label for="username">Username</label>
+      <input type="text" id="username" placeholder="Username"/>
+    </div>
+
+    <div class="field">
+      <label for="password">Password</label>
+      <input type="password" id="password" placeholder="Password"/>
+    </div>
+
+    <div class="actions">
+      <button class="btn-primary" onclick="login()">Log in</button>
+    </div>
+
+    <div class="forgot-link-container">
+      <a href="#" class="forgot-link" onclick="openForgotPasswordModal()">Forgot your password?</a>
+    </div>
+
+    <div class="error" id="error"></div>
+  </div>
+
+  <!-- Single modal only — reset directly, no OTP validation step -->
+  <div class="modal-bg" id="fp-modal">
+    <div class="modal">
+      <button class="modal-close" onclick="closeModal('fp-modal')">&times;</button>
+      <h3>Reset Password</h3>
+
+      <div class="field">
+        <label for="fp-username">Username</label>
+        <input type="text" id="fp-username" placeholder="Username"/>
+      </div>
+
+      <div class="field">
+        <label for="fp-newer-password">New password</label>
+        <input type="password" id="fp-newer-password" placeholder="New Password"/>
+      </div>
+
+      <div class="field">
+        <label for="fp-confirm-password">Confirm password</label>
+        <input type="password" id="fp-confirm-password" placeholder="Confirm Password"/>
+      </div>
+
+      <button class="btn-primary" onclick="resetPassword()">Reset Password</button>
+      <div class="error" id="fp-error"></div>
+    </div>
+  </div>
+
+<script>
+  function closeModal(id){ document.getElementById(id).style.display="none"; }
+
+  async function login() {
+    const username = document.getElementById("username").value.trim();
+    const password = document.getElementById("password").value.trim();
+    const errorBox = document.getElementById("error");
+
+    if (!username || !password) {
+      errorBox.textContent = "Username and password required";
+      return;
+    }
+
+    const res = await fetch("/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password })
+    });
+
+    if (res.ok) location.href = "/";
+    else errorBox.textContent = (await res.json()).error || "Login failed";
+  }
+
+  function openForgotPasswordModal(){
+    document.getElementById("fp-modal").style.display="flex";
+  }
+
+  async function resetPassword(){
+    const username = fp-username.value.trim();
+    const newPassword = fp-newer-password.value.trim();
+    const confirmPassword = fp-confirm-password.value.trim();
+    const errorBox = document.getElementById("fp-error");
+
+    if(!username || !newPassword || !confirmPassword){
+      errorBox.textContent="All fields required"; return;
+    }
+    if(newPassword!==confirmPassword){
+      errorBox.textContent="Passwords do not match"; return;
+    }
+
+    const res = await fetch("/reset-password",{
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body:JSON.stringify({ username,newPassword })
+    });
+
+    const data = await res.json();
+    if(res.ok && data.status==="success"){
+      alert("Password updated. You may log in.");
+      closeModal("fp-modal");
+    }else{
+      errorBox.textContent=data.error||"Reset failed";
+    }
+  }
+</script>
+</body>
+
+</html>

@@ -1,0 +1,96 @@
+sudo bash -c '
+set -e
+
+UNIT_DIR=/etc/systemd/system
+APP_DIR="/home/gateway/Downloads/Munjal-Phase1/Gateway-UI/Gateway-UI/system_scripts"
+USER=gateway
+GROUP=gateway
+
+for s in main_program_phase2 smb_final main_linux_gateway_ui network_apply; do
+  systemctl stop $s.service 2>/dev/null || true
+  systemctl disable $s.service 2>/dev/null || true
+  rm -f $UNIT_DIR/$s.service
+done
+
+cat > $UNIT_DIR/main_program_phase2.service <<EOF
+[Unit]
+Description=Main Program Phase2 Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=$USER
+Group=$GROUP
+WorkingDirectory=$APP_DIR
+ExecStart=$APP_DIR/main_program
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+cat > $UNIT_DIR/smb_final.service <<EOF
+[Unit]
+Description=SMB Final Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=$USER
+Group=$GROUP
+WorkingDirectory=$APP_DIR
+ExecStart=$APP_DIR/smb_final
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+cat > $UNIT_DIR/main_linux_gateway_ui.service <<EOF
+[Unit]
+Description=Main Linux Gateway UI
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=$USER
+Group=$GROUP
+WorkingDirectory=$APP_DIR
+ExecStart=$APP_DIR/main_linux_gateway_ui
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+cat > $UNIT_DIR/network_apply.service <<EOF
+[Unit]
+Description=Network Apply
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=$USER
+Group=$GROUP
+WorkingDirectory=$APP_DIR
+ExecStart=$APP_DIR/network_apply
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reexec
+systemctl daemon-reload
+
+systemctl enable main_program_phase2.service smb_final.service main_linux_gateway_ui.service network_apply.service
+systemctl start  main_program_phase2.service smb_final.service main_linux_gateway_ui.service network_apply.service
+'

@@ -1,0 +1,148 @@
+sudo nano /etc/systemd/system/main_program.service
+
+
+[Unit]
+Description=Main Program Service
+After=network.target
+
+[Service]
+User=recomputer
+Group=recomputer
+WorkingDirectory=/home/recomputer/Gateway-UI/executablefiles
+ExecStart=/home/recomputer/Gateway-UI/executablefiles/main_program_priority
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+
+
+sudo nano /etc/systemd/system/smb_final.service
+
+
+[Unit]
+Description=SMB Final Service
+After=network.target
+
+[Service]
+User=gateway
+Group=gateway
+WorkingDirectory="/home/gateway/Downloads/Munjal-Phase1/Gateway-UI/Gateway-UI/Main Application/dist"
+ExecStart="/home/gateway/Downloads/Munjal-Phase1/Gateway-UI/Gateway-UI/Main Application/dist/smb_final"
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+
+
+
+sudo nano /etc/systemd/system/grafana_custom.service
+
+
+[Unit]
+Description=Grafana Server (Custom Binary)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=recomputer
+Group=recomputer
+WorkingDirectory=/home/recomputer/Downloads/grafana-12.2.0/bin
+
+ExecStart=/home/recomputer/Downloads/grafana-12.2.0/bin/grafana-server \
+  --homepath /home/recomputer/Downloads/grafana-12.2.0 \
+  --config /home/recomputer/Downloads/grafana-12.2.0/conf/defaults.ini
+
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=10000
+
+[Install]
+WantedBy=multi-user.target
+
+
+
+
+sudo nano /etc/systemd/system/main_linux_gateway_ui.service
+
+
+[Unit]
+Description=Main Linux Gateway UI
+After=network.target
+
+[Service]
+User=recomputer
+Group=recomputer
+WorkingDirectory=/home/recomputer/Gateway-UI/
+ExecStart=/home/recomputer/Gateway-UI/executablefiles/main_linux_gateway_ui
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+
+
+
+sudo nano /etc/systemd/system/network_apply.service
+
+
+[Unit]
+Description=Network Apply
+After=network.target
+
+[Service]
+
+User=gateway
+Group=gateway
+WorkingDirectory="/home/gateway/Downloads/Munjal-Phase1/Gateway-UI/Gateway-UI/Main Application/dist"
+ExecStart="/home/gateway/Downloads/Munjal-Phase1/Gateway-UI/Gateway-UI/Main Application/dist/network_apply"
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+
+
+
+
+sudo systemctl daemon-reexec
+sudo systemctl daemon-reload
+
+
+
+
+sudo systemctl enable main_program.service
+sudo systemctl enable main_linux_gateway_ui.service
+sudo systemctl enable grafana_custom.service
+
+
+
+sudo systemctl start main_program.service
+sudo systemctl start main_linux_gateway_ui.service
+sudo systemctl start grafana_custom.service
+
+sudo systemctl restart grafana_custom.service
+sudo systemctl restart main_linux_gateway_ui
+sudo systemctl restart main_program
+
+
+sudo systemctl stop main_program_phase2.service
+sudo systemctl stop smb_final.service
+sudo systemctl stop main_linux_gateway_ui.service
+sudo systemctl stop network_apply.service
+
+
+
+sudo systemctl disable main_program_phase2.service
+sudo systemctl disable smb_final.service
+sudo systemctl disable main_linux_gateway_ui.service
+sudo systemctl disable network_apply.service
+
+
+
+sudo systemctl delete main_program_phase2.service
+sudo systemctl delete smb_final.service
+sudo systemctl delete main_linux_gateway_ui.service
+sudo systemctl delete network_apply.service

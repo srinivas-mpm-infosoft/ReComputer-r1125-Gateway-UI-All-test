@@ -1,0 +1,16 @@
+bcrypt
+itsdangerous
+pymysql
+python-multipart
+psutil
+pyserial
+requests
+minimalmodbus
+pyodbc
+paramiko
+pandas
+flask
+flask_sqlalchemy
+smbus2
+mysql.connector
+pysmb

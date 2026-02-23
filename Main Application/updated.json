@@ -1,0 +1,10621 @@
+[
+  {
+    "flag": true,
+    "timestamp": "2025-08-26 13:43:53",
+    "updated_fields": [
+      "wireless.communicationMedia"
+    ],
+    "updated_by": {
+      "username": "superadmin",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-08-26 13:44:18",
+    "updated_fields": [
+      "modbusTcp.table"
+    ],
+    "updated_by": {
+      "username": "superadmin",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-08-26 14:33:36",
+    "updated_fields": [
+      "ioSettings.analog.saveLog"
+    ],
+    "updated_by": {
+      "username": "realme",
+      "role": "user"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-08-28 10:41:09",
+    "updated_fields": [
+      "ioSettings.settings.modbus"
+    ],
+    "updated_by": {
+      "username": "superadmin",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-08-29 06:42:19",
+    "updated_fields": [
+      "ioSettings.analog.channels"
+    ],
+    "updated_by": {
+      "username": "superadmin",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-08-29 06:42:39",
+    "updated_fields": [
+      "ioSettings.settings.digitalInput"
+    ],
+    "updated_by": {
+      "username": "superadmin",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-08-29 06:42:59",
+    "updated_fields": [
+      "ioSettings.settings.digitalInput"
+    ],
+    "updated_by": {
+      "username": "superadmin",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-04 16:44:31",
+    "updated_fields": [
+      "modbus.modbusR1.slaves",
+      "modbus.modbusR1.table",
+      "wireless.communicationMedia"
+    ],
+    "updated_by": {
+      "username": "superadmin",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-08 12:02:14",
+    "updated_fields": [
+      "plcType",
+      "PLC"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-08 12:10:50",
+    "updated_fields": [
+      "plcType",
+      "PLC.cred.driver",
+      "PLC.cred.ip",
+      "PLC.cred.slot",
+      "PLC.cred.port",
+      "PLC.address_access.read",
+      "PLC.data_reading_freq(in secs)"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-08 12:35:42",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-08 12:36:24",
+    "updated_fields": [
+      "plcType",
+      "PLC",
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-08 12:46:46",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-08 12:47:22",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-08 12:47:44",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-08 13:39:07",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-08 13:39:44",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-08 14:48:34",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-08 14:48:48",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-08 15:10:12",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-08 15:37:24",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-09 10:28:20",
+    "updated_fields": [
+      "ioSettings.settings.modbusTcp",
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-10 09:17:17",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-10 09:18:11",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-10 09:24:56",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-10 09:25:21",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-10 09:25:25",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-10 09:26:33",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-10 09:26:44",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-10 09:31:04",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-10 09:31:16",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-10 09:37:57",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-10 10:05:08",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-10 10:05:21",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-10 10:06:18",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-10 10:06:30",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-10 10:06:39",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-10 10:07:12",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-10 10:07:20",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-10 10:22:25",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-10 10:22:43",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-10 10:22:57",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-10 10:23:03",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-10 10:26:07",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-10 10:26:49",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-10 10:26:58",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-10 10:27:06",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-10 10:33:25",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-10 10:35:32",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-10 10:35:45",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-10 13:03:56",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-10 13:04:15",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-10 15:34:14",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-10 15:34:44",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-12 15:48:27",
+    "updated_fields": [
+      "wireless.communicationMedia",
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-12 15:48:37",
+    "updated_fields": [
+      "wireless.communicationMedia"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-12 16:31:10",
+    "updated_fields": [
+      "wireless.communicationMedia"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-15 10:42:17",
+    "updated_fields": [
+      "wireless.communicationMedia"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-15 12:20:22",
+    "updated_fields": [
+      "offlineData.schedule.date"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-15 12:25:44",
+    "updated_fields": [
+      "fileToDb"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-15 12:26:21",
+    "updated_fields": [
+      "fileToDb.files"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-15 12:36:54",
+    "updated_fields": [
+      "fileToDb.files"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-15 12:38:39",
+    "updated_fields": [
+      "fileToDb.files"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-15 12:53:05",
+    "updated_fields": [
+      "fileToDb.files"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-15 12:54:01",
+    "updated_fields": [
+      "fileToDb.files"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-15 12:54:03",
+    "updated_fields": [
+      "fileToDb.files"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-15 12:54:21",
+    "updated_fields": [
+      "fileToDb.files"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-15 12:54:23",
+    "updated_fields": [
+      "fileToDb.files"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-15 12:54:51",
+    "updated_fields": [
+      "fileToDb.files"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-15 12:55:38",
+    "updated_fields": [
+      "fileToDb.files"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-15 12:55:41",
+    "updated_fields": [
+      "fileToDb.files"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-15 12:55:43",
+    "updated_fields": [
+      "fileToDb.files"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-15 12:56:10",
+    "updated_fields": [
+      "fileToDb.files"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-15 12:56:21",
+    "updated_fields": [
+      "fileToDb.files"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-15 12:57:18",
+    "updated_fields": [
+      "fileToDb.files"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-15 13:00:07",
+    "updated_fields": [
+      "fileToDb.files"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-15 13:00:22",
+    "updated_fields": [
+      "fileToDb.files"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-15 13:36:25",
+    "updated_fields": [
+      "fileToDb.files"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-15 13:36:55",
+    "updated_fields": [
+      "fileToDb.files"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-15 13:46:06",
+    "updated_fields": [
+      "fileToDb.files"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-15 14:10:50",
+    "updated_fields": [
+      "fileToDb"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-15 14:40:13",
+    "updated_fields": [
+      "fileToDb"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-15 14:41:05",
+    "updated_fields": [
+      "fileToDb.files"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-15 14:46:27",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-15 15:13:29",
+    "updated_fields": [
+      "fileToDb.files"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-15 15:24:03",
+    "updated_fields": [
+      "fileToDb.files"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-15 15:24:57",
+    "updated_fields": [
+      "fileToDb.files"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-15 16:51:24",
+    "updated_fields": [
+      "fileToDb.files"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-24 12:45:16",
+    "updated_fields": [
+      "alarmSettings"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-15 17:10:17",
+    "updated_fields": [
+      "fileToDb.files"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-15 17:25:42",
+    "updated_fields": [
+      "fileToDb.files"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-15 17:29:13",
+    "updated_fields": [
+      "ioSettings.analog.channels"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-15 17:38:29",
+    "updated_fields": [
+      "fileToDb.files"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-16 11:49:36",
+    "updated_fields": [
+      "ioSettings.settings.modbusTcp"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-16 11:49:49",
+    "updated_fields": [
+      "ioSettings.settings.modbusTcp",
+      "ioSettings.analog.channels"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-16 11:53:13",
+    "updated_fields": [
+      "modbus.modbusR1.slaves",
+      "modbus.modbusR1.table"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-16 11:53:37",
+    "updated_fields": [
+      "modbus.pollingInterval.r1.interval"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-16 11:53:57",
+    "updated_fields": [
+      "wireless.jsonEndpoint"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-16 11:55:08",
+    "updated_fields": [
+      "ioSettings.settings.modbusTcp",
+      "offlineData.schedule.date"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-16 12:14:34",
+    "updated_fields": [
+      "ioSettings.settings.modbus",
+      "ioSettings.settings.digitalInput",
+      "ioSettings.settings.modbusTcp"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-16 12:19:01",
+    "updated_fields": [
+      "modbus.modbusR1.table"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-16 12:29:36",
+    "updated_fields": [
+      "wireless.communicationMedia"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-22 09:38:49",
+    "updated_fields": [
+      "modbus.modbusR1.table"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-22 09:39:19",
+    "updated_fields": [
+      "offlineData.schedule.date",
+      "fileToDb.files"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-22 09:39:48",
+    "updated_fields": [
+      "ioSettings.settings.digitalInput",
+      "ioSettings.settings.modbusTcp"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-22 10:24:18",
+    "updated_fields": [
+      "wireless.communicationMedia",
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-22 10:29:27",
+    "updated_fields": [
+      "wireless.communicationMedia"
+    ],
+    "updated_by": {
+      "username": "murali",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 13:53:58",
+    "updated_fields": [
+      "energyMeter"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 14:01:57",
+    "updated_fields": [
+      "ModbusRTU"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 14:02:04",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.schneider_em6436h.registersBySlave.1"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 14:02:10",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.schneider_em6436h.slaves",
+      "ModbusRTU.energyMeter.brands.schneider_em6436h.registersBySlave.2"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 14:02:15",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.schneider_em6436h.slaves",
+      "ModbusRTU.energyMeter.brands.schneider_em6436h.registersBySlave.3"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 14:26:39",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.schneider_em6436h.slaves",
+      "ModbusRTU.settings"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 14:27:16",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.schneider_em6436h.label"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 14:35:09",
+    "updated_fields": [
+      "modbus",
+      "energyMeter",
+      "ModbusRTU.energyMeter.brands.schneider_em6436h.registersBySlave.1"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 14:37:08",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.schneider_em6436h.registersBySlave.1"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 14:59:17",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.schneider_em6436h.registersBySlave.1"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 14:59:31",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.schneider_em6436h.registersBySlave.1"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:02:46",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.abc_energy_meter",
+      "ModbusRTU.energyMeter.order"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:02:49",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.abc_energy_meter.slaves",
+      "ModbusRTU.energyMeter.brands.abc_energy_meter.registersBySlave.1"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:02:57",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.order"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:03:50",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.schneider_em6436h.slaves"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:04:40",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.schneider_em6436h.presets"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:05:39",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.abc",
+      "ModbusRTU.energyMeter.order"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:05:41",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.abc.slaves",
+      "ModbusRTU.energyMeter.brands.abc.registersBySlave.1"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:12:46",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.order",
+      "ModbusRTU.energyMeter.globalPresets"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:13:34",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.globalPresets.schneider_em6436h"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:13:48",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.def",
+      "ModbusRTU.energyMeter.order"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:23:22",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.schneider_em6436h.slaves"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:23:26",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.schneider_em6436h.slaves"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:23:36",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.def.slaves",
+      "ModbusRTU.energyMeter.brands.def.registersBySlave.1"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:23:47",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.def.slaves",
+      "ModbusRTU.energyMeter.brands.def.registersBySlave.2"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:23:50",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.def.slaves"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:24:20",
+    "updated_fields": [
+      "ModbusRTU"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:24:28",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.schneider_em6436h.registersBySlave.1"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:25:00",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.abc",
+      "ModbusRTU.energyMeter.order"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:25:14",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.order"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:27:24",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.def",
+      "ModbusRTU.energyMeter.order"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:27:26",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.def.slaves",
+      "ModbusRTU.energyMeter.brands.def.registersBySlave.1"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:27:47",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.globalPresets.schneider_em6436h"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:27:56",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.def.registersBySlave.1"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:28:18",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.order"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:34:22",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.ghi",
+      "ModbusRTU.energyMeter.order"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:36:51",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.order"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:36:58",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.order"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:38:43",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.order"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:38:45",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.abc.slaves",
+      "ModbusRTU.energyMeter.brands.abc.registersBySlave.1"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:38:57",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.order"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:41:35",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.order"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:42:00",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.order"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:50:46",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.def",
+      "ModbusRTU.energyMeter.order"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:51:00",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.order"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:51:32",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.schneider_em6436h.slaves",
+      "ModbusRTU.energyMeter.brands.schneider_em6436h.registersBySlave.2"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:52:04",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.schneider_em6436h.registersBySlave.2"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:54:33",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.schneider_em6436h.slaves",
+      "ModbusRTU.energyMeter.brands.schneider_em6436h.registersBySlave.3"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:54:35",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.schneider_em6436h.slaves"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 15:54:59",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.schneider_em6436h.slaves"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 17:04:21",
+    "updated_fields": [
+      "transmitters"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 17:04:58",
+    "updated_fields": [
+      "transmitters"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 17:53:05",
+    "updated_fields": [
+      "transmitters"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 17:53:44",
+    "updated_fields": [
+      "plc_configurations",
+      "ModbusRTU.energyMeter.brands.schneider_em6436h.slaves"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 17:54:04",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.schneider_em6436h.registersBySlave.2"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 17:54:46",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.schneider_em6436h.slaves",
+      "ModbusRTU.energyMeter.brands.def"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-29 17:55:13",
+    "updated_fields": [
+      "transmitters"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-30 09:23:15",
+    "updated_fields": [
+      "plc_configurations"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-30 18:09:11",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.schneider_em6436h.slaves"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-30 18:09:40",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.schneider_em6436h.slaves"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-30 18:10:31",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.abc",
+      "ModbusRTU.energyMeter.order"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-30 18:10:37",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.abc.slaves",
+      "ModbusRTU.energyMeter.brands.abc.registersBySlave.1"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-09-30 18:10:45",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.abc.registersBySlave.1"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-10-03 09:29:54",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.order"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-10-03 09:47:42",
+    "updated_fields": [
+      "ModbusRTU.PLC"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-10-03 09:53:08",
+    "updated_fields": [
+      "ModbusRTU.transmitters"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-10-03 09:53:17",
+    "updated_fields": [
+      "ModbusRTU.transmitters"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-10-03 10:32:56",
+    "updated_fields": [
+      "ModbusRTU.PLC"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-10-03 10:33:14",
+    "updated_fields": [
+      "ModbusRTU.PLC"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-10-03 10:36:38",
+    "updated_fields": [
+      "ModbusRTU.PLC"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-10-03 10:44:44",
+    "updated_fields": [
+      "ModbusRTU.PLC"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-10-03 11:04:48",
+    "updated_fields": [
+      "ModbusRTU.PLC"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-10-03 12:53:08",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.schneider_em6436h.registersBySlave.1"
+    ],
+    "updated_by": {
+      "username": "new_cm4",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-10-03 14:21:34",
+    "updated_fields": [
+      "ModbusRTU.energyMeter.brands.schneider_em6436h.registersBySlave.1"
+    ],
+    "updated_by": {
+      "username": "new_cm4",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-10-08 13:49:00",
+    "updated_fields": [
+      "offlineData.schedule.date"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-10-08 14:22:47",
+    "updated_fields": [
+      "alarmSettings.PLC"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-10-08 14:22:53",
+    "updated_fields": [
+      "alarmSettings.PLC.Allen Bradley.slaves.1.alerts"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-10-08 14:23:01",
+    "updated_fields": [
+      "alarmSettings.Modbus.schneider_em6436h"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-10-08 14:23:22",
+    "updated_fields": [
+      "alarmSettings.Modbus.schneider_em6436h.slaves.1.alerts"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-10-08 14:34:09",
+    "updated_fields": [
+      "alarmSettings.Modbus.schneider_em6436h"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-10-08 14:34:27",
+    "updated_fields": [
+      "alarmSettings.Modbus.schneider_em6436h.slaves.1.alerts"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-10-08 14:54:22",
+    "updated_fields": [
+      "alarmSettings.Modbus.schneider_em6436h",
+      "alarmSettings.PLC"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-10-08 14:54:45",
+    "updated_fields": [
+      "alarmSettings.Modbus.schneider_em6436h.slaves.1.alerts"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-10-08 14:55:07",
+    "updated_fields": [
+      "alarmSettings.PLC.Allen Bradley"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-10-08 14:55:25",
+    "updated_fields": [
+      "alarmSettings.PLC.Allen Bradley.slaves.1.alerts"
+    ],
+    "updated_by": {
+      "username": "srinivas",
+      "role": "admin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-10-28 10:41:24",
+    "updated_fields": [
+      "ModbusRTU.transmitters"
+    ],
+    "updated_by": {
+      "username": "new_cm4",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-10-28 10:46:09",
+    "updated_fields": [
+      "ModbusRTU.transmitters"
+    ],
+    "updated_by": {
+      "username": "new_cm4",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-10-28 11:29:22",
+    "updated_fields": [
+      "ModbusRTU.PLC"
+    ],
+    "updated_by": {
+      "username": "new_cm4",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-12-16 11:21:57",
+    "updated_fields": [
+      "ioSettings.settings.modbus"
+    ],
+    "updated_by": {
+      "username": "new_cm4",
+      "role": "superadmin"
+    }
+  },
+  {
+    "flag": true,
+    "timestamp": "2025-12-16 11:26:59",
+    "updated_fields": [
+      "ioSettings.settings.modbus",
+      "ioSettings.settings.modbusTcp"
+    ],
+    "updated_by": {
+      "username": "new_cm4",
+      "role": "superadmin"
+    }
+  },
+  {
+    "ts": "2026-01-13T17:45:11.428517",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "wireless",
+      "network"
+    ]
+  },
+  {
+    "ts": "2026-01-13T20:46:55.707633",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-13T20:47:07.675092",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-13T20:50:02.864822",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-13T21:07:58.092601",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-13T21:26:52.366600",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-13T21:36:26.446563",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-13T21:36:42.957468",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-13T21:36:52.781825",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-13T21:44:36.809319",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-14T11:16:52.646974",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-14T12:49:32.183196",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-14T16:13:13.348724",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-14T17:30:20.391089",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-14T17:30:36.036689",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-14T19:33:53.196955",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-14T19:40:28.082861",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-14T20:16:48.904846",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-14T20:18:13.754013",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-14T21:25:33.937798",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-14T21:58:45.299987",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-14T21:59:32.460609",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-14T22:09:45.018902",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-15T08:34:23.886955",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-15T08:35:01.427211",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-15T08:37:26.453693",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-15T09:01:37.887505",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-15T09:02:12.375847",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-15T09:02:39.535843",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-15T11:31:09.623638",
+    "user": {
+      "role": "superadmin",
+      "username": "superadminr"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-15T16:40:10.113094",
+    "user": {
+      "role": "superadmin",
+      "username": "superadminr"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-15T17:49:16.077225",
+    "user": {
+      "role": "superadmin",
+      "username": "superadminr"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-15T17:55:39.521323",
+    "user": {
+      "role": "superadmin",
+      "username": "superadminr"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-15T18:04:12.125467",
+    "user": {
+      "role": "superadmin",
+      "username": "superadminr"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-15T18:11:33.066188",
+    "user": {
+      "role": "superadmin",
+      "username": "superadminr"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-15T18:11:33.085558",
+    "user": {
+      "role": "superadmin",
+      "username": "superadminr"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-15T18:12:18.441283",
+    "user": {
+      "role": "superadmin",
+      "username": "superadminr"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-15T18:12:18.479023",
+    "user": {
+      "role": "superadmin",
+      "username": "superadminr"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-15T18:12:28.908867",
+    "user": {
+      "role": "superadmin",
+      "username": "superadminr"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-15T18:12:58.297173",
+    "user": {
+      "role": "superadmin",
+      "username": "superadminr"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-15T19:05:06.093204",
+    "user": {
+      "role": "superadmin",
+      "username": "superadminr"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-15T20:39:53.815080",
+    "user": {
+      "role": "superadmin",
+      "username": "superadminr"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-15T20:40:44.381745",
+    "user": {
+      "role": "superadmin",
+      "username": "superadminr"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-15T20:40:57.808963",
+    "user": {
+      "role": "superadmin",
+      "username": "superadminr"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-15T20:42:10.257942",
+    "user": {
+      "role": "superadmin",
+      "username": "superadminr"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-15T20:43:50.854893",
+    "user": {
+      "role": "superadmin",
+      "username": "superadminr"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-15T20:50:20.180880",
+    "user": {
+      "role": "superadmin",
+      "username": "superadminr"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-15T20:51:06.117417",
+    "user": {
+      "role": "superadmin",
+      "username": "superadminr"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T17:49:14.213125",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T20:31:20.133805",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T20:32:16.381205",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T20:53:57.055221",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T20:53:57.129079",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T20:53:57.164922",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:00:39.467383",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:00:39.533604",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:00:39.556301",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:00:39.585198",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:00:54.366330",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:00:54.399548",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:00:54.457823",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:00:54.512189",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:00:54.656438",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:01:50.929013",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:01:51.017242",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:01:51.093504",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:01:51.412653",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:01:51.434040",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:01:51.467379",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:01:51.496713",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:01:51.567711",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:01:51.603621",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:01:51.689741",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:01:51.764319",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:01:51.811978",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:01:51.937708",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:01:52.019999",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:01:52.189041",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:01:52.307866",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:01:52.358197",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:01:52.429634",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:01:52.547413",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:01:52.562214",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:01:52.825356",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:15.243095",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:15.349501",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:15.431117",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:15.473561",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:15.638764",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:16.029912",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:16.081037",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:16.336633",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:16.614046",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:16.622105",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:16.654487",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:16.795542",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:17.204743",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:17.248123",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:17.268886",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:17.514745",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:17.552582",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:17.633429",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:17.687483",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:17.757879",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:18.050251",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:18.084619",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:18.125658",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:18.289695",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:18.442080",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:18.498974",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:18.598352",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:18.666780",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:18.779328",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:18.867205",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:18.966635",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:19.011488",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:19.067593",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:19.221041",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:19.353856",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:19.396924",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:19.434493",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:19.465189",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:19.487379",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:19.545146",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:19.643162",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:19.707038",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:19.830822",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:19.874785",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:10:20.103664",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:24:02.664135",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T21:24:44.325590",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "comPort",
+      "ethernet",
+      "fileToDb",
+      "ioSettings",
+      "kafka",
+      "modbusTcp",
+      "network",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "smtp",
+      "wireless"
+    ]
+  },
+  {
+    "ts": "2026-01-22T22:00:00.802484",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-01-22T22:06:16.675568",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-01-22T22:06:32.930082",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-01-22T22:14:40.959168",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-01-23T06:36:06.311335",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-01-23T08:44:07.184231",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "alarmSettings",
+      "ioSettings",
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-01-23T09:00:13.286368",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "alarmSettings",
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-01-23T09:00:33.874647",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-01-23T09:18:16.207355",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-01-23T09:21:33.025261",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "alarmSettings",
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-01-23T09:31:30.925913",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-01-23T09:35:36.335990",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-01-23T09:36:01.835138",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-01-23T09:36:10.290140",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-01-23T09:36:16.698745",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-01-23T12:47:07.967305",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-01-23T12:55:11.404177",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-01-23T12:55:26.043891",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-01-23T12:57:37.363153",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-01-23T13:02:32.460476",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-01-23T13:02:40.979687",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-04T17:27:51.080162",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-04T17:27:58.187495",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-04T17:28:01.550088",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-04T17:28:31.216506",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-04T17:28:36.766230",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-04T17:28:39.865667",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-04T17:28:55.953210",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-04T17:28:58.268797",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-04T17:48:50.857404",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-04T17:49:15.288340",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-04T17:54:42.378584",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-04T18:06:49.414852",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-05T09:10:40.264163",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-05T09:35:06.233768",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-05T09:35:22.845448",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-05T09:35:33.483145",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-05T09:35:37.413844",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-05T09:35:47.061326",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-05T09:35:49.509590",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-05T09:36:02.022080",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-05T09:36:35.719227",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-05T09:36:40.997221",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-05T09:36:49.495080",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-05T09:37:11.836853",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-05T09:49:59.707593",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-05T11:15:52.352357",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-05T11:15:54.872004",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-05T11:16:03.358169",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-05T11:16:09.940858",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-05T11:16:15.584735",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-05T11:16:28.358611",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-05T11:36:52.594225",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings",
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-05T11:51:47.829664",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-05T12:02:05.327235",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-05T12:06:50.931172",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-05T12:07:00.299239",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-05T12:08:44.148298",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-05T12:10:30.985414",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-05T12:12:17.293903",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-05T12:13:37.675209",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-05T12:15:14.260827",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-05T12:15:48.103973",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-05T12:21:28.826445",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-05T12:24:28.086408",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-05T12:24:35.699348",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-05T12:25:15.872388",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-05T12:25:23.014622",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-05T12:26:11.657325",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-05T12:30:54.386994",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-05T12:31:00.950851",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-05T12:33:38.487848",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-05T13:58:16.673546",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-05T13:58:29.457656",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-05T13:59:02.999579",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-05T13:59:29.620870",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-05T14:35:56.282302",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-05T14:41:52.275828",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-05T14:53:00.939553",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-05T15:01:37.882173",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-05T15:01:50.278744",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-05T15:04:44.605480",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-05T17:39:42.182577",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-05T17:40:24.109268",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-05T17:40:40.266986",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-05T17:42:55.975007",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-05T17:43:23.176702",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-05T17:48:29.158257",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-05T17:48:35.064436",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-05T17:54:40.178798",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-05T19:15:29.685607",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-05T19:16:40.517686",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings",
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-05T19:20:00.471654",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-05T19:20:13.967341",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-05T19:54:28.620546",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-05T19:54:45.428774",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-05T19:55:45.942863",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-06T09:00:25.987980",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-06T09:01:45.794168",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-06T09:16:55.639211",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "Database"
+    ]
+  },
+  {
+    "ts": "2026-02-06T09:32:04.742997",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-06T09:32:33.656067",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-06T09:37:23.650400",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-06T09:48:04.410080",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-06T09:49:16.253709",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-06T09:49:32.350586",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-06T09:57:40.807040",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-06T09:57:51.078525",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-06T09:58:01.144056",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-06T09:58:12.467707",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-06T09:58:31.427715",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-06T09:59:29.674968",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-06T10:00:25.945150",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-06T10:00:36.074000",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-06T10:15:39.287450",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-06T10:15:56.954788",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-06T10:16:02.188318",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-06T10:16:07.293946",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-06T10:17:15.325664",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-06T10:17:27.850580",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-06T10:53:54.297115",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "network"
+    ]
+  },
+  {
+    "ts": "2026-02-06T10:54:27.465827",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "network"
+    ]
+  },
+  {
+    "ts": "2026-02-06T10:58:19.557810",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "network"
+    ]
+  },
+  {
+    "ts": "2026-02-06T10:59:01.131057",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "network"
+    ]
+  },
+  {
+    "ts": "2026-02-06T11:37:53.681669",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-06T11:38:44.639140",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-06T11:45:14.678950",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-06T12:01:22.101714",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-06T12:02:45.281729",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-06T12:03:10.992910",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-06T12:12:56.937268",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-06T13:53:10.984936",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-06T13:53:48.286048",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-06T13:54:05.340316",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-06T14:20:13.046337",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-06T14:52:07.232265",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-06T16:21:00.665056",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-06T16:35:48.763155",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-06T16:43:45.102284",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-06T16:43:52.519804",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-06T17:23:20.915203",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-06T17:40:13.089635",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-06T17:50:01.896552",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-06T17:53:27.749544",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-06T18:01:20.513716",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-06T18:16:15.327251",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-06T18:20:25.470981",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-06T18:24:48.141444",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-06T18:26:19.386434",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-06T18:29:33.580679",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-06T19:02:38.400337",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-06T19:25:07.008824",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-06T19:26:13.395992",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-06T19:31:00.438921",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-06T19:40:38.067363",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-06T19:41:02.271456",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-06T19:41:33.676621",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-06T20:21:47.792972",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-07T10:00:01.809171",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-07T10:38:59.936375",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "Database",
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-07T10:39:03.350147",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-07T10:39:36.389170",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-07T10:49:46.928571",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "Database",
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-07T10:49:59.719708",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-07T11:03:38.146156",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-07T11:13:58.079678",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-07T11:24:23.339524",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "Database",
+      "ModbusRTU",
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-07T11:25:25.481552",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "Database",
+      "ModbusRTU",
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-07T11:26:11.778350",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "Database"
+    ]
+  },
+  {
+    "ts": "2026-02-07T11:26:46.010349",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-07T11:27:53.936281",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-07T11:33:13.154437",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-07T11:54:15.043639",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-07T12:23:01.698197",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-07T12:23:52.978621",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-07T12:25:40.987058",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-07T12:25:52.542539",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-07T12:26:01.331319",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-07T12:26:12.283437",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-07T12:26:27.286794",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-07T12:26:47.955721",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-07T12:27:07.436479",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-07T12:27:23.039852",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-07T12:31:39.826048",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "network"
+    ]
+  },
+  {
+    "ts": "2026-02-07T12:32:03.252403",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "network"
+    ]
+  },
+  {
+    "ts": "2026-02-07T12:48:54.765870",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-07T12:49:01.859844",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-07T12:57:07.098510",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-07T12:59:03.921617",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-07T13:47:33.411410",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ioSettings",
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-07T13:47:55.320614",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-07T13:55:18.300195",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-07T14:26:15.273356",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-07T15:04:53.066036",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "network"
+    ]
+  },
+  {
+    "ts": "2026-02-07T15:31:33.890460",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "network"
+    ]
+  },
+  {
+    "ts": "2026-02-07T15:35:38.835727",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "network"
+    ]
+  },
+  {
+    "ts": "2026-02-07T15:50:21.556441",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "network"
+    ]
+  },
+  {
+    "ts": "2026-02-07T16:51:09.256728",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "network"
+    ]
+  },
+  {
+    "ts": "2026-02-07T16:57:35.661365",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-07T16:58:15.998185",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-07T17:01:33.517938",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-10T17:12:05.739171",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "Database"
+    ]
+  },
+  {
+    "ts": "2026-02-11T10:39:13.699137",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-11T10:55:17.382800",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-11T11:04:27.034321",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-11T11:07:43.999177",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-11T11:12:14.657387",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-11T11:15:38.151559",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-11T11:36:16.567723",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-11T11:43:53.993736",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings",
+      "mysqlConfig"
+    ]
+  },
+  {
+    "ts": "2026-02-11T11:44:32.579924",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-11T12:07:10.474580",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings",
+      "mysqlConfig"
+    ]
+  },
+  {
+    "ts": "2026-02-11T12:17:18.801719",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-11T12:17:49.379631",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-11T12:18:19.015044",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-11T12:18:28.978631",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-11T12:19:27.619446",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-11T12:24:44.050111",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-11T12:25:22.596752",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-11T12:44:52.871910",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-11T12:49:04.336077",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-11T12:50:58.575948",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-11T12:51:10.320840",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-11T12:51:41.856768",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-11T12:52:51.327086",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-11T13:02:05.055514",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-11T14:02:54.406612",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-11T14:03:37.326239",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-11T14:08:06.331897",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-11T14:08:18.528068",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-11T14:12:14.568220",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-11T14:12:29.896239",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-11T14:12:35.303664",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-11T14:13:58.446912",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-11T14:15:36.489602",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-11T14:27:50.894393",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-11T14:29:11.655838",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-11T14:29:42.234152",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-11T14:31:14.649488",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-11T14:31:36.245219",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-11T14:32:22.687580",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-11T14:32:45.123437",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-11T14:43:04.590090",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-11T14:52:27.452599",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-12T15:18:06.755525",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "network"
+    ]
+  },
+  {
+    "ts": "2026-02-12T15:18:12.570049",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-12T15:24:17.510319",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "network"
+    ]
+  },
+  {
+    "ts": "2026-02-12T15:25:47.138831",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "network"
+    ]
+  },
+  {
+    "ts": "2026-02-12T15:29:36.976833",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "network"
+    ]
+  },
+  {
+    "ts": "2026-02-12T15:34:49.511782",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-12T15:38:15.678042",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-12T15:38:25.229345",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-12T15:40:02.152903",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "network"
+    ]
+  },
+  {
+    "ts": "2026-02-12T16:03:52.423497",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-12T16:05:08.003215",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-12T16:19:04.508334",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-12T16:20:40.663857",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-12T16:28:31.250356",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-12T16:55:15.348581",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-12T17:10:15.444784",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-12T17:14:44.728577",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-12T17:28:59.194503",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-12T17:46:45.440255",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-12T17:46:53.441630",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-12T17:48:05.708511",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-12T17:48:15.405802",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-12T17:58:16.692037",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-12T18:15:14.516054",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-12T18:15:31.378172",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-12T18:49:07.933683",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T09:43:50.674150",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T09:44:21.305251",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T09:49:17.690621",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T09:49:29.036692",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T09:49:41.327468",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T09:49:52.027460",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T09:52:05.910801",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T09:52:20.053304",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T09:52:33.833611",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T09:52:51.108806",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T09:53:07.620455",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T09:57:41.316643",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T10:30:02.234257",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T10:55:16.780488",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T10:55:32.139632",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T10:55:41.738466",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T10:55:52.460469",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T11:47:28.464216",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T11:50:01.642417",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T11:50:08.232797",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T11:51:09.148869",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T11:51:14.443110",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T12:02:36.114142",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings",
+      "network"
+    ]
+  },
+  {
+    "ts": "2026-02-13T12:02:41.301064",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T12:02:48.471723",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T12:02:58.008037",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T12:03:13.010353",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T12:04:15.728449",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T12:04:28.833963",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T12:06:59.760043",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T12:09:55.757478",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T12:10:19.002895",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T12:14:48.891756",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T12:15:30.108122",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T12:16:01.256815",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T12:16:13.624404",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T12:17:52.105427",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T12:17:58.810867",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T12:18:09.225277",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T12:18:14.807299",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T12:18:25.433280",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T12:43:43.654186",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "Database"
+    ]
+  },
+  {
+    "ts": "2026-02-13T12:53:51.341289",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "Database",
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T12:56:51.346820",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "Database"
+    ]
+  },
+  {
+    "ts": "2026-02-13T13:59:30.147995",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T14:00:19.323861",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T14:07:13.864375",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T16:35:04.737506",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-13T17:31:50.481330",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-13T17:45:07.685119",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-13T18:05:31.813246",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-13T18:05:39.925460",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-13T18:05:46.330406",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-13T18:19:10.219961",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-13T18:19:17.643503",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-13T18:19:42.229953",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-13T18:20:07.750135",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-14T09:44:53.255473",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-14T09:58:39.838987",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-14T09:59:27.804947",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-14T10:01:09.845788",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-14T10:01:19.024312",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-14T10:02:34.190005",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-14T10:02:44.876391",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-14T10:03:06.673893",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-14T10:03:36.932268",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-14T10:03:44.379756",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-14T10:15:21.792050",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-14T10:15:26.371658",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-14T10:15:30.516693",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-14T10:30:40.513846",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-14T12:18:32.160742",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings",
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-14T12:18:41.586532",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-14T12:36:29.886493",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-14T12:36:38.956415",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-14T12:37:02.054761",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-14T12:44:37.187861",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-14T12:46:35.616633",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-14T13:08:17.635677",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-14T13:08:43.913200",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-14T13:20:12.387407",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-14T13:20:30.804050",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-14T13:20:53.706983",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-14T13:21:08.456804",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-14T13:21:14.381992",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-14T13:21:23.598388",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-14T13:41:41.555921",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-14T13:42:11.384898",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-14T14:11:39.837700",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings",
+      "smtp"
+    ]
+  },
+  {
+    "ts": "2026-02-14T14:12:00.583268",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-14T14:23:47.231903",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-14T14:25:30.835002",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "network"
+    ]
+  },
+  {
+    "ts": "2026-02-14T14:26:22.591817",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "network"
+    ]
+  },
+  {
+    "ts": "2026-02-14T14:37:42.961162",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "adminSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-14T14:47:03.093043",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "adminSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-14T15:04:23.844049",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-14T15:04:41.583374",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-14T16:17:18.199727",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-14T16:18:06.231048",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-14T16:18:11.126312",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-14T16:18:16.505362",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-14T16:18:23.912069",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-14T16:18:28.537859",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-14T16:18:42.609916",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-14T16:21:11.967097",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-14T16:21:14.850172",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-14T16:22:12.978883",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-14T16:22:26.135739",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-14T16:22:43.905293",
+    "user": {
+      "role": "user",
+      "username": "gatewayuser"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-14T17:20:22.395258",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-14T17:22:26.982086",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-14T17:22:50.343051",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-14T17:46:10.645606",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings",
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-14T17:46:20.344099",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-14T17:46:23.284319",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-14T17:46:29.957668",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-14T17:47:34.482123",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-14T17:47:54.735744",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-14T17:49:43.939079",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-15T10:01:08.329825",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-15T10:01:27.740199",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-15T10:08:56.921976",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-15T10:09:03.528468",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-15T10:09:08.378158",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-15T10:09:14.245681",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-15T10:26:48.779296",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-15T10:26:57.090108",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-15T10:37:30.955709",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-15T10:37:34.989416",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-15T10:37:44.429442",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-15T10:37:51.547305",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-15T10:40:10.546171",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-15T10:40:14.813909",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-15T10:40:39.312206",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-15T10:45:10.067933",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-15T10:45:20.199782",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-15T10:45:29.411304",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-15T10:57:28.054334",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-15T11:02:29.484788",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-15T11:02:43.135248",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-15T11:03:01.960355",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-15T11:03:57.932682",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-15T11:04:03.363913",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-15T11:18:40.288365",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-15T11:26:03.860339",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "adminSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-15T11:27:09.612517",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-15T11:27:39.162404",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "adminSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-15T11:27:54.934816",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-15T11:38:21.132411",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-15T11:38:42.895002",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-15T11:43:47.741426",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-15T11:43:59.135018",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-15T12:28:42.140599",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-15T12:35:40.236049",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-15T14:55:42.006790",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-15T14:55:48.984698",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-15T14:57:07.008042",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-15T14:57:09.826824",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-15T14:57:13.097606",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-15T14:57:16.279716",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-15T17:19:29.876687",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-15T17:21:00.850783",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-15T17:38:47.782097",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-15T17:41:27.724018",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-15T17:48:06.846120",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-15T17:49:36.519429",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-15T17:49:45.137719",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-15T17:53:41.156910",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-15T17:59:21.886997",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-15T18:05:21.504236",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "network"
+    ]
+  },
+  {
+    "ts": "2026-02-15T18:05:48.608884",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "network"
+    ]
+  },
+  {
+    "ts": "2026-02-15T18:06:03.762080",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "network"
+    ]
+  },
+  {
+    "ts": "2026-02-15T18:07:08.479735",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "network"
+    ]
+  },
+  {
+    "ts": "2026-02-15T18:14:46.496651",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "smtp"
+    ]
+  },
+  {
+    "ts": "2026-02-15T18:14:58.849327",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-15T18:15:10.835522",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-15T18:15:56.985002",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-15T18:16:12.778221",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-15T18:19:33.232313",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-15T18:19:42.722576",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-15T18:21:44.951283",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-15T18:21:49.940326",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-15T18:21:55.060680",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-15T18:22:04.818846",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-15T18:38:09.673637",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-16T10:34:12.144388",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-16T10:50:50.555282",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-16T10:51:11.867931",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-16T10:51:38.833922",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-16T10:53:04.153591",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-02-16T11:24:17.316571",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-16T11:31:21.206297",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-16T11:38:17.842908",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-16T11:40:12.209470",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-16T11:40:48.917872",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-16T12:13:17.197320",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-16T12:13:35.898745",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-16T12:16:22.627767",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-16T12:16:51.726427",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-16T12:16:58.396804",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-16T12:17:56.214117",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-16T16:10:22.496755",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-16T16:10:32.247566",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-16T16:10:40.164623",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-16T16:10:46.123632",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-16T17:29:16.835146",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "network"
+    ]
+  },
+  {
+    "ts": "2026-02-17T10:46:14.712169",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-17T11:12:39.314407",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-17T11:13:25.673837",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "adminSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-17T11:13:39.504592",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-17T11:13:47.352114",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "adminSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-17T11:14:25.944411",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "adminSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-17T11:14:52.666771",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "adminSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-17T11:15:36.363980",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-17T11:59:07.455133",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-17T11:59:13.284226",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-17T12:01:01.267019",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "network"
+    ]
+  },
+  {
+    "ts": "2026-02-17T12:13:20.495308",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-17T12:13:44.635120",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-17T14:51:55.005582",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-17T14:52:02.244464",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-17T14:52:09.256583",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-17T14:55:24.749611",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-17T14:55:33.158647",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-19T11:19:38.782194",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-19T11:22:03.403513",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "adminSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-19T11:22:10.132479",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-19T11:24:27.209598",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-19T11:25:54.192848",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-19T11:26:03.475484",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-19T11:26:07.891974",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-19T11:30:39.862029",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "adminSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-19T11:31:10.530672",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "rs485"
+    ]
+  },
+  {
+    "ts": "2026-02-19T11:31:19.345695",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-19T11:34:39.713501",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-19T11:35:39.866178",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-19T11:45:22.537970",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-19T11:48:16.119954",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-19T11:52:33.398882",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-19T14:47:39.844266",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "adminSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-19T14:50:00.145996",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU",
+      "alarmSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-19T14:53:00.193439",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-19T14:53:16.751503",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-19T14:55:51.647044",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-19T14:56:52.359280",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-19T14:57:52.042416",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-19T14:58:06.405762",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-19T14:58:13.818811",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-19T14:58:18.364733",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-19T14:58:22.328148",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-19T14:58:28.589683",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-19T14:59:05.864029",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-19T14:59:09.273210",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-19T14:59:16.251294",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-19T14:59:25.979451",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-19T15:00:32.940197",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-02-19T15:02:47.639511",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-19T15:02:54.590591",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-19T15:45:57.530489",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "network"
+    ]
+  },
+  {
+    "ts": "2026-02-19T15:59:01.774419",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "network"
+    ]
+  },
+  {
+    "ts": "2026-02-19T16:03:19.578806",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "network"
+    ]
+  },
+  {
+    "ts": "2026-02-19T16:25:19.304484",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-19T16:48:46.675648",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "network"
+    ]
+  },
+  {
+    "ts": "2026-02-19T16:48:50.506676",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-02-23T10:10:27.334795",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "network"
+    ]
+  },
+  {
+    "ts": "2026-02-23T10:16:38.031877",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "network"
+    ]
+  }
+]
