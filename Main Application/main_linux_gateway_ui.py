@@ -14,6 +14,17 @@ from flask import (
 )
 from flask_sqlalchemy import SQLAlchemy
 
+from flask_cors import CORS
+
+CORS(
+    app,
+    supports_credentials=True,
+    origins=[
+        "http://localhost:5173",   # React dev
+        "http://127.0.0.1:5173",
+    ]
+)
+
 # ============================================================
 # PATHS
 # ============================================================

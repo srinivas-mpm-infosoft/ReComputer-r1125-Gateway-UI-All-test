@@ -1,7 +1,7 @@
 {
   "wifi": {
-    "password": "SANDman_2020",
-    "ssid": "mpminfosoft_airtel_5GHz"
+    "password": "",
+    "ssid": ""
   },
   "sim4g": {
     "apn": "",

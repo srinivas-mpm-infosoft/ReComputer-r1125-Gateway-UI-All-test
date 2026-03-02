@@ -9,7 +9,7 @@ After=network.target
 User=recomputer
 Group=recomputer
 WorkingDirectory=/home/recomputer/Gateway-UI/executablefiles
-ExecStart=/home/recomputer/Gateway-UI/executablefiles/main_program_priority
+ExecStart=/home/recomputer/Gateway-UI/executablefiles/main_program
 Restart=always
 RestartSec=2
 
@@ -109,6 +109,7 @@ WantedBy=multi-user.target
 
 sudo systemctl daemon-reexec
 sudo systemctl daemon-reload
+
 
 
 

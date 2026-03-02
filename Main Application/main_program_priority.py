@@ -5613,18 +5613,9 @@ def system_status_monitor():
 # WIFI, 4G, Ethernet
 # ==================================================
 
-#!/usr/bin/env python3
 
-import json
-import time
+
 import hashlib
-import subprocess
-import serial
-from pathlib import Path
-import os
-import logging
-from datetime import datetime
-
 
 # ---------------- PATHS ----------------
 BASE = Path("/home/recomputer/Gateway-UI/Main Application/")
@@ -5636,6 +5627,21 @@ STATE_FILE   = BASE / "last_network_state.json"
 SERIAL_PORT = "/dev/ttyUSB2"
 BAUDRATE    = 115200
 MODEM_USB_ID = "1e0e:9011"
+
+MODEMS = {
+    "simcom": {
+        "usb_id": "1e0e:9011",
+        "at_port": "/dev/ttyUSB2",
+        "mode": "ecm"
+    },
+    "quectel": {
+        "usb_id": "2c7c:0125",
+        "at_port": "/dev/ttyUSB2",
+        "ppp_port": "/dev/ttyUSB3",
+        "mode": "ppp"
+    }
+}
+
 
 # ---------------- LOGGING ----------------
 LOG_BASE = Path("/home/recomputer/logs")
@@ -5670,14 +5676,151 @@ def write_json(path, data):
 def hash_dict(d):
     return hashlib.sha256(json.dumps(d, sort_keys=True).encode()).hexdigest()
 
-def modem_present():
+def detect_modem():
     out = subprocess.run(["lsusb"], capture_output=True, text=True).stdout
-    return MODEM_USB_ID in out
+    for name, cfg in MODEMS.items():
+        if cfg["usb_id"] in out:
+            log.info(f"[MODEM] Detected {name}")
+            return name
+    return None
+
+
+def setup_quectel_ppp(apn):
+    log.info("[4G] Starting Quectel PPP")
+
+    # kill old sessions
+    subprocess.run(["sudo", "poff", "-a"], check=False)
+    subprocess.run(["sudo", "killall", "pppd"], check=False)
+    time.sleep(2)
+
+    # update chat script dynamically (important!)
+    chat = f"""
+        ABORT "NO CARRIER"
+        ABORT "ERROR"
+        ABORT "NO DIALTONE"
+        ABORT "BUSY"
+        ABORT "NO ANSWER"
+        "" AT
+        OK ATE0
+        OK AT+CGDCONT=1,"IP","{apn}"
+        OK ATD*99#
+        CONNECT \\d\\c
+    """
+    log_info(f"[INFO] quectel chat {chat}")
+    subprocess.run(
+        ["sudo", "tee", "/etc/chatscripts/quectel-connect"],
+        input=chat,
+        text=True,
+        check=True
+    )
+
+    subprocess.run(["sudo", "pon", "quectel"], check=False)
+
+    # wait for ppp0
+    for _ in range(20):
+        if os.path.exists("/sys/class/net/ppp0"):
+            log.info("[4G] PPP interface up")
+            return
+        time.sleep(1)
+
+    raise RuntimeError("PPP failed to come up")
+
+def fix_routes(mode):
+    if mode == "ppp":
+        subprocess.run(["sudo", "ip", "route", "replace", "default", "dev", "ppp0"])
+    else:
+        subprocess.run([
+            "sudo", "ip", "route", "replace",
+            "default", "via", "192.168.225.1",
+            "dev", "usb0", "metric", "900"
+        ])
 
 def sim_present(ser):
     resp = send_at(ser, "AT+CPIN?", 1)
     return "OK" in resp
 
+def setup_simcom_ecm(apn):
+    if not apn:
+        log.warning("APN not configured — skipping attach")
+        subprocess.run(["sudo","ip","link","set","usb0","down"],check=False)
+        time.sleep(2)
+        return
+    log_info("[4G] Starting CFUN-based attach (Jio-safe)")
+    if not detect_modem():
+        subprocess.run(["sudo","gpioset","0","6=1"],check=False)
+        time.sleep(8)
+
+    free_port(SERIAL_PORT)
+    wait_for_tty(SERIAL_PORT)
+
+    with serial.Serial(SERIAL_PORT, BAUDRATE, timeout=2) as ser:
+        send_at(ser, "AT")
+        # 🔥 CFUN reset (THIS IS THE KEY)
+        send_at(ser, "AT+CFUN=0", 2)
+        time.sleep(15)
+
+        send_at(ser, "AT+CFUN=1", 2)
+        time.sleep(20)
+        if not sim_present(ser):
+            log_info("No Sim Inserted")
+            subprocess.run(["sudo","ip","link","set","usb0","down"],check=False)
+            time.sleep(2)
+            return
+
+
+        # Wait for LTE registration
+        log_info("[4G] Waiting for network registration")
+
+        send_at(ser, "AT+CREG", 1)
+        send_at(ser, "AT+CGREG", 1)
+        send_at(ser, "AT+CEREG", 1)
+        send_at(ser, "AT+CNSMOD", 1)
+
+        for _ in range(40):
+            creg  = send_at(ser, "AT+CREG?", 1)
+            cgreg = send_at(ser, "AT+CGREG?", 1)
+            cereg = send_at(ser, "AT+CEREG?", 1)
+            cns   = send_at(ser, "AT+CNSMOD?", 1)
+            log_info(f"creg :{creg}, cgreg: {cgreg}, cereg: {cereg}, cns: {cns}")
+
+            if (
+                ("CREG: 1" in creg or "CREG: 0,1" in creg) and
+                ("CGREG: 1" in cgreg or "CGREG: 0,1" in cgreg) and
+                ("CEREG: 1" in cereg or "CEREG: 0,1" in cereg)
+            ):
+                log_info("[4G] Registered on LTE")
+                break
+
+            time.sleep(2)
+        else:
+            raise RuntimeError("LTE registration failed")
+
+        # Attach packet service (retry like you did manually)
+        for _ in range(10):
+            resp = send_at(ser, "AT+CGATT=1", 2)
+            if "OK" in resp:
+                break
+            time.sleep(3)
+
+        # Set APN
+        send_at(ser, f'AT+CGDCONT=1,"IPV4V6","{apn}"', 2)
+
+        # Activate PDP (IGNORE ERROR — Jio behavior)
+        send_at(ser, "AT+CGACT=1,1", 2)
+
+        # Poll for IP (THIS IS THE REAL SUCCESS SIGNAL)
+        log_info("[4G] Waiting for IP from network")
+        for _ in range(30):
+            ipinfo = send_at(ser, "AT+CGPADDR=1", 2)
+            if "+CGPADDR:" in ipinfo:
+                log_info("[4G] IP assigned")
+                break
+            time.sleep(3)
+        else:
+            raise RuntimeError("No IP assigned by network")
+
+    subprocess.run(["sudo", "dhclient", "usb0"], check=False)
+    log_info("[4G] LTE READY (CFUN path)")
 
 def free_port(port):
     subprocess.run(["sudo", "fuser", "-k", port], check=False)
@@ -5691,14 +5834,20 @@ def wait_for_tty(port, timeout=40):
         time.sleep(1)
     raise RuntimeError("Serial port did not appear")
 
-def send_at(ser, cmd, wait=1):
-    log_info(f"[AT] {cmd}")
+def send_at(ser, cmd, timeout=2):
+    log.info(f"[AT] {cmd}")
     ser.write((cmd + "\r").encode())
-    time.sleep(wait)
-    resp = ser.read(ser.in_waiting or 256).decode(errors="ignore")
-    if resp.strip():
-        log_info(resp.strip())
-    return resp
+
+    end = time.time() + timeout
+    buf = ""
+    while time.time() < end:
+        buf += ser.read(ser.in_waiting or 1).decode(errors="ignore")
+        if "OK" in buf or "ERROR" in buf:
+            break
+
+    if buf.strip():
+        log.info(buf.strip())
+    return buf
 
 # ---------------- LTE REGISTRATION WAIT ----------------
 def wait_for_lte(ser, present, timeout=5):
@@ -5769,97 +5918,16 @@ def connect_wifi(ssid, password):
     )
 
 
-# ---------------- ROUTING ----------------
-def fix_routes():
-    subprocess.run(["sudo", "ip", "route", "del", "default", "dev", "usb0"], check=False)
-    subprocess.run([
-        "sudo", "ip", "route", "add",
-        "default", "via", "192.168.225.1",
-        "dev", "usb0", "metric", "900"
-    ], check=False)
-
 # ---------------- 4G ----------------
 def setup_4g(apn):
-    if not apn:
-        log.warning("APN not configured — skipping attach")
-        subprocess.run(["sudo","ip","link","set","usb0","down"],check=False)
-        time.sleep(2)
-        return
-    log_info("[4G] Starting CFUN-based attach (Jio-safe)")
-    if not modem_present():
-        subprocess.run(["sudo","gpioset","0","6=1"],check=False)
-        time.sleep(8)
+    modem = detect_modem()
+    if not modem:
+        raise RuntimeError("No supported modem detected")
 
-    free_port(SERIAL_PORT)
-    wait_for_tty(SERIAL_PORT)
-
-    with serial.Serial(SERIAL_PORT, BAUDRATE, timeout=2) as ser:
-        send_at(ser, "AT")
-        if not sim_present(ser):
-            log_info("No Sim Inserted")
-            subprocess.run(["sudo","ip","link","set","usb0","down"],check=False)
-            time.sleep(2)
-            return
-        # 🔥 CFUN reset (THIS IS THE KEY)
-        send_at(ser, "AT+CFUN=0", 2)
-        time.sleep(15)
-
-        send_at(ser, "AT+CFUN=1", 2)
-        time.sleep(20)
-
-        # Wait for LTE registration
-        log_info("[4G] Waiting for network registration")
-
-        send_at(ser, "AT+CREG", 1)
-        send_at(ser, "AT+CGREG", 1)
-        send_at(ser, "AT+CEREG", 1)
-        send_at(ser, "AT+CNSMOD", 1)
-
-        for _ in range(40):
-            creg  = send_at(ser, "AT+CREG?", 1)
-            cgreg = send_at(ser, "AT+CGREG?", 1)
-            cereg = send_at(ser, "AT+CEREG?", 1)
-            cns   = send_at(ser, "AT+CNSMOD?", 1)
-            log_info(creg, cgreg, cereg, cns)
-
-            if (
-                ("CREG: 1" in creg or "CREG: 0,1" in creg) and
-                ("CGREG: 1" in cgreg or "CGREG: 0,1" in cgreg) and
-                ("CEREG: 1" in cereg or "CEREG: 0,1" in cereg)
-            ):
-                log_info("[4G] Registered on LTE")
-                break
-
-            time.sleep(2)
-        else:
-            raise RuntimeError("LTE registration failed")
-
-        # Attach packet service (retry like you did manually)
-        for _ in range(10):
-            resp = send_at(ser, "AT+CGATT=1", 2)
-            if "OK" in resp:
-                break
-            time.sleep(3)
-
-        # Set APN
-        send_at(ser, f'AT+CGDCONT=1,"IPV4V6","{apn}"', 2)
-
-        # Activate PDP (IGNORE ERROR — Jio behavior)
-        send_at(ser, "AT+CGACT=1,1", 2)
-
-        # Poll for IP (THIS IS THE REAL SUCCESS SIGNAL)
-        log_info("[4G] Waiting for IP from network")
-        for _ in range(30):
-            ipinfo = send_at(ser, "AT+CGPADDR=1", 2)
-            if "+CGPADDR:" in ipinfo:
-                log_info("[4G] IP assigned")
-                break
-            time.sleep(3)
-        else:
-            raise RuntimeError("No IP assigned by network")
-
-    subprocess.run(["sudo", "dhclient", "usb0"], check=False)
-    log_info("[4G] LTE READY (CFUN path)")
+    if MODEMS[modem]["mode"] == "ppp":
+        setup_quectel_ppp(apn)
+    else:
+        setup_simcom_ecm(apn)
 
 # ---------------- STATIC ETHERNET (DHCP + STATIC IP) ----------------
 ETH_CONNECTION = "Wired connection 1"
@@ -5904,15 +5972,7 @@ def apply_static_ethernet(static_cfg, iface, prev_cfg):
 
     try:
         if not enabled:
-            log_info(f"[{iface}] Restoring pure DHCP")
-
-            subprocess.run([
-                "sudo", "nmcli", "con", "mod", iface,
-                "ipv4.addresses", "",
-                "ipv4.method", "auto",
-                "ipv4.ignore-auto-dns", "no",
-                "ipv4.dns", ""
-            ], check=False)
+            log_info(f"[{iface}] Static IP Not enabled")
 
         else:
             ip = static_cfg.get("ip")
