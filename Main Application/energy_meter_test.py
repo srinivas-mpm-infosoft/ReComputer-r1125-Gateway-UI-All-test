@@ -31,7 +31,7 @@ def regs_to_float(reg1, reg2, byte_order='big', word_order='little'):
 
 # --- Modbus Instrument Configuration ---
 # port = "/dev/energy_meter_usb"  # Change to your serial port, e.g., 'COM3' on Windows
-port = "/dev/ttyACM1"  # Change to your serial port, e.g., 'COM3' on Windows
+port = "/dev/ttyAMA4"  # Change to your serial port, e.g., 'COM3' on Windows
 slave_id = 2           # Change to your Modbus slave ID
 
 instrument = minimalmodbus.Instrument(port, slave_id)

@@ -180,7 +180,7 @@ ${canSeeDbFields
       <input type="text"
         name="${prefix}_db_name"
         placeholder="Database name"
-        value="${db.db_name || "ifex_demo"}"
+        value="${db.db_name || "test"}"
         style="width:140px;">
 
         </label>
@@ -197,7 +197,7 @@ ${canSeeDbFields
       : `
       <input type="hidden"
         name="${prefix}_db_name"
-        value="${db.db_name || "ifex_demo"}">
+        value="${db.db_name || "test"}">
 
       <input type="hidden"
         name="${prefix}_table_name"
@@ -1715,7 +1715,7 @@ function renderModbusDevices(
                 <th>Name</th>
                 <th>Start Address</th>
                 <th>Offset</th>
-            <th style="display:none">Type of Register</th>
+            <th >Type of Register</th>
                 <th style="display:none">Conversion</th>
                 <th>Type of Sensor</th>
 <th>Engineering Symbol</th>
@@ -2149,8 +2149,12 @@ function rowHtml(r, i) {
     r.offset,
     0,
   )}" data-field="offset" data-index="${i}" style="width:70px;"></td>
-            <td style="display:none">
+            <td >
               <select data-field="type" data-index="${i}">
+                              <option value="Coil" ${r.type === "Coil" ? "selected" : ""
+    }>Coil</option>
+                    <option value="Discrete Input" ${r.type === "Discrete Input" ? "selected" : ""
+    }>Discrete Input</option>
                 <option value="Holding Register" ${r.type === "Holding Register" ? "selected" : ""
     }>Holding Register</option>
                 <option value="Input Register" ${r.type === "Input Register" ? "selected" : ""
@@ -2284,7 +2288,7 @@ function rerenderRegsTable(rows) {
             <th>Name</th>
             <th>Start Address</th>
             <th>Offset</th>
-            <th style="display:none">Type of Register</th>
+            <th>Type of Register</th>
                 <th style="display:none">Conversion</th>
                 <th>Type of Sensor</th>
 <th>Engineering Symbol</th>
@@ -3491,7 +3495,7 @@ function renderSiemensForm(plc, index) {
   plc.Database ??= {
     upload_local: true,
     upload_cloud: false,
-    db_name: "ifex_demo",
+    db_name: "test",
     table_name: ""
   };
 
@@ -3679,7 +3683,7 @@ function renderAllenBradleyForm(plc, index) {
   plc.Database ??= {
     upload_local: true,
     upload_cloud: false,
-    db_name: "ifex_demo",
+    db_name: "test",
     table_name: ""
   };
 

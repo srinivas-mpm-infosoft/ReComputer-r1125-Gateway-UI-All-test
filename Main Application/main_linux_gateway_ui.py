@@ -16,14 +16,7 @@ from flask_sqlalchemy import SQLAlchemy
 
 from flask_cors import CORS
 
-CORS(
-    app,
-    supports_credentials=True,
-    origins=[
-        "http://localhost:5173",   # React dev
-        "http://127.0.0.1:5173",
-    ]
-)
+
 
 # ============================================================
 # PATHS
@@ -57,6 +50,15 @@ app = Flask(
     __name__,
     static_folder=str(STATIC),
     static_url_path="/static"
+)
+
+CORS(
+    app,
+    supports_credentials=True,
+    origins=[
+        "http://localhost:5173",   # React dev
+        "http://127.0.0.1:5173",
+    ]
 )
 
 # NEVER hardcode this in real life
@@ -511,17 +513,17 @@ if __name__ == "__main__":
     log = setup_logging()
     log.info("Starting Innodose Configuration UI")
             # ✅ MUST BE INSIDE app.app_context
-    # try:
-    #     create_user_internal(
-    #         username="superadmin",
-    #         password="superadmin",
-    #         role="superadmin",
-    #         creator_username="bootstrap",
-    #         creator_role="superadmin",
-    #     )
-    #     log.info("Bootstrap superadmin ensured")
-    # except RuntimeError:
-    #     log.info("Bootstrap superadmin already exists")
+    try:
+        create_user_internal(
+            username="superadmin",
+            password="superadmin",
+            role="superadmin",
+            creator_username="bootstrap",
+            creator_role="superadmin",
+        )
+        log.info("Bootstrap superadmin ensured")
+    except RuntimeError:
+        log.info("Bootstrap superadmin already exists")
     with app.app_context():
         for retry in range(10):
             if is_mysql_up():

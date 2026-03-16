@@ -49,11 +49,11 @@ Wants=network-online.target
 Type=simple
 User=recomputer
 Group=recomputer
-WorkingDirectory=/home/recomputer/Downloads/grafana-12.2.0/bin
+WorkingDirectory=/home/recomputer/grafana-12.2.0/bin
 
-ExecStart=/home/recomputer/Downloads/grafana-12.2.0/bin/grafana-server \
-  --homepath /home/recomputer/Downloads/grafana-12.2.0 \
-  --config /home/recomputer/Downloads/grafana-12.2.0/conf/defaults.ini
+ExecStart=/home/recomputer/grafana-12.2.0/bin/grafana-server \
+  --homepath /home/recomputer/grafana-12.2.0 \
+  --config /home/recomputer/grafana-12.2.0/conf/defaults.ini
 
 Restart=on-failure
 RestartSec=5

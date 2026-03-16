@@ -92,7 +92,7 @@
     },
     "settings": {
       "analog": false,
-      "digitalInput": true,
+      "digitalInput": false,
       "modbus": true,
       "modbusTCP": false
     }
@@ -436,7 +436,7 @@
         "analog_acquisition_module": {
           "label": "Analog Acquisition Module",
           "registersBySlave": {
-            "1": [
+            "4": [
               {
                 "conversion": "Float: Big Endian",
                 "divide": 1,
@@ -577,21 +577,80 @@
           },
           "slaves": [
             {
+              "id": 4,
+              "enabled": false,
+              "rs485_port": "/dev/ttyAMA4",
               "baudRate": 9600,
-              "dataBits": 8,
-              "db_name": "test",
-              "enabled": true,
-              "id": 1,
               "parity": "None",
+              "dataBits": 8,
+              "stopBits": 1,
               "pollingInterval": 5,
               "pollingIntervalUnit": "Sec",
-              "rs485_port": "/dev/ttyAMA2",
-              "stopBits": 1,
-              "table_name": "analog_sensors",
-              "upload_cloud": false,
-              "upload_local": true,
               "use_usb": false,
-              "generate_random": true
+              "upload_local": true,
+              "upload_cloud": false,
+              "db_name": "test",
+              "table_name": "analog_sensors"
+            }
+          ]
+        },
+        "digital_i_o": {
+          "label": "Digital I/O",
+          "presets": {},
+          "registersBySlave": {
+            "1": [
+              {
+                "name": "Digital Input 1",
+                "start": 1,
+                "offset": 0,
+                "type": "Discrete Input",
+                "conversion": "Float: Big Endian",
+                "sql_type": "BOOLEAN",
+                "length": 1,
+                "multiply": 1,
+                "divide": 1,
+                "process_min": "0",
+                "process_max": "1",
+                "sensor_type": "mass",
+                "eng_symbol": "kg",
+                "eng_unit": "none",
+                "enabled": true
+              },
+              {
+                "name": "Digital Input 2",
+                "start": 2,
+                "offset": 0,
+                "type": "Discrete Input",
+                "conversion": "Float: Big Endian",
+                "sql_type": "BOOLEAN",
+                "length": 1,
+                "multiply": 1,
+                "divide": 1,
+                "process_min": "0",
+                "process_max": "1",
+                "sensor_type": "energy",
+                "eng_symbol": "Wh",
+                "eng_unit": "none",
+                "enabled": true
+              }
+            ]
+          },
+          "slaves": [
+            {
+              "id": 1,
+              "enabled": true,
+              "rs485_port": "/dev/ttyAMA4",
+              "baudRate": 9600,
+              "parity": "None",
+              "dataBits": 8,
+              "stopBits": 1,
+              "pollingInterval": 5,
+              "pollingIntervalUnit": "Sec",
+              "use_usb": false,
+              "upload_local": true,
+              "upload_cloud": false,
+              "db_name": "test",
+              "table_name": "digital_io"
             }
           ]
         },
@@ -615,7 +674,7 @@
                 "sensor_type": "current",
                 "sql_type": "FLOAT",
                 "start": 2998,
-                "type": "Input Register"
+                "type": "Holding Register"
               },
               {
                 "conversion": "Float: Big Endian",
@@ -632,7 +691,7 @@
                 "sensor_type": "current",
                 "sql_type": "FLOAT",
                 "start": 3000,
-                "type": "Input Register"
+                "type": "Holding Register"
               },
               {
                 "conversion": "Float: Big Endian",
@@ -649,7 +708,7 @@
                 "sensor_type": "current",
                 "sql_type": "FLOAT",
                 "start": 3002,
-                "type": "Input Register"
+                "type": "Holding Register"
               },
               {
                 "conversion": "Float: Big Endian",
@@ -666,7 +725,7 @@
                 "sensor_type": "voltage",
                 "sql_type": "FLOAT",
                 "start": 3018,
-                "type": "Input Register"
+                "type": "Holding Register"
               },
               {
                 "conversion": "Float: Big Endian",
@@ -683,7 +742,7 @@
                 "sensor_type": "voltage",
                 "sql_type": "FLOAT",
                 "start": 3020,
-                "type": "Input Register"
+                "type": "Holding Register"
               },
               {
                 "conversion": "Float: Big Endian",
@@ -700,7 +759,7 @@
                 "sensor_type": "voltage",
                 "sql_type": "FLOAT",
                 "start": 3022,
-                "type": "Input Register"
+                "type": "Holding Register"
               },
               {
                 "conversion": "Float: Big Endian",
@@ -717,7 +776,7 @@
                 "sensor_type": "voltage",
                 "sql_type": "FLOAT",
                 "start": 3026,
-                "type": "Input Register"
+                "type": "Holding Register"
               },
               {
                 "conversion": "Float: Big Endian",
@@ -734,7 +793,7 @@
                 "sensor_type": "voltage",
                 "sql_type": "FLOAT",
                 "start": 3028,
-                "type": "Input Register"
+                "type": "Holding Register"
               },
               {
                 "conversion": "Float: Big Endian",
@@ -751,7 +810,7 @@
                 "sensor_type": "voltage",
                 "sql_type": "FLOAT",
                 "start": 3030,
-                "type": "Input Register"
+                "type": "Holding Register"
               },
               {
                 "conversion": "Float: Big Endian",
@@ -768,7 +827,7 @@
                 "sensor_type": "No Unit",
                 "sql_type": "FLOAT",
                 "start": 3082,
-                "type": "Input Register"
+                "type": "Holding Register"
               },
               {
                 "conversion": "Float: Big Endian",
@@ -785,7 +844,7 @@
                 "sensor_type": "frequency",
                 "sql_type": "FLOAT",
                 "start": 3108,
-                "type": "Input Register"
+                "type": "Holding Register"
               },
               {
                 "conversion": "Float: Big Endian",
@@ -802,27 +861,26 @@
                 "sensor_type": "energy",
                 "sql_type": "FLOAT",
                 "start": 3204,
-                "type": "Input Register"
+                "type": "Holding Register"
               }
             ]
           },
           "slaves": [
             {
-              "baudRate": 9600,
-              "dataBits": 8,
-              "db_name": "test",
-              "enabled": false,
               "id": 2,
+              "enabled": false,
+              "rs485_port": "/dev/ttyAMA4",
+              "baudRate": 9600,
               "parity": "None",
+              "dataBits": 8,
+              "stopBits": 2,
               "pollingInterval": 5,
               "pollingIntervalUnit": "Sec",
-              "rs485_port": "/dev/ttyAMA4",
-              "stopBits": 2,
-              "table_name": "energy_meter",
-              "upload_cloud": false,
-              "upload_local": true,
               "use_usb": false,
-              "generate_random": true
+              "upload_local": true,
+              "upload_cloud": false,
+              "db_name": "test",
+              "table_name": "energy_meter"
             }
           ]
         }
@@ -961,7 +1019,8 @@
       },
       "order": [
         "analog_acquisition_module",
-        "schneider"
+        "schneider",
+        "digital_i_o"
       ]
     },
     "settings": {
