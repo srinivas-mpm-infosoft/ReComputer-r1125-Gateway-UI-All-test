@@ -11,25 +11,23 @@
   },
   "ioSettings": {
     "analog": {
+      "pollingInterval": 5,
+      "pollingIntervalUnit": "Sec",
       "channels": [
         {
           "address": "0x48",
-          "enabled": true,
+          "enabled": false,
           "mode": "0.-2.048V",
           "name": "Analog input",
           "range": "0:10V"
         }
       ],
       "db": {
-        "db_name": "test",
-        "table_name": "analog_reading",
+        "upload_local": true,
         "upload_cloud": false,
-        "upload_local": true
-      },
-      "generate_random": true,
-      "name": "Analog Input",
-      "pollingInterval": 5,
-      "pollingIntervalUnit": "Sec"
+        "db_name": "ifex_demo",
+        "table_name": "analog_reading"
+      }
     },
     "analogOutput": {
       "channels": [
@@ -56,13 +54,11 @@
         }
       ],
       "db": {
-        "db_name": "test",
+        "db_name": "ifex_demo",
         "table_name": "digital_reading",
         "upload_cloud": false,
         "upload_local": true
       },
-      "generate_random": true,
-      "name": "Digital Input",
       "pollingInterval": 5,
       "pollingIntervalUnit": "Sec"
     },
@@ -93,7 +89,7 @@
     "settings": {
       "analog": false,
       "digitalInput": false,
-      "modbus": true,
+      "modbus": false,
       "modbusTCP": false
     }
   },
@@ -185,29 +181,25 @@
     "topic": "test-topic"
   },
   "Database": {
-    "cloud": {
-      "cred": {
-        "autocommit": "false",
-        "charset": "utf8mb4",
-        "database": "test",
-        "host": "caboose.proxy.rlwy.net",
-        "password": "fnRaJLFnIlNWyDsNYEpVsnyuZCMppLlO",
-        "port": 15805,
-        "user": "root"
-      },
-      "enabled": true
-    },
     "local": {
+      "enabled": true,
       "cred": {
-        "autocommit": "false",
-        "charset": "utf8mb4",
-        "database": "gateway",
         "host": "localhost",
-        "password": "gateway",
         "port": 3306,
-        "user": "gateway"
-      },
-      "enabled": true
+        "user": "gateway",
+        "password": "gateway",
+        "database": "gateway"
+      }
+    },
+    "cloud": {
+      "enabled": true,
+      "cred": {
+        "host": "caboose.proxy.rlwy.net",
+        "port": 15805,
+        "user": "root",
+        "password": "fnRaJLFnIlNWyDsNYEpVsnyuZCMppLlO",
+        "database": "test"
+      }
     }
   },
   "plc_configurations": [
@@ -1038,30 +1030,31 @@
     "user": "munjalhopperalerts@gmail.com"
   },
   "network": {
+    "wifi": {
+      "ssid": "",
+      "password": ""
+    },
     "sim4g": {
-      "apn": "airtelgprs.com",
-      "provider": "airtel"
+      "provider": "airtel",
+      "apn": "airtelgprs.com"
     },
     "static": {
-      "dns_primary": "8.8.8.8",
-      "dns_secondary": "8.8.4.4",
+      "iface": "eth0",
       "enabled": false,
-      "gateway": "",
       "ip": "192.168.1.15",
-      "subnet": "255.255.255.0"
+      "subnet": "255.255.255.0",
+      "gateway": "",
+      "dns_primary": "8.8.8.8",
+      "dns_secondary": "8.8.4.4"
     },
     "static2": {
-      "dns_primary": "",
-      "dns_secondary": "",
-      "enabled": false,
-      "gateway": "",
       "iface": "eth1",
+      "enabled": false,
       "ip": "",
-      "subnet": ""
-    },
-    "wifi": {
-      "password": "",
-      "ssid": ""
+      "subnet": "",
+      "gateway": "",
+      "dns_primary": "",
+      "dns_secondary": ""
     }
   },
   "adminSettings": {
