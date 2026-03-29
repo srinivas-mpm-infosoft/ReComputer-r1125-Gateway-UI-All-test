@@ -5120,12 +5120,6 @@ function migrateModbusAlertsIfNeeded() {
 
 
 // ===================== Updated Energy Meter with Register Tabs =====================
-function renderModbusRTUInner() {
-  return `
-    <div class="panel-header">Modbus RTU</div>
-    <div id="modbus-rtu-root"></div>
-  `;
-}
 function renderModbusRTUDeviceSection(
   selectedBrand = "",
   selectedSlave = "",
@@ -5307,6 +5301,23 @@ function renderEnergyAlertsTable(brandKey, slaveId, registerKey) {
             placeholder="Alert message">
     </td>
 
+    <td>
+  <select name="do_${i}" class="do-select">
+    <option value="neutral" ${!row.digital_output || row.digital_output === "neutral" ? "selected" : ""}>Neutral</option>
+    <option value="DO1" ${row.digital_output === "DO1" ? "selected" : ""}>DO1</option>
+    <option value="DO2" ${row.digital_output === "DO2" ? "selected" : ""}>DO2</option>
+    <option value="DO3" ${row.digital_output === "DO3" ? "selected" : ""}>DO3</option>
+    <option value="DO4" ${row.digital_output === "DO4" ? "selected" : ""}>DO4</option>
+  </select>
+</td>
+
+<td>
+  <select name="status_${i}" class="status-select">
+    <option value="NA" ${!row.status || row.status === "NA" ? "selected" : ""}>NA</option>
+    <option value="HIGH" ${row.status === "HIGH" ? "selected" : ""}>HIGH</option>
+    <option value="LOW" ${row.status === "LOW" ? "selected" : ""}>LOW</option>
+  </select>
+</td>
     <td style="text-align:center">
       <input type="checkbox" name="enabled_${i}" ${row.enabled ? "checked" : ""}>
     </td>
@@ -5330,7 +5341,7 @@ function renderEnergyAlertsTable(brandKey, slaveId, registerKey) {
       .join("")
     : `
   <tr>
-    <td colspan="8" style="padding:14px; text-align:center; color:#6b7280;">
+    <td colspan="10" style="padding:14px; text-align:center; color:#6b7280;">
       No alerts configured for this register.
     </td>
   </tr>
@@ -5360,6 +5371,8 @@ function renderEnergyAlertsTable(brandKey, slaveId, registerKey) {
             <th>Email</th>
             <th>Contact</th>
             <th>Message</th>
+            <th>Digital Output</th>
+<th>Status</th>
             <th>Enabled</th>
             <th>Delete</th>
           </tr>
@@ -5428,6 +5441,30 @@ function setupEnergyHandlers(brandKey, slaveId, registerKey) {
   const form = document.getElementById("em-form");
   if (!form) return;
 
+  function updateStatusControl(rowIndex) {
+  const doEl = form.querySelector(`[name=do_${rowIndex}]`);
+  const statusEl = form.querySelector(`[name=status_${rowIndex}]`);
+
+  if (!doEl || !statusEl) return;
+
+  if (doEl.value === "neutral") {
+    statusEl.value = "NA";
+    statusEl.disabled = true;
+  } else {
+    statusEl.disabled = false;
+
+    if (statusEl.value === "NA") {
+      statusEl.value = "HIGH"; // default
+    }
+  }
+}
+
+// initialize + attach listeners
+form.querySelectorAll(".do-select").forEach((el, i) => {
+  updateStatusControl(i);
+  el.addEventListener("change", () => updateStatusControl(i));
+});
+
   const regs = getEnergyBrandRegisters(brandKey, slaveId);
 const reg = regs.find(r => getRegisterKey(r) === registerKey);
 if (!reg) return;
@@ -5451,6 +5488,8 @@ const alertKey = buildRtuAlertKey(brandKey, slaveId, reg);
         email: "",
         contact: "",
         message: `${brandKey} S${slaveId}`,
+          digital_output: "neutral",
+  status: "NA",
         enabled: true,
       });
       
@@ -5473,7 +5512,8 @@ const alertKey = buildRtuAlertKey(brandKey, slaveId, reg);
       slaveId,
       registerKey
     );
-
+    
+    
     const trs = [...form.querySelectorAll("tbody tr")];
 
     // 🔒 Placeholder-only table → do nothing
@@ -5499,6 +5539,8 @@ const alertKey = buildRtuAlertKey(brandKey, slaveId, reg);
       const email = tr.querySelector(`[name=email_${i}]`)?.value?.trim();
       const contact = tr.querySelector(`[name=contact_${i}]`)?.value?.trim();
       const enabled = tr.querySelector(`[name=enabled_${i}]`)?.checked || false;
+      const digital_output = tr.querySelector(`[name=do_${i}]`)?.value || "neutral";
+const status = tr.querySelector(`[name=status_${i}]`)?.value || "NA";
 
       // 🔥 NULL / EMPTY CHECKS (HARD FAIL)
       if (!condition) {
@@ -5522,7 +5564,15 @@ const alertKey = buildRtuAlertKey(brandKey, slaveId, reg);
         );
         return;
       }
+if (digital_output === "neutral" && status !== "NA") {
+  alert(`Row ${i + 1}: Status must be NA when Digital Output is Neutral.`);
+  return;
+}
 
+if (digital_output !== "neutral" && (status !== "HIGH" && status !== "LOW")) {
+  alert(`Row ${i + 1}: Status must be HIGH or LOW when Digital Output is selected.`);
+  return;
+}
       const threshold = Number(thresholdRaw);
       if (Number.isNaN(threshold)) {
         alert(`Row ${i + 1}: Threshold must be a valid number.`);
@@ -5558,6 +5608,8 @@ const alertKey = buildRtuAlertKey(brandKey, slaveId, reg);
         email,
         contact,
         message,
+          digital_output,
+  status,
         enabled,
       });
     }

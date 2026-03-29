@@ -5,7 +5,7 @@ import time
 import minimalmodbus
 import serial
 
-PORT = "/dev/ttyAMA4"
+PORT = "/dev/ttyACM1"
 SLAVE_ID = 1
 
 instrument = minimalmodbus.Instrument(PORT, SLAVE_ID)
@@ -30,7 +30,7 @@ try:
         values = instrument.read_registers(
             registeraddress=0,
             number_of_registers=8,
-            functioncode=3
+            functioncode=4
         )
 
         # Raw values (µA or mV depending on mode)

@@ -22,7 +22,7 @@ from flask_cors import CORS
 # PATHS
 # ============================================================
 
-BASE = Path("/home/recomputer/Gateway-UI/Main Application")
+BASE = Path("/home/pi/Downloads/Gateway-UI/Main Application")
 STATIC = BASE / "static"
 
 CONFIG_FILE = BASE / "config.json"
@@ -93,7 +93,7 @@ db = SQLAlchemy(app)
 # LOGGING (DATE-AWARE)
 # ============================================================
 
-LOG_ROOT = Path("/home/recomputer/logs")
+LOG_ROOT = Path("/home/pi/logs")
 LOGGER_NAME = "configuration_ui"
 
 _current_log_date = None

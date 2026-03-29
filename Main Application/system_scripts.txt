@@ -37,7 +37,7 @@ WantedBy=multi-user.target
 
 
 
-sudo nano /etc/systemd/system/grafana_custom.service
+sudo nano /etc/systemd/system/grafana.service
 
 
 [Unit]
@@ -47,13 +47,13 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=recomputer
-Group=recomputer
-WorkingDirectory=/home/recomputer/grafana-12.2.0/bin
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/grafana-12.2.0/bin
 
-ExecStart=/home/recomputer/grafana-12.2.0/bin/grafana-server \
-  --homepath /home/recomputer/grafana-12.2.0 \
-  --config /home/recomputer/grafana-12.2.0/conf/defaults.ini
+ExecStart=/home/pi/grafana-12.2.0/bin/grafana-server \
+  --homepath /home/pi/grafana-12.2.0 \
+  --config /home/pi/grafana-12.2.0/conf/defaults.ini
 
 Restart=on-failure
 RestartSec=5
@@ -115,13 +115,13 @@ sudo systemctl daemon-reload
 
 sudo systemctl enable main_program.service
 sudo systemctl enable main_linux_gateway_ui.service
-sudo systemctl enable grafana_custom.service
+sudo systemctl enable grafana.service
 
 
 
 sudo systemctl start main_program.service
 sudo systemctl start main_linux_gateway_ui.service
-sudo systemctl start grafana_custom.service
+sudo systemctl start grafana.service
 
 sudo systemctl restart grafana_custom.service
 sudo systemctl restart main_linux_gateway_ui

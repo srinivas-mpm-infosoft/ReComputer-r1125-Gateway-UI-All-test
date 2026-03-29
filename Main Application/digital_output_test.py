@@ -60,11 +60,16 @@ import RPi.GPIO
 import time
 
 
-IN1 = 23;
-IN2 = 24;
+IN1 = 16;
+IN2 = 17;
+IN3 = 22;
+IN4 = 23;
 
-OUT1 = 17;
-OUT2 = 27;
+OUT1 = 24;
+OUT2 = 25;
+
+OUT3 = 26;
+OUT4 = 6;
 
 
 GPIO = RPi.GPIO
@@ -74,23 +79,29 @@ GPIO.setwarnings(False)
 
 GPIO.setup(OUT1, GPIO.OUT)
 GPIO.setup(OUT2, GPIO.OUT)
+GPIO.setup(OUT3, GPIO.OUT)
+GPIO.setup(OUT4, GPIO.OUT)
+
 
 
 GPIO.setup(IN1, GPIO.IN)
 GPIO.setup(IN2, GPIO.IN)
-
+GPIO.setup(IN3, GPIO.IN)
+GPIO.setup(IN4, GPIO.IN)
 
 try:
     i = 0
-    while(1):
-        GPIO.output(OUT1, i%2)
-        GPIO.output(OUT2, (i+1)%2)
-        print("OUT1 %d       OUT2  %d"%((i%2),(i+1)%2))
-        print("IN1  %d       IN2   %d\r\n\r\n"%(GPIO.input(IN1),GPIO.input(IN2)))
-        time.sleep(1)
-        i=i+1;
-        if(i>=100):
-            i = 0;
+    # while(1):
+    GPIO.output(OUT1, i%2)
+    GPIO.output(OUT2, (i+1)%2)
+    GPIO.output(OUT3, i%2)
+    GPIO.output(OUT4, (i+1)%2)
+    print("OUT1 %d       OUT2  %d   OUT3  %d    OUT4  %d"%((i%2),(i+1)%2,(i%2),(i+1)%2))
+    print("IN1  %d       IN2   %d   IN3  %d       IN4   %d\r\n\r\n"%(GPIO.input(IN1),GPIO.input(IN2),GPIO.input(IN3),GPIO.input(IN4)))
+    # time.sleep(3)
+        # i=i+1;
+        # if(i>=100):
+        #     i = 0;
         
         
 except KeyboardInterrupt:    

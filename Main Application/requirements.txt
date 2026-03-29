@@ -12,7 +12,6 @@ psutil
 pyserial
 requests
 pymysql
-mariadb
 minimalmodbus
 kafka-python
 smbus2

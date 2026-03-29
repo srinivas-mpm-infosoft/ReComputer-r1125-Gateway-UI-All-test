@@ -1,0 +1,467 @@
+#!/usr/bin/env python3
+"""
+Enhanced Data Logger & Uploader for Raspberry Pi CM4 PoE 4G Board
+
+Main responsibilities:
+1. Read analog voltage data from ADS1115 ADC and multiple analog channels.
+2. Save readings to MySQL.
+3. Log readings to CSV (prefer SD card if mounted).
+4. Send new data to remote host (TCP) and/or upload via 4G LTE (HTTP POST).
+5. Run as a TCP server to accept incoming data.
+6. Poll HTTP API for control commands.
+7. RS485 send/receive with multiple Modbus slaves.
+8. Handle multiple digital I/O channels.
+9. Process alarm settings and thresholds.
+"""
+
+import os
+import io
+import time
+import csv
+import json
+import socket
+import subprocess
+import struct
+from datetime import datetime
+import glob
+from pathlib import Path
+import serial
+import sys
+import logging
+from logging.handlers import TimedRotatingFileHandler
+
+
+
+# Setup comprehensive logging with daily rotation
+def setup_logging():
+    """Initialize logging with daily rotation and multiple handlers"""
+    today = datetime.now().strftime("%Y-%m-%d")
+    log_dir = Path(f"/home/pi/logs/{today}")
+    log_dir.mkdir(exist_ok=True)
+
+    # Main logger
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+
+    # Console handler with colors
+    class ColoredFormatter(logging.Formatter):
+        COLORS = {
+            "DEBUG": "\033[36m",
+            "INFO": "\033[32m",
+            "WARNING": "\033[33m",
+            "ERROR": "\033[31m",
+            "CRITICAL": "\033[35m",
+            "ALARM": "\033[91m",
+        }
+        RESET = "\033[0m"
+
+        def format(self, record):
+            if hasattr(record, "levelname"):
+                color = self.COLORS.get(record.levelname, "")
+                record.levelname = f"{color}[{record.levelname}]{self.RESET}"
+            return super().format(record)
+
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(
+        ColoredFormatter(
+            "%(asctime)s %(levelname)-8s %(threadName)-12s %(message)s",
+            datefmt="%H:%M:%S",
+        )
+    )
+
+    # Daily rotating file handler
+    file_handler = TimedRotatingFileHandler(
+        log_dir / "gateway.log",
+        when="midnight",
+        interval=1,
+        backupCount=30,  # Keep 30 days
+        encoding="utf-8",
+    )
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(
+        logging.Formatter(
+            "%(asctime)s %(levelname)-8s %(threadName)-12s %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+    )
+
+    # Alarm-specific handler (separate file)
+    alarm_handler = TimedRotatingFileHandler(
+        log_dir / "alarms.log",
+        when="midnight",
+        interval=1,
+        backupCount=7,
+        encoding="utf-8",
+    )
+    alarm_handler.setLevel(logging.WARNING)
+    alarm_handler.setFormatter(logging.Formatter("%(asctime)s ALARM %(message)s"))
+
+    logger.addHandler(console_handler)
+    logger.addHandler(file_handler)
+    logger.addHandler(alarm_handler)
+
+    # Custom alarm level
+    logging.ALARM = 35
+    logging.addLevelName(logging.ALARM, "ALARM")
+
+    def alarm(self, message, *args, **kwargs):
+        if self.isEnabledFor(logging.ALARM):
+            self._log(logging.ALARM, message, args, **kwargs)
+
+    logging.Logger.alarm = alarm
+
+    return logger
+
+
+# Initialize logging immediately
+logger = setup_logging()
+logger.info("🚀 Gateway started with daily log rotation enabled")
+# === Load full configuration JSON ===
+
+
+BASE_DIR = (
+    "/home/pi/Downloads/Gateway-UI/Main Application"
+)
+CONFIG_FILE_PATH = f"{BASE_DIR}/config.json"
+config = None
+
+
+"""
+What: Load the JSON configuration from CONFIG_FILE_PATH and return its dict.
+Calls: json.load()
+Required by: update_global_config(), start_config_monitor(), any place needing config.
+Notes: Returns None on error; caller should handle fallbacks/logging.
+Side effects: None.
+"""
+
+
+def load_config():
+    try:
+        with open(CONFIG_FILE_PATH, "r") as f:
+            return json.load(f)
+    except Exception as e:
+        log_error(f"[ERROR] Failed to load config: {e}")
+        return None
+
+
+# === GLOBAL VARIABLE DECLARATIONS (at module level) ===
+# Global configuration variables (shared across functions)
+SERIAL_PORT = "/dev/ttyUSB2"
+BAUDRATE    = 115200
+
+MODEMS = {
+    "simcom": {
+        "usb_id": "1e0e:9011",
+        "at_port": "/dev/ttyUSB2",
+        "mode": "ecm"
+    },
+    "quectel": {
+        "usb_id": "2c7c:0125",
+        "at_port": "/dev/ttyUSB2",
+        "ppp_port": "/dev/ttyUSB3",
+        "mode": "ppp"
+    }
+}
+
+# Logging convenience functions to replace all print statements
+def log_info(msg):
+    logger.info(msg)
+
+
+def log_debug(msg):
+    logger.debug(msg)
+
+
+def log_warn(msg):
+    logger.warning(msg)
+
+
+def log_error(msg):
+    logger.error(msg)
+
+
+def log_alarm(msg):
+    logger.alarm(msg)
+
+
+def detect_modem():
+    out = subprocess.run(["lsusb"], capture_output=True, text=True).stdout
+    for name, cfg in MODEMS.items():
+        if cfg["usb_id"].lower() in out.lower():
+            log_info(f"[MODEM] Detected {name}")
+            return name
+    return None
+
+
+def setup_quectel_ppp(apn):
+    log_info("[4G] Starting Quectel PPP")
+
+    # kill old sessions
+    subprocess.run(["sudo", "poff", "-a"], check=False)
+    subprocess.run(["sudo", "killall", "pppd"], check=False)
+    time.sleep(2)
+
+
+    peer_config = f"""
+{MODEMS['quectel']['ppp_port']} 115200
+connect "/usr/sbin/chat -v -f /etc/chatscripts/quectel-connect"
+noauth
+defaultroute
+replacedefaultroute
+usepeerdns
+persist
+noipdefault
+nodetach
+"""
+
+    log_info("[4G] Creating PPP peer config")
+
+    subprocess.run(
+        ["sudo", "tee", "/etc/ppp/peers/quectel"],
+        input=peer_config,
+        text=True,
+        check=True
+    )
+    # update chat script dynamically (important!)
+    chat = f"""
+ABORT "NO CARRIER"
+ABORT "ERROR"
+ABORT "NO DIALTONE"
+ABORT "BUSY"
+ABORT "NO ANSWER"
+"" AT
+OK ATE0
+OK AT+CGDCONT=1,"IP","{apn}"
+OK ATD*99#
+CONNECT \\d\\c
+"""
+
+    log_info(f"[INFO] quectel chat {chat}")
+    subprocess.run(
+        ["sudo", "tee", "/etc/chatscripts/quectel-connect"],
+        input=chat,
+        text=True,
+        check=True
+    )
+
+    # clean shutdown only if needed
+    subprocess.run(["sudo", "poff", "-a"], check=False)
+    time.sleep(2)
+
+    # ensure port is free
+    subprocess.run(["sudo", "fuser", "-k", MODEMS['quectel']['ppp_port']], check=False)
+    time.sleep(2)
+
+    # start PPP
+    subprocess.run(["sudo", "pon", "quectel"], check=False)
+
+    # wait for ppp0
+    for _ in range(20):
+        if os.path.exists("/sys/class/net/ppp0"):
+            log_info("[4G] PPP interface up")
+            return
+        time.sleep(1)
+
+    raise RuntimeError("PPP failed to come up")
+
+def fix_routes(mode):
+    if mode == "ppp":
+        subprocess.run(["sudo", "ip", "route", "replace", "default", "dev", "ppp0"])
+    else:
+        # subprocess.run([
+        #     "sudo", "ip", "route", "replace",
+        #     "default", "via", "192.168.225.1",
+        #     "dev", "usb0", "metric", "900"
+        # ])
+        pass
+
+def sim_present(ser):
+    resp = send_at(ser, "AT+CPIN?", 1)
+    return "OK" in resp
+
+def setup_simcom_ecm(apn):
+    if not apn:
+        log_warn("APN not configured — skipping attach")
+        subprocess.run(["sudo","ip","link","set","usb0","down"],check=False)
+        time.sleep(2)
+        return
+    log_info("[4G] Starting CFUN-based attach (Jio-safe)")
+
+    free_port(SERIAL_PORT)
+    wait_for_tty(SERIAL_PORT)
+
+    with serial.Serial(SERIAL_PORT, BAUDRATE, timeout=2) as ser:
+        send_at(ser, "AT")
+        # 🔥 CFUN reset (THIS IS THE KEY)
+        send_at(ser, "AT+CFUN=0", 2)
+        time.sleep(15)
+
+        send_at(ser, "AT+CFUN=1", 2)
+        time.sleep(20)
+        if not sim_present(ser):
+            log_info("No Sim Inserted")
+            subprocess.run(["sudo","ip","link","set","usb0","down"],check=False)
+            time.sleep(2)
+            return
+
+
+        # Wait for LTE registration
+        log_info("[4G] Waiting for network registration")
+
+        send_at(ser, "AT+CREG", 1)
+        send_at(ser, "AT+CGREG", 1)
+        send_at(ser, "AT+CEREG", 1)
+        send_at(ser, "AT+CNSMOD", 1)
+
+        for _ in range(40):
+            creg  = send_at(ser, "AT+CREG?", 1)
+            cgreg = send_at(ser, "AT+CGREG?", 1)
+            cereg = send_at(ser, "AT+CEREG?", 1)
+            cns   = send_at(ser, "AT+CNSMOD?", 1)
+            log_info(f"creg :{creg}, cgreg: {cgreg}, cereg: {cereg}, cns: {cns}")
+
+            if (
+                ("CREG: 1" in creg or "CREG: 0,1" in creg) and
+                ("CGREG: 1" in cgreg or "CGREG: 0,1" in cgreg) and
+                ("CEREG: 1" in cereg or "CEREG: 0,1" in cereg)
+            ):
+                log_info("[4G] Registered on LTE")
+                break
+
+            time.sleep(2)
+        else:
+            raise RuntimeError("LTE registration failed")
+
+        # Attach packet service (retry like you did manually)
+        for _ in range(10):
+            resp = send_at(ser, "AT+CGATT=1", 2)
+            if "OK" in resp:
+                break
+            time.sleep(3)
+
+        # Set APN
+        send_at(ser, f'AT+CGDCONT=1,"IPV4V6","{apn}"', 2)
+
+        # Activate PDP (IGNORE ERROR — Jio behavior)
+        send_at(ser, "AT+CGACT=1,1", 2)
+
+        # Poll for IP (THIS IS THE REAL SUCCESS SIGNAL)
+        log_info("[4G] Waiting for IP from network")
+        for _ in range(30):
+            ipinfo = send_at(ser, "AT+CGPADDR=1", 2)
+            if "+CGPADDR:" in ipinfo:
+                log_info("[4G] IP assigned")
+                break
+            time.sleep(3)
+        else:
+            raise RuntimeError("No IP assigned by network")
+
+    subprocess.run(["sudo", "dhclient", "usb0"], check=False)
+    log_info("[4G] LTE READY (CFUN path)")
+
+def free_port(port):
+    subprocess.run(["sudo", "fuser", "-k", port], check=False)
+    time.sleep(1)
+
+def wait_for_tty(port, timeout=40):
+    log_info(f"[4G] Waiting for {port}")
+    for _ in range(timeout):
+        if os.path.exists(port):
+            return
+        time.sleep(1)
+    raise RuntimeError("Serial port did not appear")
+
+def send_at(ser, cmd, timeout=2):
+    log_info(f"[AT] {cmd}")
+    ser.write((cmd + "\r").encode())
+
+    end = time.time() + timeout
+    buf = ""
+    while time.time() < end:
+        buf += ser.read(ser.in_waiting or 1).decode(errors="ignore")
+        if "OK" in buf or "ERROR" in buf:
+            break
+
+    if buf.strip():
+        log_info(buf.strip())
+    return buf
+
+# ---------------- LTE REGISTRATION WAIT ----------------
+def wait_for_lte(ser, present, timeout=5):
+    log_info("[4G] Waiting for LTE registration")
+    # if present:
+    #     send_at(ser,"AT+CRESET",45)
+    for _ in range(timeout):
+        send_at(ser, "AT+CREG", 1)
+        send_at(ser, "AT+CGREG", 1)
+        send_at(ser, "AT+CEREG", 1)
+        send_at(ser, "AT+CNSMOD", 1)
+        creg  = send_at(ser, "AT+CREG?", 1)
+        cgreg = send_at(ser, "AT+CGREG?", 1)
+        cereg = send_at(ser, "AT+CEREG?", 1)
+        mode  = send_at(ser, "AT+CNSMOD?", 1)
+
+        if ("CREG: 1" in creg or "CREG: 0,1" in creg):
+            log_info("[4G] LTE registered")
+            return
+
+        time.sleep(2)
+
+    raise RuntimeError("LTE registration timeout")
+
+
+# ---------------- 4G ----------------
+def setup_4g(apn):
+    if not apn:
+        log_warn("APN not configured — skipping attach")
+        subprocess.run(["sudo","ip","link","set","usb0","down"],check=False)
+        time.sleep(2)
+        return
+    modem = detect_modem()
+    if not modem:
+        subprocess.run(["sudo","4g_power_on.sh"],check=False)
+        time.sleep(8)
+
+    if MODEMS[modem]["mode"] == "ppp":
+        setup_quectel_ppp(apn)
+    else:
+        setup_simcom_ecm(apn)
+
+
+def network_watcher():
+    log_info("[INFO] Network watcher started")
+
+    try:
+        config_data = load_config()
+        network = config_data.get("network", {})
+
+        setup_4g(network.get("sim4g", {}).get("apn", ""))
+
+    except Exception as e:
+        log_error(f"[NETWORK] Watcher error: {e}")
+
+
+# ==================================================
+# MAIN EXECUTION
+# ==================================================
+
+"""
+What: Main entrypoint that initializes 4G (if configured), starts all background threads,
+        and runs the main data collection loop.
+Calls:
+    - enable_4g_module(), connect_4g() when COMMUNICATION_MEDIA == "4G/LTE"
+    - start_config_monitor(), start_tcp_server(), http_command_poller(),
+    alarm_monitoring_loop(), offline_data_handler(), modbus_tcp_handler(),
+    kafka_local_consumer_thread(), rs485_communication_handler(), system_status_monitor()
+    - main_data_collection_loop()
+Side effects: Launches multiple daemon threads; sets up hardware/network; runs indefinitely.
+"""
+
+
+def main():
+    network_watcher()
+
+
+if __name__ == "__main__":
+    main()
