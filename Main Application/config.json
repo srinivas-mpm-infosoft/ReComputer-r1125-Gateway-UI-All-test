@@ -13,11 +13,11 @@
     "analog": {
       "channels": [
         {
-          "name": "Analog input",
+          "address": "0x48",
           "enabled": true,
           "mode": "0.-2.048V",
-          "range": "0:10V",
-          "address": "0x48"
+          "name": "Analog input",
+          "range": "0:10V"
         }
       ],
       "db": {
@@ -32,11 +32,11 @@
     "analogOutput": {
       "channels": [
         {
-          "name": "AO1",
+          "address": "",
           "enabled": false,
           "mode": "0-10V",
-          "range": "",
-          "address": ""
+          "name": "AO1",
+          "range": ""
         }
       ]
     },
@@ -265,9 +265,44 @@
         "data_freq_unit": "sec"
       },
       "enabled": true,
+      "generate_random": true,
       "isExpanded": true,
-      "plcType": "Delta",
-      "generate_random": true
+      "plcType": "Delta"
+    },
+    {
+      "plcType": "Siemens",
+      "PLC": {
+        "cred": {
+          "ip": "192.168.0.1",
+          "rack": 0,
+          "slot": 2
+        },
+        "address_access": {
+          "read": [
+            {
+              "content": "",
+              "DB_no": 1,
+              "address": 0,
+              "type": "float",
+              "size": "",
+              "min": 0,
+              "max": 100,
+              "read": true,
+              "write": false
+            }
+          ]
+        },
+        "data_freq_sec": 1,
+        "data_freq_unit": "sec",
+        "Database": {
+          "upload_local": true,
+          "upload_cloud": false,
+          "db_name": "test",
+          "table_name": ""
+        }
+      },
+      "isExpanded": true,
+      "enabled": true
     }
   ],
   "fileToDb": {
@@ -480,150 +515,161 @@
         "analog_acquisition_module": {
           "label": "Analog Acquisition Module",
           "registersBySlave": {
-            "1": [
+            "2": [
               {
-                "name": "Analog Input 1",
-                "start": 1,
-                "offset": -1,
-                "type": "Input Register",
+                "alert": {
+                  "do_pin": "DO1",
+                  "do_status": "High",
+                  "email": "vasus4990@gmail.com",
+                  "enabled": true,
+                  "lower_limit": 0,
+                  "message": "Level crossed the limit",
+                  "mobile": "9398255369",
+                  "upper_limit": 11
+                },
                 "conversion": "Float: Big Endian",
-                "sql_type": "FLOAT",
-                "length": 1,
-                "multiply": 1,
                 "divide": 1,
-                "process_min": "0",
-                "process_max": "5",
-                "sensor_type": "level",
+                "enabled": true,
                 "eng_symbol": "m",
                 "eng_unit": "4-20mA",
-                "enabled": true
-              },
-              {
-                "name": "Analog Input 2",
-                "start": 2,
-                "offset": -1,
-                "type": "Input Register",
-                "conversion": "Float: Big Endian",
-                "sql_type": "FLOAT",
                 "length": 1,
                 "multiply": 1,
-                "divide": 1,
+                "name": "Analog Input 1",
+                "offset": -1,
+                "process_max": "5",
                 "process_min": "0",
-                "process_max": "10",
-                "sensor_type": "flow",
+                "sensor_type": "level",
+                "sql_type": "FLOAT",
+                "start": 1,
+                "type": "Input Register",
+                "write": false
+              },
+              {
+                "conversion": "Float: Big Endian",
+                "divide": 1,
+                "enabled": true,
                 "eng_symbol": "L/min",
                 "eng_unit": "4-20mA",
-                "enabled": true
-              },
-              {
-                "name": "Analog Input 3",
-                "start": 3,
-                "offset": -1,
-                "type": "Input Register",
-                "conversion": "Float: Big Endian",
-                "sql_type": "FLOAT",
                 "length": 1,
                 "multiply": 1,
-                "divide": 1,
+                "name": "Analog Input 2",
+                "offset": -1,
+                "process_max": "10",
                 "process_min": "0",
-                "process_max": "100",
-                "sensor_type": "energy",
+                "sensor_type": "flow",
+                "sql_type": "FLOAT",
+                "start": 2,
+                "type": "Input Register"
+              },
+              {
+                "conversion": "Float: Big Endian",
+                "divide": 1,
+                "enabled": true,
                 "eng_symbol": "kWh",
                 "eng_unit": "4-20mA",
-                "enabled": true
-              },
-              {
-                "name": "Analog Input 4",
-                "start": 4,
-                "offset": -1,
-                "type": "Input Register",
-                "conversion": "Float: Big Endian",
-                "sql_type": "FLOAT",
                 "length": 1,
                 "multiply": 1,
-                "divide": 1,
-                "process_min": "0",
+                "name": "Analog Input 3",
+                "offset": -1,
                 "process_max": "100",
-                "sensor_type": "level",
+                "process_min": "0",
+                "sensor_type": "energy",
+                "sql_type": "FLOAT",
+                "start": 3,
+                "type": "Input Register"
+              },
+              {
+                "conversion": "Float: Big Endian",
+                "divide": 1,
+                "enabled": true,
                 "eng_symbol": "%",
                 "eng_unit": "4-20mA",
-                "enabled": true
-              },
-              {
-                "name": "Analog Input 5",
-                "start": 5,
-                "offset": -1,
-                "type": "Input Register",
-                "conversion": "Float: Big Endian",
-                "sql_type": "FLOAT",
                 "length": 1,
                 "multiply": 1,
-                "divide": 1,
-                "process_min": "0",
+                "name": "Analog Input 4",
+                "offset": -1,
                 "process_max": "100",
-                "sensor_type": "pressure",
+                "process_min": "0",
+                "sensor_type": "level",
+                "sql_type": "FLOAT",
+                "start": 4,
+                "type": "Input Register"
+              },
+              {
+                "conversion": "Float: Big Endian",
+                "divide": 1,
+                "enabled": true,
                 "eng_symbol": "bar",
                 "eng_unit": "4-20mA",
-                "enabled": true
-              },
-              {
-                "name": "Analog Input 6",
-                "start": 6,
-                "offset": -1,
-                "type": "Input Register",
-                "conversion": "Float: Big Endian",
-                "sql_type": "FLOAT",
                 "length": 1,
                 "multiply": 1,
-                "divide": 1,
-                "process_min": "0",
+                "name": "Analog Input 5",
+                "offset": -1,
                 "process_max": "100",
-                "sensor_type": "humidity",
+                "process_min": "0",
+                "sensor_type": "pressure",
+                "sql_type": "FLOAT",
+                "start": 5,
+                "type": "Input Register"
+              },
+              {
+                "conversion": "Float: Big Endian",
+                "divide": 1,
+                "enabled": true,
                 "eng_symbol": "%RH",
                 "eng_unit": "4-20mA",
-                "enabled": true
-              },
-              {
-                "name": "Analog Input 7",
-                "start": 7,
-                "offset": -1,
-                "type": "Input Register",
-                "conversion": "Float: Big Endian",
-                "sql_type": "FLOAT",
                 "length": 1,
                 "multiply": 1,
-                "divide": 1,
-                "process_min": "0",
+                "name": "Analog Input 6",
+                "offset": -1,
                 "process_max": "100",
-                "sensor_type": "moisture",
+                "process_min": "0",
+                "sensor_type": "humidity",
+                "sql_type": "FLOAT",
+                "start": 6,
+                "type": "Input Register"
+              },
+              {
+                "conversion": "Float: Big Endian",
+                "divide": 1,
+                "enabled": true,
                 "eng_symbol": "%",
                 "eng_unit": "4-20mA",
-                "enabled": true
-              },
-              {
-                "name": "Analog Input 8",
-                "start": 8,
-                "offset": -1,
-                "type": "Input Register",
-                "conversion": "Float: Big Endian",
-                "sql_type": "FLOAT",
                 "length": 1,
                 "multiply": 1,
-                "divide": 1,
-                "process_min": "0",
+                "name": "Analog Input 7",
+                "offset": -1,
                 "process_max": "100",
-                "sensor_type": "turbidity",
+                "process_min": "0",
+                "sensor_type": "moisture",
+                "sql_type": "FLOAT",
+                "start": 7,
+                "type": "Input Register"
+              },
+              {
+                "conversion": "Float: Big Endian",
+                "divide": 1,
+                "enabled": true,
                 "eng_symbol": "NTU",
                 "eng_unit": "4-20mA",
-                "enabled": true
+                "length": 1,
+                "multiply": 1,
+                "name": "Analog Input 8",
+                "offset": -1,
+                "process_max": "100",
+                "process_min": "0",
+                "sensor_type": "turbidity",
+                "sql_type": "FLOAT",
+                "start": 8,
+                "type": "Input Register"
               }
             ]
           },
           "slaves": [
             {
-              "id": 1,
+              "id": 2,
               "enabled": true,
-              "rs485_port": "/dev/ttyACM1",
+              "rs485_port": "/dev/serial/by-id/usb-1a86_USB_Single_Serial_5A99022512-if00",
               "baudRate": 9600,
               "parity": "None",
               "dataBits": 8,
@@ -634,8 +680,7 @@
               "upload_local": true,
               "upload_cloud": true,
               "db_name": "test",
-              "table_name": "analog_sensors",
-              "generate_random": true
+              "table_name": "analog_sensors"
             }
           ]
         },
@@ -784,20 +829,20 @@
           },
           "slaves": [
             {
-              "baudRate": 9600,
-              "dataBits": 8,
-              "db_name": "test",
-              "enabled": false,
               "id": 3,
+              "enabled": false,
+              "rs485_port": "/dev/ttyAMA5",
+              "baudRate": 9600,
               "parity": "Even",
+              "dataBits": 8,
+              "stopBits": 1,
               "pollingInterval": 5,
               "pollingIntervalUnit": "Sec",
-              "rs485_port": "/dev/ttyAMA5",
-              "stopBits": 1,
-              "table_name": "",
-              "upload_cloud": false,
+              "use_usb": false,
               "upload_local": true,
-              "use_usb": false
+              "upload_cloud": false,
+              "db_name": "test",
+              "table_name": ""
             }
           ]
         },
@@ -2321,6 +2366,10 @@
       {
         "name": "RS485_1 (/dev/ttyACM1)",
         "port": "/dev/ttyACM1"
+      },
+      {
+        "name": "RS485 2",
+        "port": "/dev/serial/by-id/usb-1a86_USB_Single_Serial_5A99022512-if00"
       }
     ]
   },

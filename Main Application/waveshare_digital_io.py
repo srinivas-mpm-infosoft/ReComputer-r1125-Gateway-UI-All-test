@@ -2,7 +2,7 @@ from pymodbus.client import ModbusSerialClient
 import time
 
 # Serial settings (change according to your system)
-PORT = "/dev/ttyAMA4"     # or /dev/ttyAMA0 etc
+PORT = "/dev/ttyACM1"     # or /dev/ttyAMA0 etc
 SLAVE_ID = 1              # device address
 
 client = ModbusSerialClient(

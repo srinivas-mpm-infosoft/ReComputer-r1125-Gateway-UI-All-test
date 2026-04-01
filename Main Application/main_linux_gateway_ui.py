@@ -421,6 +421,55 @@ def whoami():
         return jsonify(error="Unauthorized"), 401
     return jsonify(session["user"])
 
+
+# ============================================================
+# GPIO Status
+# ============================================================
+
+
+GPIO_PINS = {
+    "Digital Output 1": 24,
+    "Digital Output 2": 25,
+    "Digital Output 3": 26,
+    "Digital Output 4": 6
+}
+
+def get_gpio_level(pin):
+    try:
+        result = subprocess.run(
+            ["raspi-gpio", "get", str(pin)],
+            capture_output=True,
+            text=True
+        )
+
+        output = result.stdout.strip()
+
+        # Example output:
+        # GPIO 24: level=1 fsel=1 func=OUTPUT pull=NONE
+
+        if "level=1" in output:
+            return "HIGH"
+        elif "level=0" in output:
+            return "LOW"
+        else:
+            return "UNKNOWN"
+
+    except Exception as e:
+        return f"ERROR: {str(e)}"
+
+
+@app.route("/gpio-status", methods=["GET"])
+def get_gpio_status():
+    if require_login():
+        return require_login()
+
+    status = {}
+
+    for name, pin in GPIO_PINS.items():
+        status[name] = get_gpio_level(pin)
+
+    return jsonify(status)
+
 # ============================================================
 # CONFIG ROUTES
 # ============================================================
