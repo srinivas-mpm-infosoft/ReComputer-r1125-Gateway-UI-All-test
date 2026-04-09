@@ -2,7 +2,7 @@ from pymodbus.client import ModbusSerialClient
 import time
 
 PORT = "/dev/ttyACM1"
-SLAVE_ID = 1
+SLAVE_ID = 3
 BASE_ADDR = 0
 
 client = ModbusSerialClient(

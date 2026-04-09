@@ -27,6 +27,13 @@ import logging
 from logging.handlers import TimedRotatingFileHandler
 
 
+def load_config():
+    try:
+        with open(CONFIG_FILE_PATH, "r") as f:
+            return json.load(f)
+    except Exception as e:
+        log_error(f"[ERROR] Failed to load config: {e}")
+        return None
 
 # Setup comprehensive logging with daily rotation
 def setup_logging():
@@ -132,13 +139,28 @@ Side effects: None.
 """
 
 
-def load_config():
+PREV_NETWORK_FILE = f"{BASE_DIR}/prev_network.json"
+IS_UPDATED_FILE = f"{BASE_DIR}/is_updated.json"
+
+
+def load_json_file(path):
     try:
-        with open(CONFIG_FILE_PATH, "r") as f:
-            return json.load(f)
+        if os.path.exists(path):
+            with open(path, "r") as f:
+                return json.load(f)
     except Exception as e:
-        log_error(f"[ERROR] Failed to load config: {e}")
-        return None
+        log_error(f"Error loading {path}: {e}")
+    return None
+
+
+def save_json_file(path, data):
+    try:
+        with open(path, "w") as f:
+            json.dump(data, f, indent=2)
+    except Exception as e:
+        log_error(f"Error saving {path}: {e}")
+
+
 
 
 # === GLOBAL VARIABLE DECLARATIONS (at module level) ===
@@ -181,6 +203,19 @@ def log_error(msg):
 
 def log_alarm(msg):
     logger.alarm(msg)
+
+def get_network_config(config):
+    return config.get("network", {})
+
+
+def is_network_changed(new, old):
+    return new != old
+
+
+def is_update_requested():
+    data = load_json_file(IS_UPDATED_FILE)
+    return data and data.get("is_updated", False)
+
 
 
 def detect_modem():
@@ -436,8 +471,47 @@ Side effects: Launches multiple daemon threads; sets up hardware/network; runs i
 
 
 def main():
-    network_watcher()
+    log_info("[SYSTEM] Checking network execution conditions")
+
+    config_data = load_config()
+    if not config_data:
+        log_error("No config found")
+        return
+
+    current_network = get_network_config(config_data)
+    prev_network = load_json_file(PREV_NETWORK_FILE)
+
+    first_boot = prev_network is None
+    update_flag = is_update_requested()
+
+    log_info(f"[DEBUG] First boot: {first_boot}")
+    log_info(f"[DEBUG] Update flag: {update_flag}")
+
+    if first_boot:
+        log_info("[ACTION] First boot → running network setup")
+        network_watcher()
+        save_json_file(PREV_NETWORK_FILE, current_network)
+
+    elif update_flag and is_network_changed(current_network, prev_network):
+        log_info("[ACTION] Config changed & update requested → running setup")
+        network_watcher()
+        save_json_file(PREV_NETWORK_FILE, current_network)
+
+        # reset flag after applying
+        save_json_file(IS_UPDATED_FILE, {"is_updated": False})
+
+    else:
+        log_info("[SKIP] No changes detected → skipping network setup")
 
 
 if __name__ == "__main__":
     main()
+
+
+# this main_4g.py program is executing the at commands and it is fine
+
+# now i want to execute the program of sending at commands when the following conditions match
+# 1. There is an is_updated.json file present in same base folder which contains true or false. 
+# 2. Store the previous network details taken from config
+# 3. For the first time after boot, execute this program
+# 4. From next time, store the previous network details taken from the config and execute this program only when new network details and previous network details are different and is_updated.json file is true

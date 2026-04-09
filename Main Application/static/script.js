@@ -5248,7 +5248,6 @@ function getColumnNameFromRegister(registerKey) {
   return `${type}_${start}_${offset}`; // OR whatever your DB column rule is
 }
 
-
 function renderEnergyAlertsTable(brandKey, slaveId, registerKey) {
   const regs = getEnergyBrandRegisters(brandKey, slaveId);
   const reg = regs.find(r => getRegisterKey(r) === registerKey);

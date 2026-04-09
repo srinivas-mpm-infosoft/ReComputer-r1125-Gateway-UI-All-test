@@ -2,7 +2,9 @@ import serial
 import time
 
 # --- Configuration ---
-PORT = "/dev/serial/by-id/usb-1a86_USB_Single_Serial_5A99022512-if00"
+# PORT = "/dev/serial/by-id/usb-1a86_USB_Single_Serial_5A99022512-if00"
+
+PORT = "/dev/ttyACM1"
 # BAUDRATE = 9600
 # TIMEOUT  = 1        # seconds
 
@@ -80,7 +82,7 @@ PORT = "/dev/serial/by-id/usb-1a86_USB_Single_Serial_5A99022512-if00"
 
 BAUDRATE    = 9600
 TIMEOUT     = 1        # seconds
-NEW_ID      = 2        # Target Device ID (1–255)
+NEW_ID      = 3        # Target Device ID (1–255)
 
 def crc16(data: bytes):
     """Calculate Modbus CRC16 checksum."""
