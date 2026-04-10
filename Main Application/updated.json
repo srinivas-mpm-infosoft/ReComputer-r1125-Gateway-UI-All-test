@@ -13639,5 +13639,25 @@
     "fields": [
       "ModbusRTU"
     ]
+  },
+  {
+    "ts": "2026-04-10T15:16:22.231846",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ModbusRTU"
+    ]
+  },
+  {
+    "ts": "2026-04-10T16:33:47.640469",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "Database"
+    ]
   }
 ]

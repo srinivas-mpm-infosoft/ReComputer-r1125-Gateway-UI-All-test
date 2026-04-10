@@ -4,7 +4,7 @@ sudo nano cleanup_logs.sh
 #!/bin/bash
 set -euo pipefail
 
-LOG_DIR="/home/gateway/logs"
+LOG_DIR="/home/pi/logs"
 RETENTION_DAYS=7
 
 # Safety check
@@ -38,7 +38,7 @@ echo "Log cleanup completed"
 
 
 
-sudo chown gateway:gateway cleanup_logs.sh
+sudo chown pi:pi cleanup_logs.sh
 chmod +x cleanup_logs.sh
 
 
@@ -49,4 +49,4 @@ sudo crontab -e
 
 
 
-0 2 * * * /home/gateway/cleanup_logs.sh >/dev/null 2>&1
+0 2 * * * /home/pi/cleanup_logs.sh >/dev/null 2>&1

@@ -212,7 +212,7 @@
       }
     },
     "cloud": {
-      "enabled": true,
+      "enabled": false,
       "cred": {
         "host": "caboose.proxy.rlwy.net",
         "port": 15805,
@@ -934,7 +934,7 @@
               "dataBits": 8,
               "db_name": "test",
               "enabled": true,
-              "generate_random": true,
+              "generate_random": false,
               "id": 2,
               "parity": "None",
               "pollingInterval": 1,
