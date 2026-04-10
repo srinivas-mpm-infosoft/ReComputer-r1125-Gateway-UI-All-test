@@ -479,7 +479,7 @@ def main():
         return
 
     current_network = get_network_config(config_data)
-    prev_network = load_json_file(PREV_NETWORK_FILE)
+    prev_network = load_json_file(PREV_NETWORK_FIATLE)
 
     first_boot = prev_network is None
     update_flag = is_update_requested()
