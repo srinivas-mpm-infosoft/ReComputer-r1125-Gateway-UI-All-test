@@ -1,5627 +1,6100 @@
-// Global config object
-let config = {};
-//
-//function loadConfig() {
-//  fetch('config.json')
-//    .then(response => response.json())
-//    .then(data => {
-//      config = data;
-//      console.log("Config loaded", config);
-//
-//      // Now it’s safe to render, my dear
-//      renderComPortPanel();
-//      renderIOSettingsPanel();
-//    })
-//    .catch(err => console.error("Error loading config", err));
-//}
-async function loadConfig() {
-  const res = await fetch("/config");
-  const cfg = await res.json();
-  config = cfg;
-  renderIOSettingsPanel();
-}
+#!/usr/bin/env python3
+"""
+Enhanced Data Logger & Uploader for Raspberry Pi CM4 PoE 4G Board
 
-async function saveConfig() {
-  console.log("Config: ", config);
+Main responsibilities:
+1. Read analog voltage data from ADS1115 ADC and multiple analog channels.
+2. Save readings to MySQL.
+3. Log readings to CSV (prefer SD card if mounted).
+4. Send new data to remote host (TCP) and/or upload via 4G LTE (HTTP POST).
+5. Run as a TCP server to accept incoming data.
+6. Poll HTTP API for control commands.
+7. RS485 send/receive with multiple Modbus slaves.
+8. Handle multiple digital I/O channels.
+9. Process alarm settings and thresholds.
+"""
 
-  const res = await fetch("/config", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(config),
-  });
-  if (res.ok) alert("Configuration Saved!");
-}
+import os
+import io
+import time
+import csv
+import json
+import threading
+import random
+import socket
+import subprocess
+import struct
+import glob
+from pathlib import Path
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+import re
+try:
+    import smbus
+except ImportError:
+    import smbus2 as smbus
+import snap7
+from snap7.util import get_int, get_real, set_int, set_real
+from pymodbus.client import ModbusTcpClient
+import base64
+import psutil
+import serial
+from io import StringIO
+import tempfile
+import pymysql
+from dbutils.pooled_db import PooledDB
+import requests
+import sys
+import minimalmodbus
+import RPi.GPIO as GPIO
+# from kafka import KafkaProducer, KafkaConsumer, KafkaAdminClient
+# from kafka.admin import NewTopic
+# from plc.ethernet_ip_gateway import Ethernet_ip
+# from plc.S7_protocol import S7_protocol
+from smb.SMBConnection import SMBConnection  # pysmb
+import pandas as pd
+import math
+import logging
+from logging.handlers import TimedRotatingFileHandler
+import mariadb
 
-function showTab(tabId) {
-  document.querySelectorAll(".tab").forEach((t) => (t.style.display = "none"));
-  document.getElementById(tabId).style.display = "block";
-}
-console.log(config);
+# from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-if (!config.ioSettings) config.ioSettings = {};
-config.ioSettings.analog = {
-  pollingInterval: 30,
-  pollingIntervalUnit: "Sec",
-  saveLog: true,
-  channels: [
-    { enabled: true, resolution: "16 bit", mode: "0-10V" },
-    { enabled: true, resolution: "16 bit", mode: "0-10V" },
-    { enabled: true, resolution: "16 bit", mode: "0-10V" },
-    { enabled: true, resolution: "16 bit", mode: "4-20mA" },
-  ],
-  extensionADC: [
-    { resolution: "16 bit", mode: "4-20mA" },
-    { resolution: "16 bit", mode: "4-20mA" },
-    { resolution: "16 bit", mode: "4-20mA" },
-  ],
-  scaling: [
-    { min: 20, max: 40 },
-    { min: 25, max: 35 },
-    { min: 30, max: 45 },
-    { min: 2, max: 8 },
-    { min: 4, max: 10 },
-    { min: 0, max: 10 },
-    { min: 5, max: 8 },
-    { min: 10, max: 30 },
-  ],
-};
+from threading import Event
+import queue
 
-if (!config.wireless)
-  config.wireless = {
-    communicationMedia: "4G/LTE",
-    sendFormat: "FTP", // FTP, JSON, MQTT, Disable
-    ftp: {
-      serverIP: "",
-      username: "",
-      password: "",
-      port: 21,
-      logFolder: "",
-    },
-    pollingTimeUnit: "Sec",
-    pollingInterval: 5,
+CONFIG_RELOAD_EVENT = Event()
+PLC_THREADS = []
 
-    apn: "airtelgprs.com",
-  };
 
-// === PANEL RENDER FUNCTIONS ===
+class S7_protocol:
+    """
+    Siemens PLC → MySQL (PyMySQL)
 
-function updateAnalogRange(ch, savedRange = null) {
-  const modeSelect = document.getElementById(`ch_mode_${ch}`);
-  const rangeSelect = document.getElementById(`ch_range_${ch}`);
+    - Reads DB config from Database.targets
+    - Supports multiple DBs (local, cloud)
+    - Respects enabled flag
+    - Creates table if not exists
+    - Adds new columns only (no deletes)
+    """
 
-  if (!modeSelect || !rangeSelect) return;
+    def __init__(self, config, etl_config=None):
+        print("S7:- ", config)
 
-  const mode = modeSelect.value;
+        # ---------------- PLC ----------------
+        plc_cfg = config["PLC"]
 
-  // Clear existing options
-  rangeSelect.innerHTML = "";
+        self.generate_random = bool(config.get("generate_random", False))
 
-  let validRanges = [];
+        self.PLC_IP_ADDRESS = plc_cfg["cred"]["ip"]
+        self.PLC_RACK = plc_cfg["cred"]["rack"]
+        self.PLC_SLOT = plc_cfg["cred"]["slot"]
 
-  if (mode === "0-10V") {
-    validRanges = ["0-5V", "0-10V"];
-  } else if (mode === "4-20mA") {
-    validRanges = ["4-20mA", "0-20mA"]; // remove 0-20mA if HW doesn't support it
-  }
+        self.read_instructions = plc_cfg["address_access"]["read"]
+        self.write_instructions = plc_cfg["address_access"].get("write", [])
+        self.write_data = False
 
-  // Populate dropdown
-  validRanges.forEach((r) => {
-    const opt = document.createElement("option");
-    opt.value = r;
-    opt.textContent = r;
-    rangeSelect.appendChild(opt);
-  });
+        # ---------------- RUNTIME ----------------
+        self.data_freq = config["PLC"]["data_reading_freq(in secs)"]
+        self.log_folder = config["PLC"]["log_path"]
 
-  // Restore saved range if valid, else default to first option
-  if (savedRange && validRanges.includes(savedRange)) {
-    rangeSelect.value = savedRange;
-  } else {
-    rangeSelect.selectedIndex = 0;
-  }
-}
+        # ---------------- DATABASE TARGETS ----------------
+        self.db_targets = {}
 
-function renderIOSettingsPanel(subTab = "Settings") {
-  let html = `
-    <div class="panel-header">I/O Settings</div>
-    <div class="tab-list">
-      <button class="tab-btn ${
-        subTab == "Settings" ? "active" : ""
-      }" data-tab="Settings">Settings</button>
-      <button class="tab-btn ${
-        subTab == "Analog" ? "active" : ""
-      }" data-tab="Analog">Analog</button>
-      <button class="tab-btn ${
-        subTab == "Digital Input" ? "active" : ""
-      }" data-tab="Digital Input">Digital I/O</button>
-    </div>
-    <div class="tab-content">`;
+        db_name = plc_cfg["Database"]["db_name"]
 
-  /* ================= SETTINGS ================= */
-  if (subTab === "Settings") {
-    html += `
-      <form id="io-settings-form">
-        <label><input type="checkbox" name="modbus" ${
-          config.ioSettings.settings.modbus ? "checked" : ""
-        }> Modbus RTU</label>
-        <label><input type="checkbox" name="analog" ${
-          config.ioSettings.settings.analog ? "checked" : ""
-        }> Analog</label>
-        <label><input type="checkbox" name="digitalInput" ${
-          config.ioSettings.settings.digitalInput ? "checked" : ""
-        }> Digital Input</label>
-        <button type="submit" class="button-primary">Read</button>
-        <span class="checkmark" id="save-tick" style="display:none">&#10004;</span>
-        <button class="button-primary" type="button" onclick="downloadConfig()">Export Config</button>
-      </form>
-    `;
-  } else if (subTab === "Analog") {
-    const a = config.ioSettings.analog;
-    html += `
-        <form id="analog-form">
-          <label>
-            <input type="radio" name="intervalUnit" value="Sec" ${
-              a.pollingIntervalUnit === "Sec" ? "checked" : ""
-            }> Sec
-          </label>
-          <label>
-            <input type="radio" name="intervalUnit" value="Min" ${
-              a.pollingIntervalUnit === "Min" ? "checked" : ""
-            }> Min
-          </label>
-          <label>
-            <input type="radio" name="intervalUnit" value="Hour" ${
-              a.pollingIntervalUnit === "Hour" ? "checked" : ""
-            }> Hour
-          </label>
-          &nbsp;
-          Analog Polling Interval:
-          <input type="number" name="pollingInterval" style="width:60px" min="1" max="9999" value="${
-            a.pollingInterval
-          }"> (sec)
-          <br><br>
-          <section class="analog-input">
-            <b>Analog Input</b>
-            <table class="channel-table">
-              <tr><th>Enable</th><th>Mode</th><th>Scaling</th></tr>
-<tr>
-  <td>
-    <input type="checkbox" name="ch_enable_0" ${
-      a.channels[0].enabled ? " checked" : ""
-    }>
-  </td>
+        print(f"DB name: {db_name} ")
+        for name, db in plc_cfg["Database"]["targets"].items():
+            if not db.get("enabled", False):
+                continue
 
-  <td>
-    <select name="ch_mode_0"
-            id="ch_mode_0"
-            onchange="updateAnalogRange(0)">
-      <option value="0-10V" ${
-        a.channels[0].mode === "0-10V" ? "selected" : ""
-      }>0-10V</option>
-      <option value="4-20mA" ${
-        a.channels[0].mode === "4-20mA" ? "selected" : ""
-      }>4-20mA</option>
-    </select>
-  </td>
+            self.db_targets[name] = {
+                "cred": db["cred"],
+                "database": db_name,          # ✅ FIX
+                "table_name": db["table_name"],
+                "schema": db["schema"]
+            }
 
-  <td>
-    <select name="ch_range_0" id="ch_range_0"></select>
-  </td>
-</tr>
 
-            </table>
-          </section>
-          <br>
-          <button class="button-primary" type="submit">Save</button>
-          <span class="checkmark" id="analog-save-tick" style="display:none">&#10004;</span>
-        </form>
-      `;
-  } else if (subTab === "Digital Input") {
-  /* ================= DIGITAL I/O ================= */
-    const di = config.ioSettings.digitalInput || { channels: [false, false] };
-    const doo = config.ioSettings.digitalOutput || { channels: [0, 0] };
+        if not self.db_targets:
+            raise ValueError("No enabled database targets found")
 
-    html += `
-      <form id="digital-io-form">
+        # ---------------- PLC CLIENT ----------------
+        self.plc = snap7.client.Client()
 
-        <h3>Digital Input</h3>
-        <table class="channel-table">
-          <tr><th>Channel</th><th>Enable</th></tr>
-          ${[0, 1]
-            .map(
-              (i) => `
-            <tr>
-              <td>DI ${i + 1}</td>
-              <td><input type="checkbox" name="di_channel_${i}" ${
-                di.channels[i] ? "checked" : ""
-              }></td>
-            </tr>
-          `
+    # --------------------------------------------------
+    # PLC CONNECTION
+    # --------------------------------------------------
+    def connect_plc(self):
+        if not self.plc.get_connected():
+            self.plc.connect(
+                self.PLC_IP_ADDRESS,
+                self.PLC_RACK,
+                self.PLC_SLOT
             )
-            .join("")}
-        </table>
-
-        <br>
-
-        <h3>Digital Output</h3>
-        <table class="channel-table">
-          <tr><th>Channel</th><th>State</th></tr>
-          ${[0, 1]
-            .map(
-              (i) => `
-            <tr>
-              <td>DO ${i + 1}</td>
-              <td>
-                <select name="do_channel_${i}">
-                  <option value="0" ${
-                    doo.channels[i] === 0 ? "selected" : ""
-                  }>LOW</option>
-                  <option value="1" ${
-                    doo.channels[i] === 1 ? "selected" : ""
-                  }>HIGH</option>
-                </select>
-              </td>
-            </tr>
-          `
-            )
-            .join("")}
-        </table>
-
-        <br>
-        <button type="submit" class="button-primary">Apply</button>
-        <span class="checkmark" id="dio-tick" style="display:none">&#10004;</span>
-        <button class="button-primary" type="button" onclick="downloadConfig()">Export Config</button>
-      </form>
-    `;
-  }
-
-  html += "</div>";
-  document.getElementById("main-panel").innerHTML = html;
-
-  /* ================= TAB HANDLERS ================= */
-  document.querySelectorAll(".tab-btn").forEach((btn) => {
-    btn.onclick = () => renderIOSettingsPanel(btn.dataset.tab);
-  });
-
-  html += "</div>";
-  document.getElementById("main-panel").innerHTML = html;
-
-  if (subTab === "Analog") {
-    const a = config.ioSettings.analog;
-
-    requestAnimationFrame(() => {
-      updateAnalogRange(0, a.channels[0].range);
-    });
-  }
-
-  // Setup tab buttons
-  document.querySelectorAll(".tab-btn").forEach((btn) => {
-    btn.onclick = () => renderIOSettingsPanel(btn.getAttribute("data-tab"));
-  });
-
-/* ================= SETTINGS SUBMIT ================= */
-  if (subTab === "Settings") {
-    const f = document.getElementById("io-settings-form");
-    f.onsubmit = e => {
-      e.preventDefault();
-      config.ioSettings.settings.modbus = f.modbus.checked;
-      config.ioSettings.settings.analog = f.analog.checked;
-      config.ioSettings.settings.digitalInput = f.digitalInput.checked;
-      saveConfig();
-      showTick("save-tick");
-    };
-  }
-
-  /* ================= DIGITAL I/O SUBMIT (FIXED) ================= */
-  if (subTab === "Digital Input") {
-    const f = document.getElementById("digital-io-form");
-    if (!f) return;
-
-    f.onsubmit = e => {
-      e.preventDefault();
-
-      const fd = new FormData(f);
-
-      config.ioSettings.digitalInput = {
-        channels: [0,1].map(i => fd.get(`di_channel_${i}`) === "on")
-      };
-
-      config.ioSettings.digitalOutput = {
-        channels: [0,1].map(i => parseInt(fd.get(`do_channel_${i}`), 10))
-      };
-
-      saveConfig();
-      showTick("dio-tick");
-    };
-  }
-
-  /* ================= ANALOG SUBMIT ================= */
-  if (subTab === "Analog") {
-    const f = document.getElementById("analog-form");
-    f.onsubmit = e => {
-      e.preventDefault();
-      const a = config.ioSettings.analog;
-      a.pollingInterval = parseInt(f.pollingInterval.value, 10);
-      a.pollingIntervalUnit = f.intervalUnit.value;
-      a.channels[0].enabled = f["ch_enable_0"].checked;
-      a.channels[0].mode = f["ch_mode_0"].value;
-      a.channels[0].range = f["ch_range_0"].value;
-      saveConfig();
-      showTick("analog-save-tick");
-    };
-  }
-
-}
-
-function initDigitalInputScript(initialMode) {
-  function updateTableColumns(mode) {
-    const countHeaders = document.querySelectorAll(".count-col-header");
-    const countCells = document.querySelectorAll(".count-col");
-    const timeHeaders = document.querySelectorAll(".time-col-header");
-    const timeCells = document.querySelectorAll(".time-col");
-
-    if (mode === "digital") {
-      countHeaders.forEach((h) => (h.style.display = "none"));
-      countCells.forEach((c) => (c.style.display = "none"));
-      timeHeaders.forEach((h) => (h.style.display = "none"));
-      timeCells.forEach((c) => (c.style.display = "none"));
-    } else if (mode === "counter") {
-      countHeaders.forEach((h) => (h.style.display = "table-cell"));
-      countCells.forEach((c) => (c.style.display = "table-cell"));
-      timeHeaders.forEach((h) => (h.style.display = "none"));
-      timeCells.forEach((c) => (c.style.display = "none"));
-    } else if (mode === "time") {
-      countHeaders.forEach((h) => (h.style.display = "none"));
-      countCells.forEach((c) => (c.style.display = "none"));
-      timeHeaders.forEach((h) => (h.style.display = "table-cell"));
-      timeCells.forEach((c) => (c.style.display = "table-cell"));
-    }
-  }
-
-  // Init with saved mode
-  updateTableColumns(initialMode);
-
-  // Listen for radio button changes
-  document.querySelectorAll('input[name="mode"]').forEach((radio) => {
-    radio.addEventListener("change", () => {
-      updateTableColumns(radio.value);
-    });
-  });
-}
-
-function renderNetworkPanel() {
-  const APN_MAP = {
-    jio: "jionet",
-    airtel: "airtelgprs.com",
-    bsnl: "bsnlnet",
-    vi: "www",
-    other: "",
-  };
-
-  // ---------- HARD GUARANTEES ----------
-  if (!config.network) config.network = {};
-
-  if (!config.network.wifi) {
-    config.network.wifi = { ssid: "", password: "" };
-  }
-
-  if (!config.network.sim4g) {
-    config.network.sim4g = { provider: "", apn: "" };
-  }
-
-  if (!config.network.static) {
-    config.network.static = {
-      enabled: false,
-      ip: "",
-      subnet: "",
-      gateway: "",
-      dns_primary: "",
-      dns_secondary: "",
-    };
-  }
-
-  const net = config.network;
-
-  // ---------- UI ----------
-  document.getElementById("main-panel").innerHTML = `
-      <div class="panel-header">Network Configuration</div>
-
-      <div class="tab-list">
-        <button class="active" data-tab="wifi">Wi-Fi</button>
-        <button data-tab="sim">4G SIM</button>
-        <button data-tab="static">Static IP</button>
-      </div>
-
-      <!-- Wi-Fi -->
-      <div class="tab-content" id="wifi-tab">
-        <fieldset class="net-fieldset">
-          <legend>Wi-Fi Credentials</legend>
-
-          <label>SSID</label>
-          <input type="text" id="wifi-ssid" value="${net.wifi.ssid}">
-
-          <label>Password</label>
-          <input type="password" id="wifi-password" value="${
-            net.wifi.password
-          }">
-        </fieldset>
-
-        <button class="button-primary" id="save-wifi">Save Wi-Fi</button>
-        <span class="checkmark" id="wifi-tick" style="display:none">✔</span>
-      </div>
-
-      <!-- SIM -->
-      <div class="tab-content" id="sim-tab" style="display:none">
-        <fieldset class="net-fieldset">
-          <legend>4G SIM (APN)</legend>
-
-          <label>Provider</label>
-          <select id="apn-provider">
-            <option value="">Select provider</option>
-            ${Object.keys(APN_MAP)
-              .map(
-                (p) => `
-                  <option value="${p}" ${
-                  net.sim4g.provider === p ? "selected" : ""
-                }>${p.toUpperCase()}</option>`
-              )
-              .join("")}
-          </select>
-
-          <label>APN</label>
-          <input type="text" id="apn-value" value="${net.sim4g.apn}">
-        </fieldset>
-
-        <button class="button-primary" id="save-sim">Save SIM</button>
-        <span class="checkmark" id="sim-tick" style="display:none">✔</span>
-      </div>
-
-      <!-- Static IP -->
-      <div class="tab-content" id="static-tab" style="display:none">
-        <fieldset class="net-fieldset">
-          <legend>Static IP Configuration</legend>
-
-          <label>
-            <input type="checkbox" id="static-enable" ${
-              net.static.enabled ? "checked" : ""
-            }>
-            Enable Static IP
-          </label>
-
-          <label>IP Address</label>
-          <input type="text" id="static-ip" value="${net.static.ip}">
-
-          <label>Subnet Mask</label>
-          <input type="text" id="static-subnet" value="${net.static.subnet}">
-
-          <label>Gateway</label>
-          <input type="text" id="static-gw" value="${net.static.gateway}">
-
-          <label>Preferred DNS Server</label>
-          <input type="text" id="static-dns1" value="${net.static.dns_primary}">
-
-          <label>Alternate DNS Server</label>
-          <input type="text" id="static-dns2" value="${
-            net.static.dns_secondary
-          }">
-        </fieldset>
-
-        <button class="button-primary" id="save-static">Save Static IP</button>
-        <span class="checkmark" id="static-tick" style="display:none">✔</span>
-      </div>
-    `;
-
-  // ---------- Tabs ----------
-  document.querySelectorAll(".tab-list button").forEach((btn) => {
-    btn.onclick = () => {
-      document
-        .querySelectorAll(".tab-list button")
-        .forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-
-      ["wifi", "sim", "static"].forEach((t) => {
-        document.getElementById(`${t}-tab`).style.display =
-          btn.dataset.tab === t ? "block" : "none";
-      });
-    };
-  });
-
-  // ---------- APN logic ----------
-  const providerSel = document.getElementById("apn-provider");
-  const apnInput = document.getElementById("apn-value");
-
-  providerSel.onchange = () => {
-    if (!providerSel.value) {
-      apnInput.value = "";
-      apnInput.disabled = true;
-      return;
-    }
-
-    if (providerSel.value === "other") {
-      apnInput.disabled = false;
-      apnInput.value = "";
-    } else {
-      apnInput.value = APN_MAP[providerSel.value];
-      apnInput.disabled = true;
-    }
-  };
-  providerSel.onchange();
-
-  // ---------- Static enable toggle ----------
-  const toggleStaticFields = () => {
-    const en = document.getElementById("static-enable").checked;
-    [
-      "static-ip",
-      "static-subnet",
-      "static-gw",
-      "static-dns1",
-      "static-dns2",
-    ].forEach((id) => {
-      document.getElementById(id).disabled = !en;
-    });
-  };
-
-  document.getElementById("static-enable").onchange = toggleStaticFields;
-  toggleStaticFields();
-
-  // ---------- Save handlers ----------
-  document.getElementById("save-wifi").onclick = async () => {
-    net.wifi.ssid = document.getElementById("wifi-ssid").value.trim();
-    net.wifi.password = document.getElementById("wifi-password").value;
-    await saveConfig();
-    showTick("wifi-tick");
-  };
-
-  document.getElementById("save-sim").onclick = async () => {
-    net.sim4g.provider = providerSel.value;
-    net.sim4g.apn = apnInput.value.trim();
-    await saveConfig();
-    showTick("sim-tick");
-  };
-
-  document.getElementById("save-static").onclick = async () => {
-    net.static.enabled = document.getElementById("static-enable").checked;
-    net.static.ip = document.getElementById("static-ip").value.trim();
-    net.static.subnet = document.getElementById("static-subnet").value.trim();
-    net.static.gateway = document.getElementById("static-gw").value.trim();
-    net.static.dns_primary = document
-      .getElementById("static-dns1")
-      .value.trim();
-    net.static.dns_secondary = document
-      .getElementById("static-dns2")
-      .value.trim();
-
-    await saveConfig();
-    showTick("static-tick");
-  };
-}
-
-function renderChangePasswordPanel() {
-  document.getElementById("main-panel").innerHTML = `
-        <div class="panel-header">Change Password</div>
-        <div class="tab-content">
-          <form id="change-password-form">
-            <label>Old Password:</label>
-            <input type="password" name="oldPassword" required>
-            <br><br>
-            <label>New Password:</label>
-            <input type="password" name="newPassword" required>
-            <br><br>
-            <label>Confirm New Password:</label>
-            <input type="password" name="confirmPassword" required>
-            <br><br>
-            <button class="button-primary" type="submit">Update Password</button>
-            <span id="password-tick" style="display:none;color:#49ba3c;font-size:18px;">✔ Updated</span>
-          </form>
-        </div>
-      `;
-
-  let form = document.getElementById("change-password-form");
-  form.onsubmit = async function (e) {
-    e.preventDefault();
-
-    let oldPassword = form.oldPassword.value;
-    let newPassword = form.newPassword.value;
-    let confirmPassword = form.confirmPassword.value;
-    const login_req = false;
-    if (newPassword !== confirmPassword) {
-      alert("New passwords do not match!");
-      return;
-    }
-
-    let res = await fetch("/reset-password", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ oldPassword, newPassword, login_req }),
-    });
-
-    if (res.ok) {
-      document.getElementById("password-tick").style.display = "inline";
-      form.reset();
-    } else {
-      let data = await res.json();
-      alert(data.error || "Password change failed!");
-    }
-  };
-}
-
-// Inject CSS via JS
-(function injectStyles() {
-  const css = `
-      body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; color:#222; margin:16px; }
-      .panel-header { font-size:18px; font-weight:600; margin-bottom:8px; }
-      .tab-list { display:flex; flex-wrap:wrap; gap:10px; }
-      .tab-btn, .brand-tab, .slave-tab {
-        padding:6px 10px; border:1px solid #cfd4dc; background:#f7f9fc; cursor:pointer; border-radius:10px;
-        transition: all .15s ease;
-      }
-      .tab-btn[aria-selected="true"], .brand-tab[aria-selected="true"] { background:#0b5; color:#fff; border-color:#0b5; font-weight:600; }
-      .slave-tab[aria-selected="true"] { background:#005bbb; color:#fff; border-color:#005bbb; }
-      .tab-content { border:1px solid #e5e7eb; padding:12px; background:#fff; border-radius:8px; }
-      .button-primary { background:#0b5; color:#fff; padding:6px 12px; border:none; border-radius:8px; cursor:pointer; }
-      .button { background:#eef2f7; color:#111; padding:6px 10px; border:1px solid #cfd4dc; border-radius:8px; cursor:pointer; }
-      .chip-del { color:#c00; background:transparent; border:none; cursor:pointer; margin-left:6px; font-size:16px; }
-      .toolbar { display:flex; gap:8px; align-items:center; }
-      .split-toolbar { display:flex; justify-content:space-between; align-items:center; gap:8px; }
-      .channel-table { border-collapse:collapse; min-width:900px; width:100%; }
-      .channel-table th, .channel-table td { border:1px solid #d9dee5; padding:6px; }
-      .modal { position:fixed; inset:0; background:rgba(0,0,0,0.35); display:none; align-items:center; justify-content:center; }
-      .modal .modal-content { background:#fff; min-width:360px; border-radius:8px; padding:12px; }
-      label { margin-right:12px; }
-      .sr-only { position:absolute; left:-10000px; width:1px; height:1px; overflow:hidden; }
-      .card { border:1px solid #d9dee5; border-radius:8px; padding:12px; background:#fff; margin-bottom:12px; }
-      .accordion-h { display:flex; justify-content:space-between; align-items:center; padding:8px; background:#f3f6fb; border-radius:6px; cursor:pointer; }
-      .soft { color:#666; }
-      `;
-  const style = document.createElement("style");
-  style.type = "text/css";
-  style.innerText = css;
-  document.head.appendChild(style);
-})();
-
-function ensureBase() {
-  if (!config.ModbusRTU) config.ModbusRTU = {};
-  if (!config.ModbusRTU.energyMeter)
-    config.ModbusRTU.energyMeter = { brands: {}, order: [], globalPresets: {} };
-  if (!config.ModbusRTU.energyMeter.globalPresets)
-    config.ModbusRTU.energyMeter.globalPresets = {};
-  if (!config.ModbusRTU.settings)
-    config.ModbusRTU.settings = {
-      baudRate: "9600",
-      parity: "Even",
-      dataBits: 8,
-      stopBits: 1,
-    };
-  if (!config.plc_configurations) config.plc_configurations = [];
-  if (!config.ModbusRTU.transmitters) config.ModbusRTU.transmitters = [];
-}
-
-// Optional role; safe fallback to guest
-const uiState = { role: "guest" };
-async function fetchRole() {
-  try {
-    const r = await fetch("/whoami", { credentials: "include" });
-    if (!r.ok) throw new Error("whoami failed");
-    const data = await r.json();
-    uiState.role = (data.role || "guest").toLowerCase();
-  } catch (e) {
-    uiState.role = "guest";
-  }
-}
-
-// Built-in schema for EM6436H
-const builtInSchemas = {
-  schneider_em6436h: {
-    label: "Schneider EM6436H",
-    rows: [
-      //Currents (updated start addresses)
-      {
-        name: "Current L1",
-        start: 3000,
-        offset: 0,
-        type: "Input Register",
-        conversion: "Float: Big Endian / Little Word Order",
-        length: 2,
-        enabled: true,
-      },
-      {
-        name: "Current L2",
-        start: 3002,
-        offset: 0,
-        type: "Input Register",
-        conversion: "Float: Big Endian / Little Word Order",
-        length: 2,
-        enabled: true,
-      },
-      {
-        name: "Current L3",
-        start: 3004,
-        offset: 0,
-        type: "Input Register",
-        conversion: "Float: Big Endian / Little Word Order",
-        length: 2,
-        enabled: true,
-      },
-
-      // L-L Voltages
-      {
-        name: "Voltage L1-L2",
-        start: 3020,
-        offset: 0,
-        type: "Input Register",
-        conversion: "Float: Big Endian / Little Word Order",
-        length: 2,
-        enabled: true,
-      },
-      {
-        name: "Voltage L2-L3",
-        start: 3022,
-        offset: 0,
-        type: "Input Register",
-        conversion: "Float: Big Endian / Little Word Order",
-        length: 2,
-        enabled: true,
-      },
-      {
-        name: "Voltage L3-L1",
-        start: 3024,
-        offset: 0,
-        type: "Input Register",
-        conversion: "Float: Big Endian / Little Word Order",
-        length: 2,
-        enabled: true,
-      },
-
-      // L-N Voltages
-      {
-        name: "Voltage L1-N",
-        start: 3028,
-        offset: 0,
-        type: "Input Register",
-        conversion: "Float: Big Endian / Little Word Order",
-        length: 2,
-        enabled: true,
-      },
-      {
-        name: "Voltage L2-N",
-        start: 3030,
-        offset: 0,
-        type: "Input Register",
-        conversion: "Float: Big Endian / Little Word Order",
-        length: 2,
-        enabled: true,
-      },
-      {
-        name: "Voltage L3-N",
-        start: 3032,
-        offset: 0,
-        type: "Input Register",
-        conversion: "Float: Big Endian / Little Word Order",
-        length: 2,
-        enabled: true,
-      },
-
-      // Power Factor
-      {
-        name: "Power Factor Total",
-        start: 3084,
-        offset: 0,
-        type: "Input Register",
-        conversion: "Float: Big Endian / Little Word Order",
-        length: 2,
-        enabled: true,
-      },
-    ],
-  },
-}; // Confirm addresses with vendor docs before production
-
-// Utilities
-function esc(s) {
-  return (s ?? "").toString().replace(
-    /[&<>\"']/g,
-    (m) =>
-      ({
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#39;",
-      }[m])
-  );
-}
-function numOrEmpty(v, def = "") {
-  return v == null || Number.isNaN(v) ? def : v;
-}
-function deepClone(x) {
-  return JSON.parse(JSON.stringify(x));
-}
-function slugify(s) {
-  return (
-    s
-      .toLowerCase()
-      .trim()
-      .replace(/\s+/g, "_")
-      .replace(/[^\w\-]+/g, "")
-      .slice(0, 60) || "preset_" + Date.now()
-  );
-}
-function suggestNextSlaveId(slaves) {
-  const ids = (slaves || []).map((s) => Number(s.id)).filter(Number.isInteger);
-  let n = 1;
-  while (ids.includes(n)) n++;
-  return n;
-}
-function flashTick(id) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.style.display = "inline";
-  setTimeout(() => (el.style.display = "none"), 1200);
-}
-
-// Router (updated to keep tabs for PLC/Transmitter)
-async function renderModBusRTUPanel(
-  activeTopTab = "Settings",
-  brandKey = null,
-  activeSlaveId = null
-) {
-  ensureBase();
-  if (!renderModBusRTUPanel._roleFetched) {
-    await fetchRole();
-    renderModBusRTUPanel._roleFetched = true;
-  }
-
-  const tabs = [
-    { name: "Settings", label: "Settings" },
-    { name: "EnergyMeter", label: "External Module" },
-    // {name:"PLC", label:"PLC"},
-    // {name:"Transmitter", label:"Transmitter"}
-  ];
-  const topTabsHtml = `
-        <div class="tab-list" role="tablist" aria-label="Main sections">
-          ${tabs
-            .map(
-              (t) => `
-            <button role="tab" class="tab-btn" aria-selected="${
-              t.name === activeTopTab ? "true" : "false"
-            }"
-                    tabindex="${
-                      t.name === activeTopTab ? "0" : "-1"
-                    }" data-top="${t.name}">
-              ${t.label}
-            </button>`
-            )
-            .join("")}
-          <button id="tabs-actions-trigger" class="button" style="margin-left:8px;">＋ Tabs</button>
-        </div>
-      `;
-
-  if (activeTopTab === "Settings") {
-    renderSettings(topTabsHtml);
-    wireTopTabs(activeTopTab, brandKey, activeSlaveId);
-    wireTabsActions();
-    return;
-  }
-  if (activeTopTab === "EnergyMeter") {
-    renderEnergyMeter(topTabsHtml, brandKey, activeSlaveId);
-    wireTopTabs(activeTopTab, brandKey, activeSlaveId);
-    wireTabsActions();
-    return;
-  }
-  if (activeTopTab === "PLC") {
-    const inner = rtuPlcInnerHtml();
-    const panel = document.getElementById("main-panel");
-    panel.innerHTML = `
-          ${topTabsHtml}
-          <div class="tab-content" role="tabpanel" style="margin-top:8px;">
-            ${inner}
-          </div>
-        `;
-    wireTopTabs(activeTopTab, brandKey, activeSlaveId);
-    wireTabsActions();
-    bindRtuPlcInnerEvents();
-    return;
-  }
-  if (activeTopTab === "Transmitter") {
-    const inner = transmitterInnerHtml();
-    const panel = document.getElementById("main-panel");
-    panel.innerHTML = `
-          <div class="panel-header">Transmitters</div>
-          ${topTabsHtml}
-          <div class="tab-content" role="tabpanel" style="margin-top:8px;">
-            ${inner}
-          </div>
-        `;
-    wireTopTabs(activeTopTab, brandKey, activeSlaveId);
-    wireTabsActions();
-    bindTransmitterEvents();
-    return;
-  }
-
-  const panel = document.getElementById("main-panel");
-  panel.innerHTML = `
-        <div class="panel-header">${activeTopTab}</div>
-        ${topTabsHtml}
-        <div class="tab-content" role="tabpanel" style="margin-top:8px;">Coming soon…</div>
-      `;
-  wireTopTabs(activeTopTab, brandKey, activeSlaveId);
-  wireTabsActions();
-}
-
-function wireTopTabs(activeTopTab, brandKey, activeSlaveId) {
-  document.querySelectorAll('[role="tab"][data-top]').forEach((btn) => {
-    btn.onclick = () =>
-      renderModBusRTUPanel(
-        btn.getAttribute("data-top"),
-        brandKey,
-        activeSlaveId
-      );
-  });
-}
-
-function wireTabsActions() {
-  const btn = document.getElementById("tabs-actions-trigger");
-  if (!btn) return;
-  btn.onclick = () => {
-    const action = prompt("Type: add <Name> or remove <Name>");
-    if (!action) return;
-    const [cmd, ...rest] = action.split(" ");
-    const name = rest.join(" ").trim();
-    if (!name) return;
-    if (cmd.toLowerCase() === "add") {
-      const panel = document.getElementById("main-panel");
-      panel.innerHTML = `
-            <div class="panel-header">${esc(name)}</div>
-            <div class="tab-content" role="tabpanel" style="margin-top:8px;">
-              <div class="soft">Custom tab "${esc(name)}".</div>
-              <div style="margin-top:12px;"><button class="button-primary" id="custom-save">Save</button></div>
-            </div>
-          `;
-      document.getElementById("custom-save").onclick = () => {
-        saveConfig();
-        alert("Saved.");
-      };
-    } else if (cmd.toLowerCase() === "remove") {
-      alert(
-        "Custom tab removal is ephemeral in this demo. Reload resets custom tabs."
-      );
-    }
-  };
-}
-
-// Settings
-function renderSettings(topTabsHtml) {
-  const s = config.ModbusRTU.settings;
-  const html = `
-        <div class="panel-header">Settings</div>
-        ${topTabsHtml}
-        <div class="tab-content" role="tabpanel" style="margin-top:8px;">
-          <form id="rtu-settings-form">
-            <label>Baud Rate:
-              <select name="baudRate">
-                ${[
-                  "300",
-                  "600",
-                  "1200",
-                  "2400",
-                  "4800",
-                  "9600",
-                  "19200",
-                  "38400",
-                  "57600",
-                  "115200",
-                  "230400",
-                ]
-                  .map(
-                    (b) => `
-                  <option value="${b}" ${
-                      String(s.baudRate) === b ? "selected" : ""
-                    }>${b}</option>`
-                  )
-                  .join("")}
-              </select>
-            </label>
-            <label>Parity:
-              <select name="parity">
-                ${["Even", "Odd", "None"]
-                  .map(
-                    (p) => `
-                  <option value="${p}" ${
-                      s.parity === p ? "selected" : ""
-                    }>${p}</option>`
-                  )
-                  .join("")}
-              </select>
-            </label>
-            <label>Data Bits:
-              <select name="dataBits">
-                ${[5, 6, 7, 8]
-                  .map(
-                    (d) =>
-                      `<option value="${d}" ${
-                        Number(s.dataBits) === d ? "selected" : ""
-                      }>${d}</option>`
-                  )
-                  .join("")}
-              </select>
-            </label>
-            <label>Stop Bits:
-              <select name="stopBits" id="stopBits">
-                ${[1, 2]
-                  .map(
-                    (v) =>
-                      `<option value="${v}" ${
-                        Number(s.stopBits) === v ? "selected" : ""
-                      }>${v}</option>`
-                  )
-                  .join("")}
-              </select>
-            </label>
-            <div style="margin-top:8px;color:#666;font-size:12px;">
-              Even/Odd parity commonly uses 1 stop bit; None often pairs with 2 stop bits for Modbus RTU reliability.
-            </div>
-            <br>
-            <div class="toolbar">
-              <button type="submit" class="button-primary">Save</button>
-              <span class="checkmark" id="rtu-settings-tick" style="display:none;">&#10004;</span>
-            </div>
-          </form>
-        </div>
-      `;
-  document.getElementById("main-panel").innerHTML = html;
-
-  const form = document.getElementById("rtu-settings-form");
-  const paritySel = form.parity,
-    stopSel = form.stopBits;
-  paritySel.onchange = () => {
-    stopSel.value = paritySel.value === "None" ? "2" : "1";
-  };
-  form.onsubmit = (e) => {
-    e.preventDefault();
-    config.ModbusRTU.settings = {
-      baudRate: form.baudRate.value,
-      parity: form.parity.value,
-      dataBits: Number(form.dataBits.value),
-      stopBits: Number(form.stopBits.value),
-    };
-    saveConfig();
-    flashTick("rtu-settings-tick");
-  };
-}
-
-// Energy Meter (brands as tabs; slaves as tabs; presets; manual save)
-function renderEnergyMeter(
-  topTabsHtml,
-  currentBrandKey = null,
-  currentSlaveId = null
-) {
-  const em = config.ModbusRTU.energyMeter;
-  if (em.order.length === 0) {
-    const k = "waveshare_4-20ma_analog_acquisition_module";
-    if (!em.brands[k])
-      em.brands[k] = {
-        label:
-          builtInSchemas[k]?.label ||
-          "Waveshare 4-20 mA Analog Acquisition Module",
-        slaves: [],
-        registersBySlave: {},
-        presets: {},
-      };
-    em.order.push(k);
-  }
-  const brandKey = currentBrandKey || em.order[0];
-  const brand = em.brands[brandKey];
-
-  const brandTabs = `
-        <div class="tab-list" role="tablist" aria-label="Brands" style="margin-top:12px;">
-          ${em.order
-            .map((k) => {
-              const lbl = em.brands[k]?.label || k;
-              const sel = k === brandKey;
-              return `
-              <span style="display:inline-flex;align-items:center;">
-                <button role="tab" class="brand-tab" aria-selected="${
-                  sel ? "true" : "false"
-                }" tabindex="${
-                sel ? "0" : "-1"
-              }" data-brand="${k}">${lbl}</button>
-                <button class="chip-del em-brand-del" data-brand="${k}" title="Remove Brand">×</button>
-              </span>
-            `;
-            })
-            .join("")}
-          <button id="em-add-brand" class="button-primary" style="margin-left:6px;">＋ Brand</button>
-        </div>
-      `;
-
-  const slaves = brand.slaves || [];
-  const slaveId = currentSlaveId || (slaves[0]?.id ?? null);
-  const slaveTabs = `
-        <div style="margin-top:12px;">
-          <div class="tab-list" role="tablist" aria-label="Slaves">
-            ${slaves
-              .map((s) => {
-                const sel = String(s.id) === String(slaveId);
-                return `
-                <span class="slave-pill" data-slave="${
-                  s.id
-                }" style="display:inline-flex;align-items:center;">
-                  <button role="tab" class="slave-tab" aria-selected="${
-                    sel ? "true" : "false"
-                  }" tabindex="${sel ? "0" : "-1"}" data-slave="${s.id}">
-                    <span class="slave-label" data-slave="${s.id}">${
-                  s.id
-                }</span>
-                    <input class="slave-input" type="number" min="1" max="247" data-slave="${
-                      s.id
-                    }" value="${
-                  s.id
-                }" style="display:none;width:64px;margin-left:4px;">
-                  </button>
-                  <button class="chip-del em-slave-del" data-slave="${
-                    s.id
-                  }" title="Remove Slave">×</button>
-                </span>
-              `;
-              })
-              .join("")}
-            <button id="em-add-slave" class="button" style="margin-left:8px;">＋ Slave</button>
-          </div>
-        </div>
-      `;
-
-  const regKey = String(slaveId);
-  const rows =
-    slaveId == null ? [] : deepClone(brand.registersBySlave?.[regKey] || []);
-  const builtIn = builtInSchemas[brandKey]
-    ? [
-        {
-          id: `builtin:${brandKey}`,
-          name: `Built-in: ${builtInSchemas[brandKey].label}`,
-        },
-      ]
-    : [];
-  const brandPresets = Object.entries(brand.presets || {}).map(([pid, p]) => ({
-    id: `brand:${pid}`,
-    name: `Brand: ${p.name || pid}`,
-  }));
-  const globalPresets = Object.entries(em.globalPresets || {}).map(
-    ([pid, p]) => ({ id: `global:${pid}`, name: `Global: ${p.name || pid}` })
-  );
-  const presetToolbar = `
-        <select id="em-preset-select">
-          <option value="">Load preset…</option>
-          ${builtIn
-            .map((p) => `<option value="${p.id}">${p.name}</option>`)
-            .join("")}
-          ${
-            brandPresets.length
-              ? `<optgroup label="Brand presets">${brandPresets
-                  .map((p) => `<option value="${p.id}">${p.name}</option>`)
-                  .join("")}</optgroup>`
-              : ""
-          }
-          ${
-            globalPresets.length
-              ? `<optgroup label="Global presets">${globalPresets
-                  .map((p) => `<option value="${p.id}">${p.name}</option>`)
-                  .join("")}</optgroup>`
-              : ""
-          }
-        </select>
-        <button id="em-load-preset-btn" class="button">Load</button>
-        <select id="em-preset-scope" class="button"><option value="">Select to save the preset for Brand/Global</option><option value="brand">Brand</option><option value="global">Global</option></select>
-        <button id="em-save-preset-btn" class="button">Save as Preset</button>
-      `;
-
-  const regsTable =
-    slaveId == null
-      ? `<div style="margin-top:8px;color:#666;">Select a slave to view registers.</div>`
-      : `
-        <div style="margin-top:10px;">
-          <div class="toolbar" style="justify-content:space-between;">
-            <b>Registers for Slave ${slaveId}</b>
-            <div class="toolbar">
-              ${presetToolbar}
-              <button id="em-add-row" class="button">＋ Row</button>
-            </div>
-          </div>
-          <table class="channel-table" id="em-regs-table" style="margin-top:8px;">
-            <tr>
-              <th>S.No</th>
-              <th>Name</th>
-              <th>Start Address</th>
-              <th>Offset</th>
-              <th>Type</th>
-              <th>Conversion</th>
-              <th>Length</th>
-              <th>Process Range</th>
-              <th>Enabled</th>
-              <th>Remove</th>
-            </tr>
-            ${rows.map((r, i) => rowHtml(r, i)).join("")}
-          </table>
-
-        </div>
-      `;
-
-  const html = `
-        <div class="panel-header">External Module</div>
-        ${topTabsHtml}
-        <div class="tab-content" role="tabpanel" style="margin-top:8px;">
-          ${brandTabs}
-          ${slaveTabs}
-          ${regsTable}
-          <div style="margin-top:12px;" class="toolbar">
-            <button id="em-save" class="button-primary">Save</button>
-            <span class="checkmark" id="em-tick" style="display:none;">&#10004;</span>
-          </div>
-        </div>
-        ${brandAddModal()}
-        ${presetNameModal()}
-      `;
-  document.getElementById("main-panel").innerHTML = html;
-
-  // Brand handlers
-  document.querySelectorAll('.brand-tab[role="tab"]').forEach((b) => {
-    b.onclick = () =>
-      renderEnergyMeter(topTabsHtml, b.getAttribute("data-brand"), null);
-  });
-  document.querySelectorAll(".em-brand-del").forEach((b) => {
-    b.onclick = () => {
-      const k = b.getAttribute("data-brand");
-      if (
-        !confirm(
-          `Remove brand "${
-            em.brands[k]?.label || k
-          }"? This deletes its slaves and registers.`
+        return self.plc.get_connected()
+
+    # --------------------------------------------------
+    # DB CONNECTION (PyMySQL)
+    # --------------------------------------------------
+    def connect_to_db(self, db_cred, database):
+        return pymysql.connect(
+            host=db_cred["host"],
+            user=db_cred["user"],
+            password=db_cred["password"],
+            database=database,
+            port=db_cred.get("port", 3306),
+            charset=db_cred.get("charset", "utf8mb4"),
+            autocommit=False,
+            connection_timeout=timeout,
         )
-      )
-        return;
-      if (em.brands[k]) delete em.brands[k];
-      em.order = em.order.filter((x) => x !== k);
-      saveConfig();
-      const next = em.order[0] || null;
-      renderModBusRTUPanel("EnergyMeter", next, null);
-    };
-  });
-  document.getElementById("em-add-brand")?.addEventListener("click", () => {
-    openBrandModal((label) => {
-      const key =
-        label.toLowerCase().replace(/\W+/g, "_") || "brand_" + Date.now();
-      if (!em.brands[key]) {
-        em.brands[key] = {
-          label,
-          slaves: [],
-          registersBySlave: {},
-          presets: {},
-        };
-        em.order.push(key);
-      } else {
-        em.brands[key].label = label;
-        if (!em.order.includes(key)) em.order.push(key);
-      }
-      saveConfig();
-      renderModBusRTUPanel("EnergyMeter", key, null);
-    });
-  });
 
-  // Slave handlers
-  document.querySelectorAll('.slave-tab[role="tab"]').forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      const id = btn.getAttribute("data-slave");
-      const selected = btn.getAttribute("aria-selected") === "true";
-      const label = btn.querySelector(".slave-label");
-      const input = btn.querySelector(".slave-input");
-      if (!selected) {
-        renderEnergyMeter(topTabsHtml, brandKey, id);
-        return;
-      }
-      // Inline edit
-      label.style.display = "none";
-      input.style.display = "inline-block";
-      input.focus();
-      input.select();
-      const cancel = () => {
-        input.style.display = "none";
-        label.style.display = "inline";
-        input.value = label.textContent.trim();
-        cleanup();
-      };
-      const commit = () => {
-        const newVal = input.value.trim();
-        const n = parseInt(newVal, 10);
-        if (!Number.isInteger(n) || n < 1 || n > 247) {
-          alert("Slave ID must be 1..247");
-          cancel();
-          return;
-        }
-        const oldId = String(id);
-        if (String(n) === oldId) {
-          cancel();
-          return;
-        }
-        if ((brand.slaves || []).some((s) => String(s.id) === String(n))) {
-          alert("Slave ID already exists.");
-          cancel();
-          return;
-        }
-        brand.slaves = (brand.slaves || []).map((s) =>
-          String(s.id) === oldId ? { id: n } : s
-        );
-        brand.registersBySlave = brand.registersBySlave || {};
-        brand.registersBySlave[String(n)] = brand.registersBySlave[oldId] || [];
-        delete brand.registersBySlave[oldId];
-        renderEnergyMeter(topTabsHtml, brandKey, String(n));
-      };
-      const onKey = (ev) => {
-        if (ev.key === "Enter") commit();
-        else if (ev.key === "Escape") cancel();
-      };
-      const onBlur = () => commit();
-      function cleanup() {
-        input.removeEventListener("keydown", onKey);
-        input.removeEventListener("blur", onBlur);
-      }
-      input.addEventListener("keydown", onKey);
-      input.addEventListener("blur", onBlur);
-    });
-  });
-  document.querySelectorAll(".em-slave-del").forEach((b) => {
-    b.onclick = () => {
-      const sid = String(b.getAttribute("data-slave"));
-      if (!confirm(`Remove slave ${sid}?`)) return;
-      brand.slaves = (brand.slaves || []).filter((s) => String(s.id) !== sid);
-      if (brand.registersBySlave) delete brand.registersBySlave[sid];
-      saveConfig();
-      const next = brand.slaves[0]?.id ?? null;
-      renderEnergyMeter(topTabsHtml, brandKey, next);
-    };
-  });
-  document.getElementById("em-add-slave")?.addEventListener("click", () => {
-    const nextId = suggestNextSlaveId(brand.slaves || []);
-    brand.slaves = brand.slaves || [];
-    brand.slaves.push({ id: nextId });
-    brand.registersBySlave = brand.registersBySlave || {};
-    brand.registersBySlave[String(nextId)] =
-      brand.registersBySlave[String(nextId)] || [];
-    saveConfig();
-    renderEnergyMeter(topTabsHtml, brandKey, String(nextId));
-  });
+        def write_slc_data(self, instruction):
+            """Write data into PLC based on instruction"""
+            try:
+                value = instruction["value_to_write"]
+                data_type = instruction["type"]
+                size = instruction["size"]
 
-  // Registers and presets
-  if (slaveId != null) {
-    let workingRows = rows;
-    const table = document.getElementById("em-regs-table");
-    table?.addEventListener("input", (e) => {
-      const idx = Number(e.target.getAttribute("data-index"));
-      const field = e.target.getAttribute("data-field");
-      if (!Number.isInteger(idx) || !field) return;
-      let v = e.target.type === "checkbox" ? e.target.checked : e.target.value;
-      if (
-        ["start", "offset", "length"].includes(field) &&
-        e.target.type !== "checkbox"
-      )
-        v = parseInt(v, 10);
-      workingRows[idx] = workingRows[idx] || {};
-      workingRows[idx][field] = v;
-    });
-    table?.addEventListener("click", (e) => {
-      const btn = e.target.closest(".em-reg-remove");
-      if (!btn) return;
-      const idx = Number(btn.getAttribute("data-index"));
-      if (idx >= 0 && idx < workingRows.length) workingRows.splice(idx, 1);
-      rerenderRegsTable(workingRows);
-    });
-    document.getElementById("em-add-row")?.addEventListener("click", () => {
-      workingRows.push({
-        name: "",
-        start: "",
-        offset: 0,
-        type: "Input Register",
-        conversion: "Float: Big Endian",
-        length: 2,
-        process_min: "",
-        process_max: "",
-        enabled: false,
-      });
+                buffer = bytearray(size)
 
-      rerenderRegsTable(workingRows);
-    });
-    const emLoad = document.getElementById("em-load-preset-btn");
-    const emSel = document.getElementById("em-preset-select");
-    emLoad?.addEventListener("click", () => {
-      const sel = emSel.value;
-      if (!sel) return;
-      if (sel.startsWith("builtin:")) {
-        const key = sel.split(":")[1];
-        workingRows = deepClone(builtInSchemas[key]?.rows || []);
-      } else if (sel.startsWith("brand:")) {
-        const pid = sel.split(":")[1];
-        workingRows = deepClone((brand.presets || {})[pid]?.rows || []);
-      } else if (sel.startsWith("global:")) {
-        const pid = sel.split(":")[1];
-        workingRows = deepClone((em.globalPresets || {})[pid]?.rows || []);
-      }
-      rerenderRegsTable(workingRows);
-    });
-    const savePresetBtn = document.getElementById("em-save-preset-btn");
-    const scopeSel = document.getElementById("em-preset-scope");
-    savePresetBtn?.addEventListener("click", () => {
-      openPresetNameModal((presetName) => {
-        if (!presetName) return;
-        const pid = slugify(presetName);
-        if (scopeSel.value === "global") {
-          em.globalPresets[pid] = {
-            name: presetName,
-            rows: deepClone(workingRows),
-          };
-        } else {
-          brand.presets = brand.presets || {};
-          brand.presets[pid] = {
-            name: presetName,
-            rows: deepClone(workingRows),
-          };
-        }
-        saveConfig();
-        renderEnergyMeter(topTabsHtml, brandKey, slaveId);
-      });
-    });
+                if data_type == "int":
+                    set_int(buffer, 0, int(value))
+                elif data_type == "real":
+                    set_real(buffer, 0, float(value))
+                else:
+                    raise ValueError(f"Unsupported write type: {data_type}")
 
-    document.getElementById("em-save").onclick = () => {
-      brand.registersBySlave = brand.registersBySlave || {};
-      brand.registersBySlave[regKey] = deepClone(workingRows);
-      for (let i = 0; i < workingRows.length; i++) {
-        const r = workingRows[i];
-        if (
-          r.process_min !== "" &&
-          r.process_max !== "" &&
-          Number(r.process_min) >= Number(r.process_max)
-        ) {
-          alert(`Row ${i + 1}: Process Min must be less than Process Max`);
-          return;
-        }
-      }
+                if instruction['storage'] == "DB":
+                    self.plc.write_area(
+                        snap7.types.Areas.DB,
+                        instruction["DB_no"],
+                        instruction["address"],
+                        buffer
+                    )
+                elif instruction['storage'] == "MK":
+                    self.plc.write_area(
+                        snap7.types.Areas.MK,
+                        0,
+                        instruction["address"],
+                        buffer
+                    )
+                else:
+                    raise ValueError(f"Unsupported storage: {instruction['storage']}")
 
-      saveConfig();
-      flashTick("em-tick");
-    };
-  } else {
-    document.getElementById("em-save").onclick = () => {
-      for (let i = 0; i < workingRows.length; i++) {
-        const r = workingRows[i];
-        if (
-          r.process_min !== "" &&
-          r.process_max !== "" &&
-          Number(r.process_min) >= Number(r.process_max)
-        ) {
-          alert(`Row ${i + 1}: Process Min must be less than Process Max`);
-          return;
-        }
-      }
+                logging.info(f"Wrote {value} ({data_type}) to {instruction}")
+                print(f"Wrote {value} ({data_type}) to {instruction}")
 
-      saveConfig();
-      flashTick("em-tick");
-    };
-  }
-}
+            except Exception as e:
+                logging.error(f"Error writing to PLC: {e}")
+                print(f"Error writing to PLC: {e}")
 
-function rowHtml(r, i) {
-  return `
-        <tr>
-          <td>${i + 1}</td>
-          <td><input type="text" value="${esc(
-            r.name
-          )}" data-field="name" data-index="${i}" style="width:180px;"></td>
-          <td><input type="number" value="${numOrEmpty(
-            r.start
-          )}" data-field="start" data-index="${i}" style="width:90px;"></td>
-          <td><input type="number" value="${numOrEmpty(
-            r.offset,
-            0
-          )}" data-field="offset" data-index="${i}" style="width:70px;"></td>
-          <td>
-            <select data-field="type" data-index="${i}">
-              <option value="Holding Register" ${
-                r.type === "Holding Register" ? "selected" : ""
-              }>Holding Register</option>
-              <option value="Input Register" ${
-                r.type === "Input Register" ? "selected" : ""
-              }>Input Register</option>
-            </select>
-          </td>
-          <td>
-            <select data-field="conversion" data-index="${i}">
-              <option value="Raw Hex" ${
-                r.conversion === "Raw Hex" ? "selected" : ""
-              }>Raw Hex</option>
-              <option value="Integer" ${
-                r.conversion === "Integer" ? "selected" : ""
-              }>Integer</option>
-              <option value="Double" ${
-                r.conversion === "Double" ? "selected" : ""
-              }>Double</option>
-              <option value="Float: Big Endian" ${
-                r.conversion === "Float: Big Endian" ? "selected" : ""
-              }>Float: Big Endian</option>
-            </select>
-          </td>
-          <td><input type="number" value="${numOrEmpty(
-            r.length,
-            2
-          )}" data-field="length" data-index="${i}" style="width:70px;"></td>
-          <td>
-            <div style="display:flex; gap:6px;">
-              <input type="number"
-                placeholder="Min"
-                value="${numOrEmpty(r.process_min)}"
-                data-field="process_min"
-                data-index="${i}"
-                style="width:70px;">
-              <input type="number"
-                placeholder="Max"
-                value="${numOrEmpty(r.process_max)}"
-                data-field="process_max"
-                data-index="${i}"
-                style="width:70px;">
-            </div>
-          </td>
+    # --------------------------------------------------
+    # READ PLC DATA
+    # --------------------------------------------------
+    def get_data(self):
+        data_dict = {}
+        self.instructions = self.write_instructions if self.write_data else self.read_instructions
+        
+        try:
+            if not self.generate_random:
+                if not self.connect_plc():
+                    logging.error("PLC connection failed")
+                    return None
 
-          <td><input type="checkbox" ${
-            r.enabled ? "checked" : ""
-          } data-field="enabled" data-index="${i}"></td>
-          <td style="text-align:center;">
-            <button type="button" class="button em-reg-remove" data-index="${i}" title="Remove">×</button>
-          </td>
-        </tr>
-      `;
-}
-function rerenderRegsTable(rows) {
-  const table = document.getElementById("em-regs-table");
-  if (!table) return;
-  table.innerHTML = `
-        <tr>
-          <th>S.No</th>
-          <th>Name</th>
-          <th>Start Address</th>
-          <th>Offset</th>
-          <th>Type</th>
-          <th>Conversion</th>
-          <th>Length</th>
-          <th>Process Range</th>
-          <th>Enabled</th>
-          <th>Remove</th>
-        </tr>
-        ${rows.map((r, i) => rowHtml(r, i)).join("")}
-      `;
-}
+            for instr in self.read_instructions:
+                if instr["storage"] != "DB":
+                    continue
 
-// Modals
-function brandAddModal() {
-  return `
-        <div id="em-brand-modal" class="modal" aria-modal="true" role="dialog" aria-labelledby="brand-title" style="display:none;">
-          <div class="modal-content">
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-              <h3 id="brand-title" style="margin:0;">Add Brand</h3>
-              <button id="em-brand-modal-close" class="button" aria-label="Close">×</button>
-            </div>
-            <div style="margin-top:10px;">
-              <label>Brand Name: <input id="em-brand-name" type="text" placeholder="e.g., Schneider EM6436H" style="width:260px;"></label>
-              <br><br>
-              <button id="em-brand-save" class="button-primary">Save</button>
-            </div>
-          </div>
-        </div>
-      `;
-}
-function openBrandModal(onSave) {
-  const container = document.createElement("div");
-  container.innerHTML = brandAddModal();
-  document.body.appendChild(container.firstElementChild);
-  const m = document.getElementById("em-brand-modal");
-  m.style.display = "flex";
-  document.getElementById("em-brand-modal-close").onclick = () => {
-    m.remove();
-  };
-  document.getElementById("em-brand-save").onclick = () => {
-    const label = document.getElementById("em-brand-name").value.trim();
-    if (!label) return;
-    m.remove();
-    onSave(label);
-  };
-}
+                name = instr["content"]
 
-function presetNameModal() {
-  return `
-        <div id="em-preset-modal" class="modal" aria-modal="true" role="dialog" aria-labelledby="preset-title" style="display:none;">
-          <div class="modal-content">
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-              <h3 id="preset-title" style="margin:0;">Save Preset</h3>
-              <button id="em-preset-modal-close" class="button" aria-label="Close">×</button>
-            </div>
-            <div style="margin-top:10px;">
-              <label>Name: <input id="em-preset-name" type="text" placeholder="e.g., Site A v1" style="width:220px;"></label>
-              <br><br>
-              <button id="em-preset-save" class="button-primary">Save</button>
-            </div>
-          </div>
-        </div>
-      `;
-}
-function openPresetNameModal(onSave) {
-  const container = document.createElement("div");
-  container.innerHTML = presetNameModal();
-  document.body.appendChild(container.firstElementChild);
-  const m = document.getElementById("em-preset-modal");
-  m.style.display = "flex";
-  document.getElementById("em-preset-modal-close").onclick = () => {
-    m.remove();
-  };
-  document.getElementById("em-preset-save").onclick = () => {
-    const name = document.getElementById("em-preset-name").value.trim();
-    if (!name) return;
-    m.remove();
-    onSave(name);
-  };
-}
+                # ===== RANDOM MODE =====
+                if self.generate_random:
+                    min_v = safe_float(instr.get("min"), 0)
+                    max_v = safe_float(instr.get("max"), 100)
+                    if min_v > max_v:
+                        min_v, max_v = max_v, min_v
 
-/***********************
- * Modbus RTU Panel (independent, renamed helpers)
- * - Uses config.ModbusRTU.PLC for persistence only.
- * - Initializes with JSON placeholder if empty.
- * - UI state lives in rtu_plc_configurations.
- * - Function names changed as requested (renderModBusRTUPanel unchanged).
- ***********************/
+                    value = random.randint(min_v, max_v)
+                    logging.info(f"[S7][RANDOM] {name} = {value}")
 
-// Deep copy helper (structuredClone preferred with JSON fallback)
-function rtuDeepCopy(obj) {
-  try {
-    if (typeof structuredClone === "function") return structuredClone(obj);
-  } catch (e) {}
-  return JSON.parse(JSON.stringify(obj));
-}
+                # ===== REAL PLC =====
+                else:
+                        
+                    for instruction in self.instructions:
+                        if "value_to_write" in instruction:
+                            # Perform write
+                            self.write_slc_data(instruction)
 
-// RTU-only editor state
-let rtu_plc_configurations = [];
+                        data = self.plc.read_area(
+                            snap7.types.Areas.DB,
+                            instr["DB_no"],
+                            instr["address"],
+                            instr["size"]
+                        )
 
-let rtuLoaded = 0;
+                        if instr["type"] == "int":
+                            value = get_int(data, 0)
+                        elif instr["type"] == "real":
+                            value = get_real(data, 0)
+                        else:
+                            value = data
 
-// Exact JSON placeholder (Siemens RTU) requested
-const RTU_JSON_PLACEHOLDER = [
-  {
-    plcType: "Siemens",
-    isExpanded: true,
-    PLC: {
-      cred: {
-        port:
-          navigator.platform && navigator.platform.startsWith("Win")
-            ? "COM3"
-            : "/dev/ttyUSB0",
-        baudrate: 9600,
-        parity: "N",
-        stopbits: 1,
-        slave_id: 1,
-      },
-      address_access: {
-        read: [
-          {
-            type: "holding_register",
-            read: true,
-            content: "Bentonite_actual_value",
-            address: 40001,
-            length: 1,
-            datatype: "int16",
-            write: false,
-          },
-          {
-            type: "holding_register",
-            read: true,
-            content: "Bentonite_set_value",
-            address: 40002,
-            length: 1,
-            datatype: "int16",
-            write: false,
-          },
-        ],
-        write: [
-          {
-            type: "coil",
-            content: "Start_Motor",
-            address: 1,
-            value_to_write: 0,
-          },
-        ],
-      },
-      Database: { table_name: "scada_data" },
-    },
-  },
-];
+                data_dict[name] = value
 
-// Create a blank RTU entry for Add PLC
-function makeBlankRtuPlcEntry() {
-  return {
-    plcType: "Other",
-    isExpanded: true,
-    PLC: {
-      cred: {
-        port:
-          navigator.platform && navigator.platform.startsWith("Win")
-            ? "COM3"
-            : "/dev/ttyUSB0",
-        baudrate: 9600,
-        parity: "N",
-        stopbits: 1,
-        slave_id: 1,
-      },
-      address_access: { read: [], write: [] },
-      Database: { table_name: "" },
-    },
-  };
-}
+            self.data = data_dict
+            return data_dict
 
-// Load/Save RTU configs
-function loadRtuPlcState() {
-  const stored = config?.ModbusRTU?.PLC;
-  console.log(config.ModbusRTU.PLC);
-  const usePlaceholder = !(Array.isArray(stored) && stored.length > 0);
-  const source = usePlaceholder ? RTU_JSON_PLACEHOLDER : stored;
-  if (usePlaceholder) {
-    config.ModbusRTU = config.ModbusRTU || {};
-    config.ModbusRTU.PLC = rtuDeepCopy(RTU_JSON_PLACEHOLDER);
-  }
-  rtu_plc_configurations = rtuDeepCopy(source);
-  // Normalize so bindings don't crash
-  rtu_plc_configurations = rtu_plc_configurations.map((item) => ({
-    plcType: item?.plcType || "Other",
-    isExpanded: item?.isExpanded !== false,
-    PLC: item?.PLC || {
-      cred: {},
-      address_access: { read: [], write: [] },
-      Database: { table_name: "" },
-    },
-  }));
-}
+        except Exception as e:
+            logging.error(f"PLC read error: {e}")
+            return None
 
-function saveRtuPlcState() {
-  config.ModbusRTU = config.ModbusRTU || {};
-  config.ModbusRTU.PLC = rtuDeepCopy(rtu_plc_configurations);
-  if (typeof saveConfig === "function") saveConfig();
-}
+    # --------------------------------------------------
+    # TABLE MANAGEMENT
+    # --------------------------------------------------
+    def create_table_if_not_exists(self, cursor, table, schema):
+        columns = [f"`{col}` {dtype}" for col, dtype in schema.items()]
 
-// Panel init hook (call this to open RTU PLC tab)
-function initRtuPlcPanel() {
-  loadRtuPlcState();
-  renderModBusRTUPanel("PLC");
-}
+        query = f"""
+        CREATE TABLE IF NOT EXISTS `{table}` (
+            {", ".join(columns)}
+        ) ENGINE=InnoDB;
+        """
+        cursor.execute(query)
 
-// HTML render
-function rtuPlcInnerHtml() {
-  if (rtuLoaded == 0) {
-    loadRtuPlcState();
-    rtuLoaded = 1;
-  }
-  const plcConfigs = Array.isArray(rtu_plc_configurations)
-    ? rtu_plc_configurations
-    : [];
-  return `
-        <div class="split-toolbar" style="margin-bottom:8px;">
-          <div class="soft">Configure Modbus RTU PLC endpoints (independent from TCP).</div>
-          <div>
-            <button type="button" id="add-plc-entry" class="button">＋ Add PLC</button>
-            <button type="button" id="save-all-configs" class="button-primary">Save All Configurations</button>
-          </div>
-        </div>
-        <div id="plc-entries-container">
-          ${plcConfigs
-            .map((plc, index) => renderRtuPlcEntry(plc, index))
-            .join("")}
-        </div>
-      `;
-}
+    def get_existing_columns(self, cursor, table):
+        cursor.execute(f"SHOW COLUMNS FROM `{table}`")
+        return {row[0] for row in cursor.fetchall()}
 
-// Event bindings
-function bindRtuPlcInnerEvents() {
-  const addBtn = document.getElementById("add-plc-entry");
-  const saveBtn = document.getElementById("save-all-configs");
+    def add_new_columns_only(self, cursor, table, schema):
+        existing = self.get_existing_columns(cursor, table)
 
-  if (addBtn)
-    addBtn.addEventListener("click", () => {
-      if (!Array.isArray(rtu_plc_configurations)) rtu_plc_configurations = [];
-      rtu_plc_configurations.push(makeBlankRtuPlcEntry());
-      renderModBusRTUPanel("PLC");
-    });
+        for col, dtype in schema.items():
+            if col not in existing:
+                alter = f"""
+                ALTER TABLE `{table}`
+                ADD COLUMN `{col}` {dtype} DEFAULT NULL
+                """
+                cursor.execute(alter)
+                logging.info(f"Added column '{col}' to {table}")
 
-  if (saveBtn)
-    saveBtn.addEventListener("click", () => {
-      saveRtuPlcState();
-      alert("All Modbus RTU PLC configurations have been saved.");
-    });
+    # --------------------------------------------------
+    # INSERT DATA
+    # --------------------------------------------------
+    def send_data_to_db(self, cursor, table, schema):
+        cols = []
+        values = []
 
-  // Bind entries after render; guard indices
-  const entryEls = document.querySelectorAll(".plc-entry");
-  entryEls.forEach((el) => {
-    const idx = parseInt(el.getAttribute("data-index"), 10);
-    if (!Number.isInteger(idx)) return;
-    const item = rtu_plc_configurations[idx];
-    if (!item || typeof item !== "object") return;
-    if (!("plcType" in item)) item.plcType = "Other";
-    if (!("PLC" in item))
-      item.PLC = {
-        cred: {},
-        address_access: { read: [], write: [] },
-        Database: { table_name: "" },
-      };
-    bindRtuEventsForPlcEntry(idx);
-  });
-}
+        for col in schema:
+            if col in ("id", "ts"):
+                continue
+            if col in self.data:
+                cols.append(f"`{col}`")
+                values.append(self.data[col])
 
-// Single entry card
-function renderRtuPlcEntry(plc, index) {
-  const portDisplay = plc?.PLC?.cred?.port || "Port Not Set";
-  const sidDisplay =
-    plc?.PLC?.cred?.slave_id != null ? `, SID ${plc.PLC.cred.slave_id}` : "";
-  const isExpanded = plc.isExpanded !== false;
-  const isOther = plc.plcType === "Other";
-  const isAllenBradley = plc.plcType === "Allen Bradley";
+        if not cols:
+            return
 
-  return `
-        <div class="card plc-entry" data-index="${index}">
-          <div class="accordion-h">
-            <strong>${plc.plcType} - ${portDisplay}${sidDisplay}</strong>
-            <div>
-              <button type="button" class="button toggle-plc-details" title="Toggle">${
-                isExpanded ? "−" : "+"
-              }</button>
-              <button type="button" class="button remove-plc-entry" title="Remove">×</button>
-            </div>
-          </div>
-          <div class="plc-details" style="${isExpanded ? "" : "display:none;"}">
-            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin:12px 0;">
-              <label>PLC Type:
-                <select class="plc-type-select">
-                  <option value="Other" ${
-                    isOther ? "selected" : ""
-                  }>Other</option>
-                  <option value="Siemens" ${
-                    plc.plcType === "Siemens" ? "selected" : ""
-                  }>Siemens</option>
-                  <option value="Allen Bradley" ${
-                    isAllenBradley ? "selected" : ""
-                  }>Allen Bradley</option>
-                </select>
-              </label>
-              <label class="plc-driver-label" style="${
-                isAllenBradley ? "" : "display:none;"
-              }">
-                Driver Type:
-                <select class="plc-driver-select">
-                  <option value="logix" ${
-                    plc.PLC?.cred?.driver === "logix" ? "selected" : ""
-                  }>Logix</option>
-                  <option value="slc" ${
-                    plc.PLC?.cred?.driver === "slc" ? "selected" : ""
-                  }>SLC</option>
-                </select>
-              </label>
-              <label class="plc-name-label" style="${
-                isOther ? "display:none;" : ""
-              }">
-                Table Name:
-                <input type="text" class="plc-name-input" value="${
-                  plc.PLC?.Database?.table_name || ""
-                }" />
-              </label>
-            </div>
-            <div class="plc-form-container">
-              ${renderRtuFormForType(plc.plcType, plc.PLC, index)}
-            </div>
-          </div>
-        </div>
-      `;
-}
+        placeholders = ", ".join(["%s"] * len(cols))
+        cols_sql = ", ".join(cols)
 
-function bindRtuEventsForPlcEntry(index) {
-  if (!Array.isArray(rtu_plc_configurations)) return;
-  const cfg = rtu_plc_configurations[index];
-  if (!cfg) return;
-  if (!cfg.PLC)
-    cfg.PLC = {
-      cred: {},
-      address_access: { read: [], write: [] },
-      Database: { table_name: "" },
-    };
-  if (!("plcType" in cfg)) cfg.plcType = "Other";
+        query = f"""
+            INSERT INTO `{table}` ({cols_sql})
+            VALUES ({placeholders})
+        """
 
-  const entryElement = document.querySelector(
-    `.plc-entry[data-index='${index}']`
-  );
-  if (!entryElement) return;
+        cursor.execute(query, values)
 
-  const toggleBtn = entryElement.querySelector(".toggle-plc-details");
-  if (toggleBtn)
-    toggleBtn.addEventListener("click", () => {
-      const item = rtu_plc_configurations[index];
-      if (!item) return;
-      item.isExpanded = !item.isExpanded;
-      renderModBusRTUPanel("PLC");
-    });
 
-  const typeSel = entryElement.querySelector(".plc-type-select");
-  if (typeSel)
-    typeSel.addEventListener("change", (e) => {
-      const item = rtu_plc_configurations[index];
-      if (!item) return;
-      item.plcType = e.target.value;
-      item.PLC = item.PLC || {
-        cred: {},
-        address_access: { read: [], write: [] },
-        Database: { table_name: "" },
-      };
-      renderModBusRTUPanel("PLC");
-    });
+    # --------------------------------------------------
+    # MAIN LOOP
+    # --------------------------------------------------
+    def plc_to_db(self):
+        os.makedirs(self.log_folder, exist_ok=True)
 
-  const driverSelect = entryElement.querySelector(".plc-driver-select");
-  if (driverSelect) {
-    driverSelect.addEventListener("change", (e) => {
-      const item = rtu_plc_configurations[index];
-      if (!item) return;
-      const plcConfig = (item.PLC ||= {
-        cred: {},
-        address_access: { read: [], write: [] },
-        Database: { table_name: "" },
-      });
-      (plcConfig.cred ||= {}).driver = e.target.value;
-      renderModBusRTUPanel("PLC");
-    });
-  }
+        log_file = os.path.join(
+            self.log_folder,
+            f"plc_connection_{datetime.now().strftime('%Y-%m-%d')}.log"
+        )
 
-  const nameInput = entryElement.querySelector(".plc-name-input");
-  if (nameInput) {
-    nameInput.addEventListener("input", (e) => {
-      const item = rtu_plc_configurations[index];
-      if (!item) return;
-      const plcConfig = (item.PLC ||= {
-        cred: {},
-        address_access: { read: [], write: [] },
-        Database: { table_name: "" },
-      });
-      (plcConfig.Database ||= {}).table_name = e.target.value;
-    });
-  }
 
-  const removeBtn = entryElement.querySelector(".remove-plc-entry");
-  if (removeBtn) {
-    removeBtn.addEventListener("click", () => {
-      if (!confirm("Remove this PLC configuration?")) return;
-      rtu_plc_configurations.splice(index, 1);
-      renderModBusRTUPanel("PLC");
-    });
-  }
+        logging.basicConfig(
+            filename=log_file,
+            level=logging.INFO,
+            format="%(asctime)s — %(levelname)s — %(message)s"
+        )
 
-  const plcType = rtu_plc_configurations[index]?.plcType || "Other";
-  if (plcType === "Siemens") bindRtuSiemensFormEvents(index);
-  else if (plcType === "Allen Bradley") bindRtuAllenBradleyFormEvents(index);
-}
+        if not isinstance(config, dict):
+            raise TypeError(f"Invalid PLC config type: {type(config)} → {config}")
 
-// Type switcher
-function renderRtuFormForType(type, plcData, index) {
-  if (type === "Siemens") return renderRtuSiemensForm(plcData, index);
-  if (type === "Allen Bradley")
-    return renderRtuAllenBradleyForm(plcData, index);
-  return ""; // "Other" shows nothing
-}
 
-// Siemens RTU defaults (requested JSON shape)
-function ensureRtuSiemensDefaults(plc) {
-  const p = plc || {};
-  p.cred = p.cred || {};
-  p.cred.port =
-    p.cred.port ||
-    (navigator.platform && navigator.platform.startsWith("Win")
-      ? "COM3"
-      : "/dev/ttyUSB0");
-  p.cred.baudrate = p.cred.baudrate || 9600;
-  p.cred.parity = p.cred.parity || "N";
-  p.cred.stopbits = p.cred.stopbits || 1;
-  p.cred.slave_id = p.cred.slave_id != null ? p.cred.slave_id : 1;
-  p.Database = p.Database || { table_name: "" };
-  p.address_access = p.address_access || {
-    read: [],
-    write: [{ type: "coil", content: "", address: 1, value_to_write: 0 }],
-  };
-  return p;
-}
+        while True:
+            start_time = time.time()
+            try:
+                self.data = self.get_data()
+                if not self.data:
+                    time.sleep(self.data_freq)
+                    continue
 
-function renderRtuSiemensForm(plcData, index) {
-  const plcConfig = ensureRtuSiemensDefaults(plcData || {});
-  const c = plcConfig.cred;
-  const readRows = (plcConfig.address_access.read || [])
-    .map((item, rowIndex) => renderRtuSiemensRow(item, rowIndex))
-    .join("");
-  const writeRows = (plcConfig.address_access.write || [])
-    .map(
-      (item, rowIndex) => `
-        <tr data-write-index="${rowIndex}">
-          <td><input type="text" data-write-field="content" value="${
-            item.content || ""
-          }" placeholder="Tag"></td>
-          <td><input type="number" data-write-field="address" value="${
-            item.address ?? 1
-          }" min="0"></td>
-          <td><input type="number" data-write-field="value_to_write" value="${
-            item.value_to_write ?? 0
-          }" step="1" min="0" max="1"></td>
-          <td><button type="button" class="button remove-siemens-write-row">-</button></td>
-        </tr>
-      `
-    )
-    .join("");
+                # Write to ALL enabled DBs
+                for db_name, db in self.db_targets.items():
 
-  return `
-        <form id="siemens-form-${index}">
-          <fieldset><legend>RTU Credentials</legend>
-            <label>Serial Port: <input type="text" data-cred-field="port" value="${
-              c.port
-            }"></label>
-            <label>Baudrate: <input type="number" data-cred-field="baudrate" value="${
-              c.baudrate
-            }" min="1200" max="115200" step="600"></label>
-            <label>Parity:
-              <select data-cred-field="parity">
-                ${["N", "E", "O"]
-                  .map(
-                    (p) =>
-                      `<option value="${p}" ${
-                        c.parity === p ? "selected" : ""
-                      }>${p}</option>`
-                  )
-                  .join("")}
-              </select>
-            </label>
-            <label>Stop Bits:
-              <select data-cred-field="stopbits">
-                ${[1, 2]
-                  .map(
-                    (s) =>
-                      `<option value="${s}" ${
-                        c.stopbits == s ? "selected" : ""
-                      }>${s}</option>`
-                  )
-                  .join("")}
-              </select>
-            </label>
-            <label>Slave ID: <input type="number" data-cred-field="slave_id" value="${
-              c.slave_id
-            }" min="1" max="247"></label>
-          </fieldset>
+                    conn = self.connect_to_db(db["cred"], db["database"])
+                    cursor = conn.cursor()
 
-          <fieldset><legend>Read Items</legend>
-            <table>
-              <thead>
-                <tr>
-                  <th>Type</th><th>Content</th><th>Address</th><th>Length</th><th>Datatype</th><th>Read</th><th>Write</th><th>Remove</th>
-                </tr>
-              </thead>
-              <tbody class="siemens-read-tbody">${readRows}</tbody>
-            </table>
-            <button type="button" class="button add-siemens-read-row">＋ Add Read Item</button>
-          </fieldset>
+                    self.create_table_if_not_exists(
+                        cursor,
+                        db["table_name"],
+                        db["schema"]
+                    )
 
-          <fieldset style="margin-top:12px;"><legend>Write Coils</legend>
-            <table>
-              <thead>
-                <tr><th>Content</th><th>Address</th><th>Value</th><th>Remove</th></tr>
-              </thead>
-              <tbody class="siemens-write-tbody">${writeRows}</tbody>
-            </table>
-            <button type="button" class="button add-siemens-write-coil">＋ Add Write Coil</button>
-          </fieldset>
+                    self.add_new_columns_only(
+                        cursor,
+                        db["table_name"],
+                        db["schema"]
+                    )
 
-          <label style="margin-top:8px; display:block;">
-            Data Reading Frequency (secs):
-            <input type="number" data-freq-field="data_reading_freq(in secs)" value="${
-              plcConfig["data_reading_freq(in secs)"] || 180
-            }" step="0.1">
-          </label>
-        </form>
-      `;
-}
+                    self.send_data_to_db(
+                        cursor,
+                        db["table_name"],
+                        db["schema"]
+                    )
 
-function renderRtuSiemensRow(item, rowIndex) {
-  return `
-        <tr data-row-index="${rowIndex}">
-          <td>
-            <select data-field="type">
-              ${["holding_register", "input_register", "coil", "discrete_input"]
-                .map(
-                  (t) =>
-                    `<option value="${t}" ${
-                      item.type === t ? "selected" : ""
-                    }>${t}</option>`
+                    conn.commit()
+                    conn.close()
+
+                logging.info("Data stored successfully")
+
+                process_modbus_tcp_alarms(
+                    plc_type="Siemens",
+                    plc_key=self.db_targets[next(iter(self.db_targets))]["table_name"],
+                    data=self.data,
+                    config=self.config
                 )
-                .join("")}
-            </select>
-          </td>
-          <td><input type="text" data-field="content" value="${
-            item.content || ""
-          }" placeholder="Tag"></td>
-          <td><input type="number" data-field="address" value="${
-            item.address || 0
-          }" placeholder="40001"></td>
-          <td><input type="number" data-field="length" value="${
-            item.length || 1
-          }" min="1"></td>
-          <td>
-            <select data-field="datatype">
-              ${["int", "real", "dint", "bool"]
-                .map(
-                  (d) =>
-                    `<option value="${d}" ${
-                      item.datatype === d ? "selected" : ""
-                    }>${d.toUpperCase()}</option>`
+
+            except Exception as e:
+                logging.error(f"Main loop error: {e}")
+
+            finally:
+                logging.info(f"Cycle time: {time.time() - start_time:.2f}s")
+                time.sleep(self.data_freq)
+
+
+class ModbusTCPProtocol:
+    """
+    Modbus TCP → MySQL (SYNC)
+
+    Mirrors S7_protocol behavior:
+    - Per-cycle bulk read
+    - Per-cycle single INSERT
+    - Local + Cloud DB routing
+    - Schema-driven table creation
+    - Column types from config
+    """
+
+    def __init__(self, config):
+        print("MODBUS:-", config)
+
+        plc_cfg = config["PLC"]
+
+        self.config = config
+        self.generate_random = bool(config.get("generate_random", False))
+
+        # ---------------- PLC ----------------
+        self.ip = plc_cfg["cred"]["ip"]
+        self.port = plc_cfg["cred"].get("port", 502)
+        self.read_items = plc_cfg["address_access"]["read"]
+
+        # ---------------- RUNTIME ----------------
+        self.data_freq = plc_cfg["data_reading_freq(in secs)"]
+        self.log_folder = plc_cfg["log_path"]
+
+        # ---------------- DATABASE TARGETS ----------------
+        self.db_targets = {}
+
+        db_name = plc_cfg["Database"]["db_name"]
+
+        log_info(f"[INFO] DB Name: {db_name}")
+
+        for name, db in plc_cfg["Database"]["targets"].items():
+            if not db.get("enabled", False):
+                continue
+
+            self.db_targets[name] = {
+                "cred": db["cred"],
+                "database": db_name,          # ✅ FIX
+                "table_name": db["table_name"],
+                "schema": db["schema"]
+            }
+
+
+        if not self.db_targets:
+            raise ValueError("No enabled DB targets for Modbus TCP")
+
+        # ---------------- LOGGING ----------------
+        os.makedirs(self.log_folder, exist_ok=True)
+
+        logging.basicConfig(
+            filename=os.path.join(
+                self.log_folder,
+                f"modbus_tcp_{datetime.now().strftime('%Y-%m-%d')}.log"
+            ),
+            level=logging.INFO,
+            format="%(asctime)s — %(levelname)s — %(message)s"
+        )
+
+        # ---------------- MODBUS CLIENT ----------------
+        self.client = ModbusTcpClient(self.ip, port=self.port)
+
+    # --------------------------------------------------
+    # DB CONNECTION
+    # --------------------------------------------------
+
+    def connect_to_db(self, db_cred, database):
+        return mariadb.connect(
+            host=db_cred["host"],
+            user=db_cred["user"],
+            password=db_cred["password"],
+            database=database,
+            port=db_cred.get("port", 3306),
+            autocommit=False,
+            connect_timeout=5
+        )
+
+
+    # --------------------------------------------------
+    # TABLE MANAGEMENT (IDENTICAL TO S7)
+    # --------------------------------------------------
+    def create_table_if_not_exists(self, cursor, table, schema):
+        cols = [f"`{c}` {t}" for c, t in schema.items()]
+        cursor.execute(
+            f"CREATE TABLE IF NOT EXISTS `{table}` ({', '.join(cols)}) ENGINE=InnoDB;"
+        )
+
+    def add_new_columns_only(self, cursor, table, schema):
+        cursor.execute(f"SHOW COLUMNS FROM `{table}`")
+        existing = {row[0] for row in cursor.fetchall()}
+
+        for col, dtype in schema.items():
+            if col not in existing:
+                cursor.execute(
+                    f"ALTER TABLE `{table}` ADD COLUMN `{col}` {dtype} DEFAULT NULL"
                 )
-                .join("")}
-            </select>
-          </td>
-          <td><input type="checkbox" data-field="read" ${
-            item.read !== false ? "checked" : ""
-          }></td>
-          <td><input type="checkbox" data-field="write" ${
-            item.write ? "checked" : ""
-          }></td>
-          <td><button type="button" class="button remove-siemens-row">-</button></td>
-        </tr>
-      `;
-}
+                logging.info(f"Added column '{col}' to {table}")
 
-function bindRtuSiemensFormEvents(index) {
-  const form = document.getElementById(`siemens-form-${index}`);
-  if (!form) return;
-  const plcConfig = (rtu_plc_configurations[index].PLC ||= {
-    cred: {},
-    address_access: { read: [], write: [] },
-    Database: { table_name: "" },
-  });
-  ensureRtuSiemensDefaults(plcConfig);
+    
+    # --------------------------------------------------
+    # WRITE MODBUS DATA
+    # --------------------------------------------------
 
-  // Inputs: credentials, frequency, read rows, write rows
-  form.addEventListener("input", (e) => {
-    const key = e.target.dataset.credField;
-    if (key) {
-      const numeric = ["baudrate", "stopbits", "slave_id"];
-      (plcConfig.cred ||= {})[key] = numeric.includes(key)
-        ? Number(e.target.value)
-        : e.target.value;
-      return;
-    }
-    if (e.target.dataset.freqField === "data_reading_freq(in secs)") {
-      const val = parseFloat(e.target.value);
-      if (!isNaN(val)) plcConfig["data_reading_freq(in secs)"] = val;
-      return;
-    }
-    // Read row updates
-    const readRow = e.target.closest("tbody.siemens-read-tbody tr");
-    if (readRow) {
-      const rowIndex = parseInt(readRow.dataset.rowIndex, 10);
-      const field = e.target.dataset.field;
-      let value =
-        e.target.type === "checkbox" ? e.target.checked : e.target.value;
-      if (e.target.type === "number" && !isNaN(parseFloat(value)))
-        value = parseFloat(value);
-      plcConfig.address_access.read ||= [];
-      plcConfig.address_access.read[rowIndex] ||= {};
-      plcConfig.address_access.read[rowIndex][field] = value;
-      return;
-    }
-    // Write row updates
-    const writeRow = e.target.closest("tbody.siemens-write-tbody tr");
-    if (writeRow) {
-      const wIndex = parseInt(writeRow.dataset.writeIndex, 10);
-      const wField = e.target.dataset.writeField;
-      let wValue =
-        e.target.type === "checkbox" ? e.target.checked : e.target.value;
-      if (e.target.type === "number" && !isNaN(parseFloat(wValue)))
-        wValue = parseFloat(wValue);
-      plcConfig.address_access.write ||= [];
-      plcConfig.address_access.write[wIndex] ||= {
-        type: "coil",
-        content: "",
-        address: 1,
-        value_to_write: 0,
-      };
-      plcConfig.address_access.write[wIndex][wField] = wValue;
-      return;
-    }
-  });
+    def scale_percent_to_range(self,percent, min_v, max_v):
+        try:
+            percent = float(percent)
+        except (TypeError, ValueError):
+            raise ValueError("Invalid percentage value")
 
-  // Delegated clicks: add/remove read, add/remove write
-  form.addEventListener("click", (e) => {
-    if (e.target.classList.contains("add-siemens-read-row")) {
-      (plcConfig.address_access.read ||= []).push({
-        type: "holding_register",
-        read: true,
-        content: "",
-        address: 40001,
-        length: 1,
-        datatype: "int16",
-        write: false,
-      });
-      renderModBusRTUPanel("PLC");
-      return;
-    }
-    if (e.target.classList.contains("remove-siemens-row")) {
-      const rowIndex = parseInt(e.target.closest("tr").dataset.rowIndex, 10);
-      plcConfig.address_access.read.splice(rowIndex, 1);
-      renderModBusRTUPanel("PLC");
-      return;
-    }
-    if (e.target.classList.contains("add-siemens-write-coil")) {
-      (plcConfig.address_access.write ||= []).push({
-        type: "coil",
-        content: "",
-        address: 1,
-        value_to_write: 0,
-      });
-      renderModBusRTUPanel("PLC");
-      return;
-    }
-    if (e.target.classList.contains("remove-siemens-write-row")) {
-      const wIndex = parseInt(e.target.closest("tr").dataset.writeIndex, 10);
-      plcConfig.address_access.write.splice(wIndex, 1);
-      renderModBusRTUPanel("PLC");
-      return;
-    }
-  });
-}
+        if percent < 0 or percent > 100:
+            raise ValueError("Percentage must be between 0 and 100")
 
-// Allen Bradley RTU
-function renderRtuAllenBradleyForm(plcData, index) {
-  const plcConfig = ensureRtuSiemensDefaults(plcData || {});
-  const c = plcConfig.cred || {};
-  if (!c.driver) c.driver = "logix";
-  if (!Array.isArray(plcConfig.address_of_value))
-    plcConfig.address_of_value = [""];
+        min_v = float(min_v)
+        max_v = float(max_v)
 
-  const isLogix = c.driver === "logix";
-  const readRows = (plcConfig.address_access.read || [])
-    .map((item, rowIndex) => renderRtuSiemensRow(item, rowIndex))
-    .join("");
-  const writeRows = (plcConfig.address_access.write || [])
-    .map(
-      (item, rowIndex) => `
-        <tr data-write-index="${rowIndex}">
-          <td><input type="text" data-write-field="content" value="${
-            item.content || ""
-          }" placeholder="Tag"></td>
-          <td><input type="number" data-write-field="address" value="${
-            item.address ?? 1
-          }" min="0"></td>
-          <td><input type="number" data-write-field="value_to_write" value="${
-            item.value_to_write ?? 0
-          }" step="1" min="0" max="1"></td>
-          <td><button type="button" class="button remove-siemens-write-row">-</button></td>
-        </tr>
-      `
-    )
-    .join("");
+        if min_v == max_v:
+            return min_v
 
-  const addressChain = `
-        <div class="address-value-chain" style="display:${
-          isLogix ? "block" : "none"
-        }; margin-top:16px;">
-          <div class="soft" style="margin-bottom:8px;">Enter the tag path segments for Logix (e.g., Program:MainProgram → MyAOI → PV).</div>
-          <div class="address-chain" style="display:flex; align-items:center; flex-wrap:wrap; gap:8px; padding:12px; border:1px solid #ddd; border-radius:6px; background:#fafafa;">
-            ${(plcConfig.address_of_value || [""])
-              .map(
-                (value, nodeIndex) => `
-              <div style="display:flex; align-items:center; gap:6px;">
-                <input type="text" class="ab-path-node" data-node-index="${nodeIndex}" value="${
-                  value || ""
-                }" placeholder="Segment ${
-                  nodeIndex + 1
-                }" style="padding:6px; border:1px solid #ccc; border-radius:4px; font-family:monospace; width:160px;">
-                <button type="button" class="button ab-remove-node" data-node-index="${nodeIndex}" style="display:${
-                  (plcConfig.address_of_value || []).length > 1
-                    ? "inline-block"
-                    : "none"
-                };">×</button>
-                ${
-                  nodeIndex < (plcConfig.address_of_value || []).length - 1
-                    ? '<span style="margin:0 4px;">→</span>'
-                    : ""
-                }
-              </div>
-            `
-              )
-              .join("")}
-            <button type="button" class="button ab-add-node">＋</button>
-          </div>
-        </div>
-      `;
+        return min_v + (percent / 100.0) * (max_v - min_v)
 
-  return `
-        <form id="ab-form-${index}">
-          <fieldset><legend>RTU Credentials</legend>
-            <label>Serial Port: <input type="text" data-cred-field="port" value="${
-              c.port ||
-              (navigator.platform && navigator.platform.startsWith("Win")
-                ? "COM3"
-                : "/dev/ttyUSB0")
-            }"></label>
-            <label>Baudrate: <input type="number" data-cred-field="baudrate" value="${
-              c.baudrate || 9600
-            }" min="1200" max="115200" step="600"></label>
-            <label>Parity:
-              <select data-cred-field="parity">
-                ${["N", "E", "O"]
-                  .map(
-                    (p) =>
-                      `<option value="${p}" ${
-                        c.parity === p ? "selected" : ""
-                      }>${p}</option>`
-                  )
-                  .join("")}
-              </select>
-            </label>
-            <label>Stop Bits:
-              <select data-cred-field="stopbits">
-                ${[1, 2]
-                  .map(
-                    (s) =>
-                      `<option value="${s}" ${
-                        c.stopbits == s ? "selected" : ""
-                      }>${s}</option>`
-                  )
-                  .join("")}
-              </select>
-            </label>
-            <label>Slave ID: <input type="number" data-cred-field="slave_id" value="${
-              c.slave_id ?? 1
-            }" min="1" max="247"></label>
-            <label>Driver:
-              <select data-cred-field="driver" class="ab-driver-select">
-                <option value="logix" ${
-                  c.driver === "logix" ? "selected" : ""
-                }>Logix</option>
-                <option value="slc" ${
-                  c.driver === "slc" ? "selected" : ""
-                }>SLC</option>
-              </select>
-            </label>
-          </fieldset>
+    def write_register(self, address, value):
+        if not self.client.connect():
+            raise ConnectionError(f"Modbus TCP write connect failed {self.ip}:{self.port}")
 
-          <fieldset><legend>Read Items</legend>
-            <table>
-              <thead>
-                <tr>
-                  <th>Type</th><th>Content</th><th>Address</th><th>length</th><th>Datatype</th><th>Read</th><th>Write</th><th>Remove</th>
-                </tr>
-              </thead>
-              <tbody class="siemens-read-tbody">${readRows}</tbody>
-            </table>
-            <button type="button" class="button add-siemens-read-row">＋ Add Read Item</button>
-          </fieldset>
+        response = self.client.write_register(int(address), int(value))
 
-          <fieldset style="margin-top:12px;"><legend>Write Coils</legend>
-            <table>
-              <thead>
-                <tr><th>Content</th><th>Address</th><th>Value</th><th>Remove</th></tr>
-              </thead>
-            <tbody class="siemens-write-tbody">${writeRows}</tbody>
-            </table>
-            <button type="button" class="button add-siemens-write-coil">＋ Add Write Coil</button>
-          </fieldset>
+        if response.isError():
+            raise RuntimeError(f"Modbus write failed @ {address}: {response}")
 
-          <fieldset><legend>Address of Value</legend>
-            ${addressChain}
-          </fieldset>
-        </form>
-      `;
-}
+        logging.info(f"[MODBUS TCP][WRITE] D{address} = {value}")
 
-function bindRtuAllenBradleyFormEvents(index) {
-  const form = document.getElementById(`ab-form-${index}`);
-  if (!form) return;
-  const plcConfig = (rtu_plc_configurations[index].PLC ||= {
-    cred: {},
-    address_access: { read: [], write: [] },
-    Database: { table_name: "" },
-  });
-  ensureRtuSiemensDefaults(plcConfig);
+    # --------------------------------------------------
+    # READ MODBUS DATA (ONE DICT)
+    # --------------------------------------------------
+    def read_all_data(self):
+        data = {}
 
-  // Inputs: credentials/driver, read rows, write rows, address chain nodes
-  form.addEventListener("input", (e) => {
-    const key = e.target.dataset.credField;
-    if (key) {
-      const numeric = ["baudrate", "stopbits", "slave_id"];
-      (plcConfig.cred ||= {})[key] = numeric.includes(key)
-        ? Number(e.target.value)
-        : e.target.value;
-      if (key === "driver") renderModBusRTUPanel("PLC");
-      return;
-    }
-    // Address chain node edit
-    if (e.target.classList.contains("ab-path-node")) {
-      const nodeIndex = parseInt(e.target.dataset.nodeIndex, 10);
-      if (!Array.isArray(plcConfig.address_of_value))
-        plcConfig.address_of_value = [""];
-      plcConfig.address_of_value[nodeIndex] = e.target.value;
-      return;
-    }
-    // Read row updates
-    const readRow = e.target.closest("tbody.siemens-read-tbody tr");
-    if (readRow) {
-      const rowIndex = parseInt(readRow.dataset.rowIndex, 10);
-      const field = e.target.dataset.field;
-      let value =
-        e.target.type === "checkbox" ? e.target.checked : e.target.value;
-      if (e.target.type === "number" && !isNaN(parseFloat(value)))
-        value = parseFloat(value);
-      plcConfig.address_access.read ||= [];
-      plcConfig.address_access.read[rowIndex] ||= {};
-      plcConfig.address_access.read[rowIndex][field] = value;
-      return;
-    }
-    // Write row updates
-    const writeRow = e.target.closest("tbody.siemens-write-tbody tr");
-    if (writeRow) {
-      const wIndex = parseInt(writeRow.dataset.writeIndex, 10);
-      const wField = e.target.dataset.writeField;
-      let wValue =
-        e.target.type === "checkbox" ? e.target.checked : e.target.value;
-      if (e.target.type === "number" && !isNaN(parseFloat(wValue)))
-        wValue = parseFloat(wValue);
-      plcConfig.address_access.write ||= [];
-      plcConfig.address_access.write[wIndex] ||= {
-        type: "coil",
-        content: "",
-        address: 1,
-        value_to_write: 0,
-      };
-      plcConfig.address_access.write[wIndex][wField] = wValue;
-      return;
-    }
-  });
+        # ---------------- RANDOM MODE ----------------
+        if self.generate_random:
+            for item in self.read_items:
+                if not item.get("read", True):
+                    continue
 
-  // Delegated clicks: add/remove read, add/remove write, add/remove path nodes
-  form.addEventListener("click", (e) => {
-    if (e.target.classList.contains("add-siemens-read-row")) {
-      (plcConfig.address_access.read ||= []).push({
-        type: "holding_register",
-        read: true,
-        content: "",
-        address: 40001,
-        length: 1,
-        datatype: "int16",
-        write: false,
-      });
-      renderModBusRTUPanel("PLC");
-      return;
-    }
-    if (e.target.classList.contains("remove-siemens-row")) {
-      const rowIndex = parseInt(e.target.closest("tr").dataset.rowIndex, 10);
-      plcConfig.address_access.read.splice(rowIndex, 1);
-      renderModBusRTUPanel("PLC");
-      return;
-    }
-    if (e.target.classList.contains("add-siemens-write-coil")) {
-      (plcConfig.address_access.write ||= []).push({
-        type: "coil",
-        content: "",
-        address: 1,
-        value_to_write: 0,
-      });
-      renderModBusRTUPanel("PLC");
-      return;
-    }
-    if (e.target.classList.contains("remove-siemens-write-row")) {
-      const wIndex = parseInt(e.target.closest("tr").dataset.writeIndex, 10);
-      plcConfig.address_access.write.splice(wIndex, 1);
-      renderModBusRTUPanel("PLC");
-      return;
-    }
-    if (e.target.classList.contains("ab-add-node")) {
-      (plcConfig.address_of_value ||= []).push("");
-      renderModBusRTUPanel("PLC");
-      return;
-    }
-    if (e.target.classList.contains("ab-remove-node")) {
-      const nodeIndex = parseInt(e.target.dataset.nodeIndex, 10);
-      if (
-        Array.isArray(plcConfig.address_of_value) &&
-        plcConfig.address_of_value.length > 1
-      ) {
-        plcConfig.address_of_value.splice(nodeIndex, 1);
-        renderModBusRTUPanel("PLC");
-      }
-      return;
-    }
-  });
-}
+                tag = item["tag"]
+                min_v = safe_float(item.get("min"), 0)
+                max_v = safe_float(item.get("max"), 100)
 
-function transmitterInnerHtml() {
-  const list = config.ModbusRTU.transmitters;
-  return `
-        <div class="split-toolbar" style="margin-bottom:8px;">
-          <div class="soft">Manage Modbus RTU transmitters and mapped registers.</div>
-          <div>
-            <button id="tx-add" class="button">＋ Add</button>
-            <button id="tx-save" class="button-primary">Save</button>
-          </div>
-        </div>
-        <div id="tx-list">
-          ${list.map((t, i) => txCard(t, i)).join("")}
-        </div>
-      `;
-}
+                if min_v > max_v:
+                    min_v, max_v = max_v, min_v
 
-function bindTransmitterEvents() {
-  const list = config.ModbusRTU.transmitters;
-  document.getElementById("tx-add")?.addEventListener("click", () => {
-    list.push({
-      type: "RTU",
-      name: "",
-      serialPort: "/dev/ttyUSB0",
-      baudRate: 9600,
-      dataBits: 8,
-      parity: "Even",
-      stopBits: 1,
-      unitId: 1,
-      interval: 5,
-      functionCode: 3, // 03=holding, 04=input
-      registers: [],
-    });
-    renderModBusRTUPanel("Transmitter");
-  });
-  document.getElementById("tx-save")?.addEventListener("click", () => {
-    // Optional validation: unitId 1..247, fc 3 or 4, count >=1
-    saveConfig();
-    alert("Transmitters saved.");
-  });
-  list.forEach((_, i) => bindTxCard(i));
-}
+                value = random.randint(int(min_v), int(max_v))
+                data[tag] = value
 
-function txCard(t, i) {
-  const regs = (t.registers || []).map((r, ri) => regRow(r, i, ri)).join("");
-  return `
-        <div class="card" data-tx="${i}">
-          <div class="split-toolbar">
-            <b>${t.name || "(unnamed)"} <span class="soft">- RTU</span></b>
-            <button class="button tx-remove">Remove</button>
-          </div>
+            return data   # 🔥 EXIT EARLY, NO MODBUS
 
-          <div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:10px;">
-            <label>Name: <input class="tx-name" type="text" value="${
-              t.name || ""
-            }"></label>
-            <label>Serial Port: <input class="tx-serial" type="text" value="${
-              t.serialPort || "/dev/ttyUSB0"
-            }"></label>
-            <label>Baud: <input class="tx-baud" type="number" min="1200" step="1" value="${
-              t.baudRate || 9600
-            }"></label>
-            <label>Data Bits:
-              <select class="tx-dbits">
-                <option value="7" ${
-                  t.dataBits === 7 ? "selected" : ""
-                }>7</option>
-                <option value="8" ${
-                  t.dataBits === 8 ? "selected" : ""
-                }>8</option>
-              </select>
-            </label>
-            <label>Parity:
-              <select class="tx-parity">
-                <option value="None" ${
-                  t.parity === "None" ? "selected" : ""
-                }>None</option>
-                <option value="Even" ${
-                  t.parity === "Even" ? "selected" : ""
-                }>Even</option>
-                <option value="Odd" ${
-                  t.parity === "Odd" ? "selected" : ""
-                }>Odd</option>
-              </select>
-            </label>
-            <label>Stop Bits:
-              <select class="tx-sbits">
-                <option value="1" ${
-                  t.stopBits === 1 ? "selected" : ""
-                }>1</option>
-                <option value="2" ${
-                  t.stopBits === 2 ? "selected" : ""
-                }>2</option>
-              </select>
-            </label>
-            <label>Unit ID: <input class="tx-unit" type="number" min="1" max="247" value="${
-              t.unitId || 1
-            }"></label>
-            <label>Interval (s): <input class="tx-int" type="number" min="1" value="${
-              t.interval || 5
-            }"></label>
-            <label>Function:
-              <select class="tx-fc">
-                <option value="3" ${
-                  t.functionCode === 3 ? "selected" : ""
-                }>03 - Read Holding</option>
-                <option value="4" ${
-                  t.functionCode === 4 ? "selected" : ""
-                }>04 - Read Input</option>
-              </select>
-            </label>
-          </div>
+        # ---------------- REAL DEVICE MODE ----------------
+        if not self.client.connect():
+            raise ConnectionError(
+                f"Modbus TCP connection failed {self.ip}:{self.port}"
+            )
 
-          <div style="margin-top:12px;">
-            <div class="split-toolbar">
-              <span class="soft">Registers</span>
-              <button class="button tx-reg-add">＋ Add Register</button>
-            </div>
-            <div class="tx-reg-list">
-              ${
-                regs ||
-                `<div class="soft" style="margin-top:6px;">No registers yet.</div>`
-              }
-            </div>
-          </div>
-        </div>
-      `;
-}
+        # ---------------- WRITE FIRST ----------------
+        for item in self.read_items:
+            if not item.get("write", False):
+                continue
 
-function regRow(r, ti, ri) {
-  return `
-        <div class="row" data-tx="${ti}" data-reg="${ri}" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; align-items:center;">
-          <label style="min-width:180px;">Name: <input class="reg-name" type="text" value="${
-            r.name || ""
-          }"></label>
-          <label>Address: <input class="reg-addr" type="number" min="0" value="${
-            Number.isFinite(r.address) ? r.address : 0
-          }"></label>
-          <label>Count: <input class="reg-count" type="number" min="1" value="${
-            r.count || 1
-          }"></label>
-          <label>Datatype:
-            <select class="reg-type">
-              <option value="int16" ${
-                r.datatype === "int16" ? "selected" : ""
-              }>int16</option>
-              <option value="uint16" ${
-                r.datatype === "uint16" ? "selected" : ""
-              }>uint16</option>
-              <option value="int32" ${
-                r.datatype === "int32" ? "selected" : ""
-              }>int32</option>
-              <option value="uint32" ${
-                r.datatype === "uint32" ? "selected" : ""
-              }>uint32</option>
-              <option value="float32" ${
-                r.datatype === "float32" ? "selected" : ""
-              }>float32</option>
-            </select>
-          </label>
-          <label>Scaling: <input class="reg-scale" type="number" step="any" value="${
-            r.scaling ?? 1.0
-          }"></label>
-          <label>Unit: <input class="reg-unit" type="text" value="${
-            r.unit || ""
-          }"></label>
-          <button class="button tx-reg-remove">Remove</button>
-        </div>
-      `;
-}
+            addr = item["address"]
+            percent = item.get("value")
 
-function bindTxCard(i) {
-  const card = document.querySelector(`.card[data-tx="${i}"]`);
-  if (!card) return;
+            min_v = safe_float(item.get("min"), 0)
+            max_v = safe_float(item.get("max"), 100)
 
-  // Remove transmitter
-  card.querySelector(".tx-remove").onclick = () => {
-    if (!confirm("Remove this transmitter?")) return;
-    config.ModbusRTU.transmitters.splice(i, 1);
-    renderModBusRTUPanel("Transmitter");
-  };
+            if percent in ("", None):
+                logging.warning(f"Skipping write @ {addr}: empty value")
+                continue
 
-  // Add register
-  card.querySelector(".tx-reg-add").onclick = () => {
-    const t = config.ModbusRTU.transmitters[i];
-    t.registers = t.registers || [];
-    // sensible default for float32 holding reg at address 0
-    t.registers.push({
-      name: "",
-      address: 0,
-      count: 2,
-      datatype: "float32",
-      scaling: 1.0,
-      unit: "",
-    });
-    renderModBusRTUPanel("Transmitter");
-  };
+            try:
+                scaled_value = self.scale_percent_to_range(percent, min_v, max_v)
+            except ValueError as e:
+                logging.error(f"Invalid write value @ {addr}: {e}")
+                continue
 
-  // Input handlers
-  card.addEventListener("input", (e) => {
-    const t = config.ModbusRTU.transmitters[i];
-    if (e.target.classList.contains("tx-name")) t.name = e.target.value;
-    if (e.target.classList.contains("tx-serial")) t.serialPort = e.target.value;
-    if (e.target.classList.contains("tx-baud")) {
-      const v = parseInt(e.target.value, 10);
-      t.baudRate = Number.isFinite(v)
-        ? Math.max(1200, Math.min(115200, v))
-        : 9600;
-    }
-    if (e.target.classList.contains("tx-dbits"))
-      t.dataBits = parseInt(e.target.value, 10) || 8;
-    if (e.target.classList.contains("tx-parity")) t.parity = e.target.value;
-    if (e.target.classList.contains("tx-sbits"))
-      t.stopBits = parseInt(e.target.value, 10) || 1;
-    if (e.target.classList.contains("tx-unit")) {
-      const v = parseInt(e.target.value, 10);
-      t.unitId = Number.isFinite(v) ? Math.max(1, Math.min(247, v)) : 1;
-    }
-    if (e.target.classList.contains("tx-int")) {
-      const v = parseFloat(e.target.value);
-      t.interval = Number.isFinite(v) ? Math.max(1, v) : 5;
-    }
-    if (e.target.classList.contains("tx-fc")) {
-      const v = parseInt(e.target.value, 10);
-      t.functionCode = v === 3 || v === 4 ? v : 3; // constrain to 03/04
-    }
-    t.type = "RTU";
-  });
+            logging.info(
+                f"[MODBUS TCP][WRITE] Addr={addr} "
+                f"Percent={percent}% → Scaled={scaled_value}"
+            )
 
-  // Register row handlers (delegate)
-  card.addEventListener("click", (e) => {
-    if (e.target.classList.contains("tx-reg-remove")) {
-      const row = e.target.closest(".row");
-      if (!row) return;
-      const ri = parseInt(row.getAttribute("data-reg"), 10);
-      const t = config.ModbusRTU.transmitters[i];
-      t.registers.splice(ri, 1);
-      renderModBusRTUPanel("Transmitter");
-    }
-  });
+            self.write_register(addr, int(round(scaled_value)))
 
-  card.addEventListener("input", (e) => {
-    const row = e.target.closest(".row");
-    if (!row) return;
-    if (!e.target.classList) return;
-    const ri = parseInt(row.getAttribute("data-reg"), 10);
-    const t = config.ModbusRTU.transmitters[i];
-    const r = t.registers?.[ri];
-    if (!r) return;
+        # ---------------- THEN READ ----------------
+        for item in self.read_items:
+            if not item.get("read", True):
+                continue
 
-    if (e.target.classList.contains("reg-name")) r.name = e.target.value;
-    if (e.target.classList.contains("reg-addr")) {
-      const v = parseInt(e.target.value, 10);
-      r.address = Number.isFinite(v) ? Math.max(0, v) : 0; // zero-based offset
-    }
-    if (e.target.classList.contains("reg-count")) {
-      const v = parseInt(e.target.value, 10);
-      r.count = Number.isFinite(v) ? Math.max(1, v) : 1;
-    }
-    if (e.target.classList.contains("reg-type")) {
-      r.datatype = e.target.value; // int16|uint16|int32|uint32|float32
-      // optional auto-count for common types
-      if (
-        r.datatype === "float32" ||
-        r.datatype === "int32" ||
-        r.datatype === "uint32"
-      )
-        r.count = 2;
-      if (r.datatype === "int16" || r.datatype === "uint16") r.count = 1;
-    }
-    if (e.target.classList.contains("reg-scale")) {
-      const v = parseFloat(e.target.value);
-      r.scaling = Number.isFinite(v) ? v : 1.0;
-    }
-    if (e.target.classList.contains("reg-unit")) r.unit = e.target.value;
-  });
-}
+            res = self.client.read_holding_registers(
+                address=int(item["address"]),
+                count=int(item.get("length", 1))
+            )
 
-// Bootstrapping example: call router to show default tab after load
-document.addEventListener("DOMContentLoaded", () => {
-  renderModBusRTUPanel("EnergyMeter");
-});
+            if res.isError():
+                raise RuntimeError(
+                    f"Modbus read failed @ {item['address']}"
+                )
 
-function renderModbusTcpPanel() {
-  if (!config.plc_configurations) {
-    config.plc_configurations = [];
-  }
-  const plcConfigs = config.plc_configurations;
+            data[item["tag"]] = res.registers[0]
 
-  const mainPanelHtml = `
-        <div class="panel-header">Modbus TCP Configuration</div>
-        <div id="plc-entries-container">
-          ${plcConfigs.map((plc, index) => renderPlcEntry(plc, index)).join("")}
-        </div>
-        <button type="button" id="add-plc-entry" class="button-primary" style="margin-top: 16px;">+ Add PLC Configuration</button>
-        <button type="button" id="save-all-configs" class="button-primary" style="margin-left: 16px;">Save All Configurations</button>
-      `;
+        self.client.close()
+        return data
 
-  document.getElementById("main-panel").innerHTML = mainPanelHtml;
+    # --------------------------------------------------
+    # INSERT DATA (ONE ROW)
+    # --------------------------------------------------
+    def insert_data(self, cursor, table, schema, data):
+        cols = []
+        vals = []
 
-  // --- Main Event Listeners ---
-  document.getElementById("add-plc-entry").addEventListener("click", () => {
-    plcConfigs.push({ plcType: "Other", PLC: {}, isExpanded: true }); // New entries are expanded by default
-    renderModbusTcpPanel();
-  });
+        for col in schema:
+            if col in ("id", "ts"):
+                continue
+            if col in data:
+                cols.append(f"`{col}`")
+                vals.append(data[col])
 
-  document.getElementById("save-all-configs").addEventListener("click", () => {
-    saveConfig();
-    alert("All PLC configurations have been saved!");
-  });
+        if not cols:
+            return
 
-  plcConfigs.forEach((plc, index) => bindEventsForPlcEntry(index));
-}
+        placeholders = ", ".join(["%s"] * len(cols))
+        cols_sql = ", ".join(cols)
 
-// --- Functions for Rendering and Binding a Single PLC Entry ---
+        cursor.execute(
+            f"INSERT INTO `{table}` ({cols_sql}) VALUES ({placeholders})",
+            vals
+        )
 
-function renderPlcEntry(plc, index) {
-  const ipDisplay =
-    plc.PLC && plc.PLC.cred && plc.PLC.cred.ip ? plc.PLC.cred.ip : "Not Set";
-  const isExpanded = plc.isExpanded !== false; // Default to expanded if not set
-  const isOther = plc.plcType === "Other";
-  const isAllenBradley = plc.plcType === "Allen Bradley";
+    # --------------------------------------------------
+    # MAIN LOOP
+    # --------------------------------------------------
+    def plc_to_db(self):
 
-  return `
-        <div class="plc-entry" data-index="${index}" style="border: 1px solid #ccc; margin-bottom: 12px; border-radius: 4px;">
-          <div class="plc-header" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; padding: 8px; background: #f0f0f0;">
-            <strong>${plc.plcType} - ${ipDisplay}</strong>
-            <button type="button" class="toggle-plc-details">${
-              isExpanded ? "−" : "+"
-            }</button>
-          </div>
-          <div class="plc-details" style="padding: 16px; ${
-            isExpanded ? "display: block;" : "display: none;"
-          }">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 8px;">
-              
-              <label>PLC Type:
-                <select class="plc-type-select">
-                  <option value="Other" ${
-                    plc.plcType === "Other" ? "selected" : ""
-                  }>Other</option>
-                  <option value="Siemens" ${
-                    plc.plcType === "Siemens" ? "selected" : ""
-                  }>Siemens</option>
-                  <option value="Allen Bradley" ${
-                    plc.plcType === "Allen Bradley" ? "selected" : ""
-                  }>Allen Bradley</option>
-                </select>
-              </label>
+        while not CONFIG_RELOAD_EVENT.is_set():
+            start_cycle = time.time()
 
-              <label class="plc-driver-label" style="${
-                isAllenBradley ? "" : "display:none;"
-              }">
-                Driver Type:
-                <select class="plc-driver-select">
-                  <option value="logix" ${
-                    plc.PLC?.cred?.driver === "logix" ? "selected" : ""
-                  }>Logix</option>
-                  <option value="slc" ${
-                    plc.PLC?.cred?.driver === "slc" ? "selected" : ""
-                  }>SLC</option>
-                </select>
-              </label>
+            try:
+                data = self.read_all_data()
+                logging.info(f"Modbus data: {data}")
 
-              <label class="plc-name-label" style="${
-                isOther ? "display:none;" : ""
-              }">
-                Table Name:
-                <input type="text" class="plc-name-input" value="${
-                  plc.PLC?.Database?.table_name || ""
-                }" />
-              </label>
+                for db in self.db_targets.values():
+                    print(f"Connecting to {db}")
+                    conn = self.connect_to_db(
+                        db["cred"],
+                        db["database"]
+                    )
+                    cursor = conn.cursor()
 
-              <button type="button" class="remove-plc-entry">Remove</button>
-            </div>
+                    self.create_table_if_not_exists(
+                        cursor,
+                        db["table_name"],
+                        db["schema"]
+                    )
 
-            <div class="plc-form-container">
-              ${renderFormForType(plc.plcType, plc.PLC, index)}
-            </div>
-          </div>
-        </div>
-      `;
-}
+                    self.add_new_columns_only(
+                        cursor,
+                        db["table_name"],
+                        db["schema"]
+                    )
 
-function renderFormForType(type, plcData, index) {
-  if (type === "Siemens") return renderSiemensForm(plcData, index);
-  if (type === "Allen Bradley") return renderAllenBradleyForm(plcData, index);
-  return "<div><em>Please select a PLC type to configure its settings.</em></div>";
-}
+                    self.insert_data(
+                        cursor,
+                        db["table_name"],
+                        db["schema"],
+                        data
+                    )
 
-function bindEventsForPlcEntry(index) {
-  const entryElement = document.querySelector(
-    `.plc-entry[data-index='${index}']`
-  );
-  if (!entryElement) return;
+                    conn.commit()
+                    conn.close()
 
-  entryElement.querySelector(".plc-header").addEventListener("click", (e) => {
-    if (e.target.classList.contains("toggle-plc-details")) {
-      // Toggle expanded state
-      config.plc_configurations[index].isExpanded =
-        !config.plc_configurations[index].isExpanded;
-      renderModbusTcpPanel();
-    }
-  });
+                # ---- Alarms (same philosophy as S7) ----
+                process_modbus_tcp_alarms(
+                    plc_type="Delta",
+                    plc_key=next(iter(self.db_targets.values()))["table_name"],
+                    data=data,
+                )
 
-  entryElement
-    .querySelector(".plc-type-select")
-    .addEventListener("change", (e) => {
-      config.plc_configurations[index].plcType = e.target.value;
-      config.plc_configurations[index].PLC = {};
-      renderModbusTcpPanel();
-    });
+            except Exception as e:
+                logging.exception(f"Modbus TCP loop error: {e}")
+                try:
+                    self.client.close()
+                except:
+                    pass
 
-  // Driver type selection for Allen Bradley
-  const driverSelect = entryElement.querySelector(".plc-driver-select");
-  if (driverSelect) {
-    driverSelect.addEventListener("change", (e) => {
-      const plcConfig = config.plc_configurations[index].PLC;
-      if (!plcConfig.cred) plcConfig.cred = {};
-      plcConfig.cred.driver = e.target.value;
-    });
-  }
+            finally:
+                elapsed = time.time() - start_cycle
+                time.sleep(max(0, self.data_freq - elapsed))
 
-  const nameInput = entryElement.querySelector(".plc-name-input");
-  if (nameInput) {
-    nameInput.addEventListener("input", (e) => {
-      const plcConfig = config.plc_configurations[index].PLC;
-      if (!plcConfig.Database) plcConfig.Database = {};
-      plcConfig.Database.table_name = e.target.value;
-    });
-  }
 
-  entryElement
-    .querySelector(".remove-plc-entry")
-    .addEventListener("click", () => {
-      config.plc_configurations.splice(index, 1);
-      renderModbusTcpPanel();
-    });
+# Versioning and Synchronization
+CONFIG_VERSION = 0
+THREAD_LOCK = threading.Lock()
+HW_LOCK = threading.Lock()  # Protects I2C and Serial Bus
+GPIO_LOCK   = threading.Lock()
+I2C_LOCK    = threading.Lock()
+RS485_LOCK  = threading.Lock()
+DIGITAL_QUEUE = queue.Queue(maxsize=1000)
+MODBUS_DB_QUEUE = queue.Queue(maxsize=1000)
+STOP_EVENT = threading.Event()
+MANAGED_THREADS = []
 
-  const plcType = config.plc_configurations[index].plcType;
-  if (plcType === "Siemens") bindSiemensFormEvents(index);
-  else if (plcType === "Allen Bradley") bindAllenBradleyFormEvents(index);
-}
-// --- Siemens-Specific Functions ---
 
-// --- shared row renderer ---
-function renderSiemensRow(item, rowIndex) {
-  return `
-            <tr data-row-index="${rowIndex}">
-                <td><input type="text" data-field="content" value="${
-                  item.content || ""
-                }" placeholder="Tag Name"></td>
-                <td>
-                    <select data-field="storage">
-                        ${["DB", "I", "Q", "M"]
-                          .map(
-                            (m) =>
-                              `<option value="${m}" ${
-                                item.storage === m ? "selected" : ""
-                              }>${m}</option>`
-                          )
-                          .join("")}
-                    </select>
-                </td>
-                <td><input type="number" data-field="DB_no" value="${
-                  item.DB_no || ""
-                }" placeholder="DB No."></td>
-                <td><input type="number" data-field="address" value="${
-                  item.address || ""
-                }" placeholder="Address"></td>
-                <td>
-                    <select class="siemens-read-type" data-field="type">
-                        ${["int", "real", "dint", "bool"]
-                          .map(
-                            (t) =>
-                              `<option value="${t}" ${
-                                item.type === t ? "selected" : ""
-                              }>${t.toUpperCase()}</option>`
-                          )
-                          .join("")}
-                    </select>
-                </td>
-                <td><input type="number" data-field="size" value="${
-                  item.size || ""
-                }" readonly></td>
-                <td><input type="checkbox" data-field="read" ${
-                  item.read !== false ? "checked" : ""
-                }></td>
-                <td><input type="checkbox" data-field="write" ${
-                  item.write ? "checked" : ""
-                }></td>
-                <td class="value-cell" style="${
-                  item.write ? "" : "display:none;"
-                }">
-                    <input type="number" data-field="value_to_write" value="${
-                      item.value_to_write || 0
-                    }" style="width:70px;">
-                </td>
-                <td><button type="button" class="remove-siemens-row">-</button></td>
-            </tr>
-        `;
-}
 
-function renderSiemensForm(plcData, index) {
-  const plcConfig = plcData || {};
-  if (!plcConfig.cred) plcConfig.cred = { ip: "192.168.0.1", slot: 2, rack: 0 };
-  if (!plcConfig.Database) plcConfig.Database = { table_name: "" };
-  if (!plcConfig.address_access) plcConfig.address_access = {};
-  if (!plcConfig.address_access.read) plcConfig.address_access.read = [];
-  if (
-    !plcConfig.address_access.write ||
-    !plcConfig.address_access.write.length
-  ) {
-    plcConfig.address_access.write = [
-      { content: "", address: "", value_to_write: 0 },
-    ];
-  }
+# Setup comprehensive logging with daily rotation
+def setup_logging():
+    """Initialize logging with daily rotation and multiple handlers"""
+    today = datetime.now().strftime("%Y-%m-%d")
+    log_dir = Path(f"/home/gateway/logs/{today}")
+    log_dir.mkdir(exist_ok=True)
 
-  return `
-            <form id="siemens-form-${index}">
-                <fieldset><legend>Credentials</legend>
-                    <label>IP: <input type="text" data-cred-field="ip" value="${
-                      plcConfig.cred.ip
-                    }"></label>
-                    <label>Rack: <input type="number" data-cred-field="rack" value="${
-                      plcConfig.cred.rack
-                    }"></label>
-                    <label>Slot: <input type="number" data-cred-field="slot" value="${
-                      plcConfig.cred.slot
-                    }"></label>
-                </fieldset>
-                <fieldset><legend>Read/Write Operations</legend>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Content</th><th>Storage</th><th>DB No.</th><th>Address</th>
-                                <th>Type</th><th>Size</th><th>Read</th><th>Write</th>
-                                <th class="value-header" style="display:none;">Value to Write</th>
-                                <th>Remove</th>
-                            </tr>
-                        </thead>
-                        <tbody class="siemens-read-tbody">
-                            ${plcConfig.address_access.read
-                              .map(renderSiemensRow)
-                              .join("")}
-                        </tbody>
-                    </table>
-                    <button type="button" class="add-siemens-read-row">+ Add Item</button>
-                </fieldset>
-                <label>
-                    Data Reading Frequency (secs): 
-                    <input type="number" data-freq-field="data_reading_freq(in secs)" 
-                          value="${
-                            plcConfig["data_reading_freq(in secs)"] || 180
-                          }" step="0.1">
-                </label>
-            </form>
-        `;
-}
+    # Main logger
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
 
-function bindSiemensFormEvents(index) {
-  const form = document.getElementById(`siemens-form-${index}`);
-  if (!form) return;
-  const plcConfig = config.plc_configurations[index].PLC;
-
-  const tbody = form.querySelector(".siemens-read-tbody");
-  const header = form.querySelector(".value-header");
-
-  const updateHeaderVisibility = () => {
-    const anyWrite = plcConfig.address_access.read.some((r) => r.write);
-    header.style.display = anyWrite ? "" : "none";
-  };
-
-  // --- Read/Write rows listener ---
-  tbody.addEventListener("input", (e) => {
-    const row = e.target.closest("tr");
-    if (!row) return;
-    const rowIndex = parseInt(row.dataset.rowIndex, 10);
-    const field = e.target.dataset.field;
-    if (!field) return;
-
-    let value =
-      e.target.type === "checkbox" ? e.target.checked : e.target.value;
-    if (e.target.type === "number" && !isNaN(parseFloat(value)))
-      value = parseFloat(value);
-
-    const readItem = plcConfig.address_access.read[rowIndex];
-
-    if (field !== "value_to_write") readItem[field] = value;
-
-    if (field === "write") {
-      const valCell = row.querySelector(".value-cell");
-      if (valCell) valCell.style.display = value ? "" : "none";
-
-      if (value) {
-        let existing = plcConfig.address_access.write.find(
-          (w) => w.content === readItem.content
-        );
-        if (!existing) {
-          let empty = plcConfig.address_access.write.find(
-            (w) => w.content === ""
-          );
-          if (empty) {
-            empty.content = readItem.content || "";
-            empty.address = readItem.address || "";
-            empty.value_to_write = 0;
-          } else {
-            plcConfig.address_access.write.push({
-              content: readItem.content || "",
-              address: readItem.address || "",
-              value_to_write: 0,
-            });
-          }
+    # Console handler with colors
+    class ColoredFormatter(logging.Formatter):
+        COLORS = {
+            "DEBUG": "\033[36m",
+            "INFO": "\033[32m",
+            "WARNING": "\033[33m",
+            "ERROR": "\033[31m",
+            "CRITICAL": "\033[35m",
+            "ALARM": "\033[91m",
         }
-      } else {
-        plcConfig.address_access.write = plcConfig.address_access.write.filter(
-          (w) => w.content !== readItem.content
-        );
-        if (!plcConfig.address_access.write.length) {
-          plcConfig.address_access.write.push({
-            content: "",
-            address: "",
-            value_to_write: 0,
-          });
-        }
-      }
-      updateHeaderVisibility();
-    }
+        RESET = "\033[0m"
 
-    if (field === "value_to_write") {
-      let writeItem = plcConfig.address_access.write.find(
-        (w) => w.content === readItem.content
-      );
-      if (writeItem) writeItem.value_to_write = value;
-    }
-  });
+        def format(self, record):
+            if hasattr(record, "levelname"):
+                color = self.COLORS.get(record.levelname, "")
+                record.levelname = f"{color}[{record.levelname}]{self.RESET}"
+            return super().format(record)
 
-  // --- Add row ---
-  form.querySelector(".add-siemens-read-row").addEventListener("click", () => {
-    plcConfig.address_access.read.push({
-      content: "",
-      storage: "DB",
-      DB_no: "",
-      address: "",
-      type: "int",
-      size: 2,
-      read: true,
-      write: false,
-      value_to_write: 0,
-    });
-    tbody.innerHTML = plcConfig.address_access.read
-      .map(renderSiemensRow)
-      .join("");
-    updateHeaderVisibility();
-  });
-
-  // --- Remove row ---
-  tbody.addEventListener("click", (e) => {
-    if (!e.target.classList.contains("remove-siemens-row")) return;
-    const row = e.target.closest("tr");
-    const rowIndex = parseInt(row.dataset.rowIndex, 10);
-    plcConfig.address_access.read.splice(rowIndex, 1);
-    tbody.innerHTML = plcConfig.address_access.read
-      .map(renderSiemensRow)
-      .join("");
-    updateHeaderVisibility();
-  });
-
-  // --- Frequency input listener ---
-  const freqInput = form.querySelector(
-    '[data-freq-field="data_reading_freq(in secs)"]'
-  );
-  if (freqInput) {
-    freqInput.addEventListener("input", (e) => {
-      const val = parseFloat(e.target.value);
-      if (!isNaN(val)) plcConfig["data_reading_freq(in secs)"] = val;
-    });
-  }
-
-  updateHeaderVisibility();
-}
-
-// --- Allen Bradley-Specific Functions ---
-
-function renderAllenBradleyForm(plcData, index) {
-  const plcConfig = plcData || {};
-  if (!plcConfig.cred)
-    plcConfig.cred = {
-      driver: "logix",
-      ip: "192.168.1.200",
-      slot: 1,
-      port: 44818,
-    };
-  if (!plcConfig.address_access || !plcConfig.address_access.read)
-    plcConfig.address_access = { read: [] };
-  if (!plcConfig.address_of_value) plcConfig.address_of_value = [""];
-
-  const isSlc = plcConfig.cred.driver === "slc";
-
-  const renderReadRow = (item, rowIndex) => `
-            <tr data-row-index="${rowIndex}">
-                <td><input type="text" data-field="content" value="${
-                  item.content || ""
-                }" placeholder="Tag Name"></td>
-                <td><input type="text" data-field="address" value="${
-                  item.address || ""
-                }" placeholder="PLC Tag"></td>
-                <td><input type="checkbox" data-field="read" ${
-                  item.read !== false ? "checked" : ""
-                }></td>
-                <td><input type="checkbox" data-field="write" ${
-                  item.write ? "checked" : ""
-                }></td>
-                <td><button type="button" class="remove-ab-row">-</button></td>
-            </tr>
-        `;
-
-  const renderAddressValueChain = (chain) => `
-            <div class="address-chain" style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 16px; border: 2px solid #e0e0e0; border-radius: 8px; background: #f9f9f9;">
-                ${chain
-                  .map(
-                    (value, nodeIndex) => `
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
-                            <input type="text" 
-                                  data-node-index="${nodeIndex}" 
-                                  value="${value || ""}" 
-                                  placeholder="Address ${nodeIndex + 1}" 
-                                  style="padding: 8px; border: 2px solid #ddd; border-radius: 4px; font-family: monospace; width: 120px;">
-                            <button type="button" 
-                                    class="remove-node" 
-                                    data-node-index="${nodeIndex}"
-                                    style="background: #f44336; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 12px; display: ${
-                                      chain.length > 1 ? "block" : "none"
-                                    };">×</button>
-                        </div>
-                        ${
-                          nodeIndex < chain.length - 1
-                            ? '<div style="color: #4CAF50; font-weight: bold; font-size: 18px; margin: 0 4px;">→</div>'
-                            : ""
-                        }
-                    </div>
-                `
-                  )
-                  .join("")}
-                <button type="button" class="add-node" 
-                        style="background: #4CAF50; color: white; border: none; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; font-size: 18px; margin-left: 8px;">+</button>
-            </div>
-        `;
-
-  return `
-            <form id="ab-form-${index}">
-                <fieldset><legend>Credentials</legend>
-                    <label>IP: <input type="text" data-cred-field="ip" value="${
-                      plcConfig.cred.ip
-                    }"></label>
-                    <label>Slot: <input type="number" data-cred-field="slot" value="${
-                      plcConfig.cred.slot
-                    }"></label>
-                    <label>Port: <input type="number" data-cred-field="port" value="${
-                      plcConfig.cred.port
-                    }"></label>
-                </fieldset>
-                
-                <fieldset><legend>Read/Write Operations</legend>
-                    <table>
-                        <thead><tr><th>Content</th><th>Address</th><th>Read</th><th>Write</th><th>Remove</th></tr></thead>
-                        <tbody class="ab-read-tbody">${plcConfig.address_access.read
-                          .map(renderReadRow)
-                          .join("")}</tbody>
-                    </table>
-                    <button type="button" class="add-ab-read-row">+ Add Item</button>
-                </fieldset>
-
-                <fieldset id="address-of-value-section-${index}" style="margin-top: 20px; ${
-    isSlc ? "display: none;" : ""
-  }"><legend>Address of Value</legend>
-                    <div style="margin-bottom: 12px; padding: 8px; background: #e3f2fd; border-radius: 4px; font-size: 14px; color: #1565c0;">
-                        <strong>Address Chain:</strong> Sequential chain of address values. Use + to add nodes, × to remove specific nodes.
-                    </div>
-                    <div class="address-value-chain">
-                        ${renderAddressValueChain(plcConfig.address_of_value)}
-                    </div>
-                </fieldset>
-            </form>
-        `;
-}
-
-function bindEventsForPlcEntry(index) {
-  const entryElement = document.querySelector(
-    `.plc-entry[data-index='${index}']`
-  );
-  if (!entryElement) return;
-
-  entryElement.querySelector(".plc-header").addEventListener("click", (e) => {
-    if (e.target.classList.contains("toggle-plc-details")) {
-      // Toggle expanded state
-      config.plc_configurations[index].isExpanded =
-        !config.plc_configurations[index].isExpanded;
-      renderModbusTcpPanel();
-    }
-  });
-
-  entryElement
-    .querySelector(".plc-type-select")
-    .addEventListener("change", (e) => {
-      config.plc_configurations[index].plcType = e.target.value;
-      config.plc_configurations[index].PLC = {};
-      renderModbusTcpPanel();
-    });
-
-  // Driver type selection for Allen Bradley - with conditional visibility
-  const driverSelect = entryElement.querySelector(".plc-driver-select");
-  if (driverSelect) {
-    driverSelect.addEventListener("change", (e) => {
-      const plcConfig = config.plc_configurations[index].PLC;
-      if (!plcConfig.cred) plcConfig.cred = {};
-      plcConfig.cred.driver = e.target.value;
-
-      // Toggle Address of Value section visibility based on driver type
-      const addressSection = document.getElementById(
-        `address-of-value-section-${index}`
-      );
-      if (addressSection) {
-        if (e.target.value === "slc") {
-          addressSection.style.display = "none";
-        } else {
-          addressSection.style.display = "block";
-        }
-      }
-    });
-  }
-
-  const nameInput = entryElement.querySelector(".plc-name-input");
-  if (nameInput) {
-    nameInput.addEventListener("input", (e) => {
-      const plcConfig = config.plc_configurations[index].PLC;
-      if (!plcConfig.Database) plcConfig.Database = {};
-      plcConfig.Database.table_name = e.target.value;
-    });
-  }
-
-  entryElement
-    .querySelector(".remove-plc-entry")
-    .addEventListener("click", () => {
-      config.plc_configurations.splice(index, 1);
-      renderModbusTcpPanel();
-    });
-  console.log(config.plc_configurations);
-
-  const plcType = config.plc_configurations[index].plcType;
-  if (plcType === "Siemens") bindSiemensFormEvents(index);
-  else if (plcType === "Allen Bradley") bindAllenBradleyFormEvents(index);
-}
-
-function bindAllenBradleyFormEvents(index) {
-  const form = document.getElementById(`ab-form-${index}`);
-  if (!form) return;
-
-  form.addEventListener("input", (e) => {
-    const plcConfig = config.plc_configurations[index].PLC;
-
-    if (e.target.dataset.credField) {
-      plcConfig.cred[e.target.dataset.credField] = e.target.value;
-    } else if (e.target.dataset.nodeIndex !== undefined) {
-      // Handle Address of Value chain inputs
-      const nodeIndex = parseInt(e.target.dataset.nodeIndex, 10);
-      const value = e.target.value;
-
-      if (!plcConfig.address_of_value) {
-        plcConfig.address_of_value = [];
-      }
-      plcConfig.address_of_value[nodeIndex] = value;
-    } else {
-      // Handle read/write table inputs
-      const row = e.target.closest("tr");
-      if (row) {
-        const rowIndex = parseInt(row.dataset.rowIndex, 10);
-        const field = e.target.dataset.field;
-        const value =
-          e.target.type === "checkbox" ? e.target.checked : e.target.value;
-        plcConfig.address_access.read[rowIndex][field] = value;
-      }
-    }
-  });
-
-  form.querySelector(".add-ab-read-row").addEventListener("click", () => {
-    const plcConfig = config.plc_configurations[index].PLC;
-    if (!plcConfig.address_access.read) plcConfig.address_access.read = [];
-    plcConfig.address_access.read.push({ read: true });
-    renderModbusTcpPanel();
-  });
-
-  form.querySelector(".ab-read-tbody").addEventListener("click", (e) => {
-    if (e.target.classList.contains("remove-ab-row")) {
-      const rowIndex = parseInt(e.target.closest("tr").dataset.rowIndex, 10);
-      config.plc_configurations[index].PLC.address_access.read.splice(
-        rowIndex,
-        1
-      );
-      renderModbusTcpPanel();
-    }
-  });
-
-  // Handle address chain events - only if the section exists and is visible
-  const addressChainContainer = form.querySelector(".address-value-chain");
-  if (addressChainContainer) {
-    addressChainContainer.addEventListener("click", (e) => {
-      const plcConfig = config.plc_configurations[index].PLC;
-
-      if (e.target.classList.contains("add-node")) {
-        // Add new node to the chain
-        if (!plcConfig.address_of_value) plcConfig.address_of_value = [];
-        plcConfig.address_of_value.push("");
-        renderModbusTcpPanel();
-      } else if (e.target.classList.contains("remove-node")) {
-        // Remove specific node from the chain
-        const nodeIndex = parseInt(e.target.dataset.nodeIndex, 10);
-        if (plcConfig.address_of_value.length > 1) {
-          // Keep at least one node
-          plcConfig.address_of_value.splice(nodeIndex, 1);
-          renderModbusTcpPanel();
-        }
-      }
-    });
-  }
-}
-
-// ===================== Minimal palette =====================
-const UI_ACCENT = "#2563eb";
-const UI_TEXT = "#111827";
-const UI_MUTED = "#6b7280";
-const UI_BORDER = "#e5e7eb";
-const UI_TAB_ACTIVE = "#4338ca";
-const UI_BG_MILD = "#f9fafb";
-const UI_TAB_ACTIVE_BG = "#eef2ff";
-
-function tabBtnStyle(active) {
-  const base = `border:1px solid ${UI_BORDER}; background:#fff; color:${UI_TEXT}; padding:6px 10px; margin:6px 8px 0 0; border-radius:8px; cursor:pointer; font-size:13px;`;
-  const act = `border-color:${UI_TAB_ACTIVE}; color:${UI_TAB_ACTIVE}; background:${UI_TAB_ACTIVE_BG};`;
-  return base + (active ? act : "");
-}
-function btnPrimaryStyle() {
-  return `background:${UI_ACCENT}; color:#fff; border:1px solid ${UI_ACCENT}; padding:6px 12px; border-radius:8px; font-size:13px; cursor:pointer;`;
-}
-function btnDarkStyle() {
-  return `background:${UI_TEXT}; color:#fff; border:1px solid ${UI_TEXT}; padding:6px 12px; border-radius:8px; font-size:13px; cursor:pointer;`;
-}
-function inputStyle(w = "") {
-  const wcss = w ? `width:${w};` : "";
-  return `${wcss} padding:6px 8px; border:1px solid ${UI_BORDER}; border-radius:6px; font-size:13px; color:${UI_TEXT}; background:#fff;`;
-}
-const thStyle = `padding:8px 10px; font-weight:600; color:${UI_TEXT}; background:${UI_BG_MILD}; border-bottom:1px solid ${UI_BORDER}; text-align:left;`;
-const tdStyle = `padding:8px 10px; color:${UI_TEXT}; border-bottom:1px solid #f3f4f6;`;
-
-// ===================== Legacy -> nested migration for Modbus =====================
-function migrateModbusAlertsToNested() {
-  if (!window.config) window.config = {};
-  if (!config.alarmSettings) config.alarmSettings = {};
-  if (!config.alarmSettings.Modbus) config.alarmSettings.Modbus = {};
-  const mod = config.alarmSettings.Modbus;
-  if (!Array.isArray(mod.alerts)) return;
-
-  const next = {};
-  for (const a of mod.alerts || []) {
-    const brand = a.brand_key == null ? "" : String(a.brand_key).trim();
-    const sid = a.slave_id == null ? "" : String(a.slave_id).trim();
-    if (!brand || !sid) continue;
-    if (!next[brand]) next[brand] = { slaves: {} };
-    if (!next[brand].slaves[sid]) next[brand].slaves[sid] = { alerts: [] };
-    next[brand].slaves[sid].alerts.push({
-      condition: a.condition,
-      threshold: a.threshold,
-      contact: a.contact,
-      message: a.message,
-      enabled: !!a.enabled,
-    });
-  }
-  delete mod.alerts;
-  Object.assign(mod, next);
-  if (typeof saveConfig === "function") {
-    try {
-      saveConfig();
-    } catch (e) {}
-  }
-}
-
-// ===================== Data accessors: Energy Meter =====================
-function getEnergyBrands() {
-  const em =
-    config.ModbusRTU && config.ModbusRTU.energyMeter
-      ? config.ModbusRTU.energyMeter
-      : null;
-  const brands = em && em.brands ? em.brands : {};
-  const order =
-    em && Array.isArray(em.order) && em.order.length
-      ? em.order
-      : Object.keys(brands);
-  return { brands, order };
-}
-function getEnergyBrandSlaves(brandKey) {
-  const { brands } = getEnergyBrands();
-  const b = brands[brandKey];
-  const slaves = b && Array.isArray(b.slaves) ? b.slaves : [];
-  return slaves
-    .map((s) => (s && s.id != null ? String(s.id) : ""))
-    .filter(Boolean);
-}
-function getModbusAlerts(brandKey, slaveId, registerName) {
-  const em = config.alarmSettings?.energyMeter;
-  if (!em) return [];
-
-  const brand = em[brandKey];
-  if (!brand) return [];
-
-  const slave = brand[String(slaveId)];
-  if (!slave) return [];
-
-  const alerts = slave[registerName];
-  return Array.isArray(alerts) ? alerts : [];
-}
-function ensureModbusAlerts(brandKey, slaveId, registerName) {
-  if (!config.alarmSettings) config.alarmSettings = {};
-  if (!config.alarmSettings.energyMeter) config.alarmSettings.energyMeter = {};
-
-  const em = config.alarmSettings.energyMeter;
-
-  if (!em[brandKey]) em[brandKey] = {};
-  if (!em[brandKey][String(slaveId)]) em[brandKey][String(slaveId)] = {};
-  if (!Array.isArray(em[brandKey][String(slaveId)][registerName]))
-    em[brandKey][String(slaveId)][registerName] = [];
-
-  return em[brandKey][String(slaveId)][registerName];
-}
-
-function setModbusAlerts(brandKey, slaveId, registerName, rows) {
-  if (!Array.isArray(rows)) {
-    console.error("setModbusAlerts: rows is not array", rows);
-    return;
-  }
-
-  const list = ensureModbusAlerts(brandKey, slaveId, registerName);
-
-  list.length = 0;
-  list.push(
-    ...rows.map((r) => ({
-      condition: r.condition || "<=",
-      threshold: r.threshold === "" ? "" : Number(r.threshold),
-      contact: r.contact || "",
-      email: r.email || "",
-      message: r.message || `${brandKey} S${slaveId} ${registerName}`,
-      enabled: !!r.enabled,
-    }))
-  );
-
-  try {
-    saveConfig?.();
-  } catch (e) {
-    console.error("saveConfig failed", e);
-  }
-}
-
-function pickFirstEnergyBrandAndSlave() {
-  const { brands, order } = getEnergyBrands();
-  const brandKey =
-    order && order.length ? order[0] : Object.keys(brands)[0] || "";
-  const slave = brandKey ? getEnergyBrandSlaves(brandKey)[0] || "" : "";
-  return { brandKey, slaveId: slave };
-}
-
-// ===================== Data accessors: PLC =====================
-function getPlcBrandsAndSlaves() {
-  const list =
-    config.ModbusRTU && Array.isArray(config.ModbusRTU.PLC)
-      ? config.ModbusRTU.PLC
-      : [];
-  const map = {};
-  list.forEach((entry) => {
-    const plcType = entry && entry.plcType ? String(entry.plcType) : "Unknown";
-    const cred = entry && entry.PLC && entry.PLC.cred ? entry.PLC.cred : {};
-    const sid = cred && cred.slave_id != null ? String(cred.slave_id) : "";
-    if (!map[plcType]) map[plcType] = new Set();
-    if (sid) map[plcType].add(sid);
-  });
-  const out = {};
-  Object.keys(map).forEach((k) => (out[k] = Array.from(map[k]).sort()));
-  return out;
-}
-function ensurePlcNested() {
-  if (!window.config) window.config = {};
-  if (!config.alarmSettings) config.alarmSettings = {};
-  if (!config.alarmSettings.Modbus) config.alarmSettings.Modbus = {};
-  if (!config.alarmSettings.PLC) config.alarmSettings.PLC = {};
-  return config.alarmSettings.PLC;
-}
-function getPlcAlerts(brandKey, slaveId) {
-  const plc = ensurePlcNested();
-  const brand = plc[brandKey] || {};
-  const slaves = brand.slaves || {};
-  const node = slaves[slaveId] || {};
-  return Array.isArray(node.alerts) ? node.alerts : [];
-}
-function ensurePlcAlerts(brandKey, slaveId) {
-  const plc = ensurePlcNested();
-  if (!plc[brandKey]) plc[brandKey] = { slaves: {} };
-  if (!plc[brandKey].slaves[slaveId])
-    plc[brandKey].slaves[slaveId] = { alerts: [] };
-  return plc[brandKey].slaves[slaveId].alerts;
-}
-function setPlcAlerts(brandKey, slaveId, rows) {
-  const plc = ensurePlcNested();
-  ensurePlcAlerts(brandKey, slaveId);
-  plc[brandKey].slaves[slaveId].alerts = rows.map((r) => ({
-    condition: r.condition || "<=",
-    threshold: r.threshold === "" ? "" : Number(r.threshold),
-    contact: r.contact || "",
-    message: r.message || `${brandKey} S${slaveId}`,
-    enabled: !!r.enabled,
-  }));
-  if (typeof saveConfig === "function") {
-    try {
-      saveConfig();
-    } catch (e) {}
-  }
-}
-function pickFirstPlcBrandAndSlave() {
-  const map = getPlcBrandsAndSlaves();
-  const brands = Object.keys(map);
-  const brand = brands[0] || "Allen Bradley";
-  const slave = map[brand] && map[brand][0] ? map[brand][0] : "";
-  return { brandKey: brand, slaveId: slave };
-}
-
-// ===================== Existing Digital & Analog forms are kept as-is =====================
-// renderDigitalIOAlertsForm(subTab)
-// renderAnalogAlertsForm(subTab)
-// setupTabHandlers handles Digital/Analog paths inside
-
-// ===================== Modbus composite UI: Energy + PLC =====================
-function renderAlarmSettings(mainTab = "Modbus", subTab = "Channel 1") {
-  migrateModbusAlertsToNested();
-
-  // const MainTabs = ["Digital I/O", "Modbus", "Analog", "SMS Settings"];
-  const MainTabs = ["Modbus", "Analog"];
-  const mainTabsHtml = MainTabs.map(
-    (t) =>
-      `<button class="main-tab-btn${
-        t === mainTab ? " active" : ""
-      }" data-tab="${t}" style="${tabBtnStyle(t === mainTab)}"
-            onmouseenter="if(!this.classList.contains('active')) this.style.background='#f3f4f6'"
-            onmouseleave="if(!this.classList.contains('active')) this.style.background='${UI_TAB_ACTIVE_BG}'"
-          >${t}</button>`
-  ).join("");
-
-  const panel = document.getElementById("main-panel");
-  panel.innerHTML = `
-        <div style="font-size:16px; font-weight:600; color:${UI_TEXT}; margin:4px 0 8px;">Alarms</div>
-        <div class="tabs-line" style="display:flex; flex-wrap:wrap; align-items:center;">${mainTabsHtml}</div>
-        <div class="panel-content" style="margin-top: 12px;">
-          ${renderAlarmSettingsContent(mainTab, subTab)}
-        </div>
-      `;
-
-  // Ensure Modbus subsections are initialized after containers exist
-  if (mainTab === "Modbus") {
-    // Call directly (containers exist now)
-    try {
-      renderEnergyMeterSection();
-    } catch (e) {
-      console.error(e);
-    }
-    // try {
-    //   renderPlcSection();
-    // } catch (e) {
-    //   console.error(e);
-    // }
-
-    // If preferring next-frame timing, use:
-    // requestAnimationFrame(() => {
-    //   try { renderEnergyMeterSection(); } catch(e) { console.error(e); }
-    //   try { renderPlcSection(); } catch(e) { console.error(e); }
-    // });
-  }
-
-  document.querySelectorAll(".main-tab-btn").forEach(
-    (btn) =>
-      (btn.onclick = () => {
-        const newMainTab = btn.dataset.tab;
-        let defaultSub = subTab;
-        if (newMainTab === "Digital I/O") defaultSub = "Channel 1";
-        if (newMainTab === "Analog") defaultSub = "A1";
-        if (newMainTab === "Modbus") defaultSub = "Energy Meter";
-        renderAlarmSettings(newMainTab, defaultSub);
-      })
-  );
-
-  setupTabHandlers(mainTab, subTab);
-}
-
-function renderAlarmSettingsContent(mainTab, subTab) {
-  if (mainTab === "Digital I/O") {
-    return renderDigitalIOAlertsForm(subTab);
-  }
-  if (mainTab === "Analog") {
-    return renderAnalogAlertsForm(subTab);
-  }
-  if (mainTab === "SMS Settings") {
-    return `<div style="padding: 20px; color: #666;">SMS Settings UI coming soon</div>`;
-  }
-  if (mainTab === "Modbus") {
-    return `
-          <div style="margin:14px 0 10px; color:${UI_TEXT}; font-weight:600;"></div>
-          <div id="em-section"></div>
-          <div style="margin:18px 0 10px; color:${UI_TEXT}; font-weight:600;"></div>
-          <div id="plc-section"></div>
-        `;
-  }
-  return `<div style="padding: 20px;">Please select a tab</div>`;
-}
-
-function renderDigitalIOAlertsForm(channel) {
-  // Ensure store exists
-  config.alarmSettings = config.alarmSettings || {};
-  config.alarmSettings["Digital I/O"] =
-    config.alarmSettings["Digital I/O"] || {};
-  config.alarmSettings["Digital I/O"][channel] = config.alarmSettings[
-    "Digital I/O"
-  ][channel] || { alerts: [] };
-
-  const channelStore = config.alarmSettings["Digital I/O"][channel];
-  channelStore.alerts = Array.isArray(channelStore.alerts)
-    ? channelStore.alerts
-    : [];
-
-  const rows = channelStore.alerts
-    .map(
-      (row, i) => `
-          <tr>
-            <td>${i + 1}</td>
-            <td>
-              <select name="trigger_${i}">
-                <option ${
-                  row.trigger === "High" ? "selected" : ""
-                }>High</option>
-                <option ${row.trigger === "Low" ? "selected" : ""}>Low</option>
-                <option ${
-                  row.trigger === "Rising Edge" ? "selected" : ""
-                }>Rising Edge</option>
-                <option ${
-                  row.trigger === "Falling Edge" ? "selected" : ""
-                }>Falling Edge</option>
-              </select>
-            </td>
-            <td><input type="text" name="contact_${i}" value="${
-        row.contact ?? ""
-      }" style="width:140px"></td>
-            <td><input type="text" name="message_${i}" value="${
-        row.message ?? ""
-      }" style="width:160px"></td>
-            <td style="text-align:center;"><input type="checkbox" name="enabled_${i}" ${
-        row.enabled ? "checked" : ""
-      }></td>
-            <td style="text-align:center;"><button type="button" class="del-alert" data-index="${i}" title="Remove" style="color:#c00;background:transparent;border:none;font-size:18px;cursor:pointer;">×</button></td>
-          </tr>
-        `
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(
+        ColoredFormatter(
+            "%(asctime)s %(levelname)-8s %(threadName)-12s %(message)s",
+            datefmt="%H:%M:%S",
+        )
     )
-    .join("");
 
-  return `
-        <form id="digital-io-alerts-form">
-          <div style="margin-bottom:10px;">
-            <button type="button" class="button-primary" id="add-digital-alert-btn">+ Add Alert</button>
-          </div>
-          <div style="overflow-x:auto;">
-            <table class="channel-table" style="width:100%; background:#fff;">
-              <tr>
-                <th>#</th>
-                <th>Trigger</th>
-                <th>Contact</th>
-                <th>Message</th>
-                <th>Enabled</th>
-                <th>Delete</th>
-              </tr>
-              ${rows}
-            </table>
-          </div>
-          <div style="margin-top:12px;">
-            <button type="submit" class="button-primary">Save</button>
-            <span class="success-tick" id="digital-io-alerts-tick" style="display:none;">✔</span>
-          </div>
-        </form>
-      `;
-}
-
-function renderAnalogAlertsForm(channel) {
-  // Ensure store exists
-  config.alarmSettings = config.alarmSettings || {};
-  config.alarmSettings.Analog = config.alarmSettings.Analog || {};
-  config.alarmSettings.Analog[channel] = config.alarmSettings.Analog[
-    channel
-  ] || { alerts: [] };
-
-  const channelStore = config.alarmSettings.Analog[channel];
-  channelStore.alerts = Array.isArray(channelStore.alerts)
-    ? channelStore.alerts
-    : [];
-
-  const rows = channelStore.alerts
-    .map(
-      (row, i) => `
-          <tr>
-            <td>${i + 1}</td>
-            <td>
-              <select name="condition_${i}">
-                <option ${row.condition === "<=" ? "selected" : ""}><=</option>
-                <option ${row.condition === "<" ? "selected" : ""}><</option>
-                <option ${row.condition === ">=" ? "selected" : ""}>>=</option>
-                <option ${row.condition === ">" ? "selected" : ""}>></option>
-              </select>
-            </td>
-            <td><input type="number" step="any" name="threshold_${i}" value="${
-        row.threshold ?? ""
-      }" style="width:80px"></td>
-            <td><input type="number" name="delay_${i}" value="${
-        row.delay ?? ""
-      }" placeholder="seconds" style="width:80px"></td>
-            <td><input type="email" name="email_${i}" value="${
-        row.email ?? ""
-      }" placeholder="email@example.com" style="width:140px"></td>
-            <td><input type="text" name="contact_${i}" value="${
-        row.contact ?? ""
-      }" style="width:140px"></td>
-            <td><input type="text" name="message_${i}" value="${
-        row.message ?? ""
-      }" style="width:160px"></td>
-            <td style="text-align:center;"><input type="checkbox" name="enabled_${i}" ${
-        row.enabled ? "checked" : ""
-      }></td>
-            <td style="text-align:center;"><button type="button" class="del-alert" data-index="${i}" title="Remove" style="color:#c00;background:transparent;border:none;font-size:18px;cursor:pointer;">×</button></td>
-          </tr>
-        `
+    # Daily rotating file handler
+    file_handler = TimedRotatingFileHandler(
+        log_dir / "gateway.log",
+        when="midnight",
+        interval=1,
+        backupCount=30,  # Keep 30 days
+        encoding="utf-8",
     )
-    .join("");
-
-  return `
-        <form id="analog-alerts-form">
-          <div style="margin-bottom:10px;">
-            <button type="button" class="button-primary" id="add-analog-alert-btn">+ Add Alert</button>
-          </div>
-          <div style="overflow-x:auto;">
-            <table class="channel-table" style="width:100%; background:#fff;">
-              <tr>
-                <th>#</th>
-                <th>Condition</th>
-                <th>Threshold</th>
-                <th>Delay (s)</th>
-                <th>Email</th>
-                <th>Contact</th>
-                <th>Message</th>
-                <th>Enabled</th>
-                <th>Delete</th>
-              </tr>
-              ${rows}
-            </table>
-          </div>
-          <div style="margin-top:12px;">
-            <button type="submit" class="button-primary">Save</button>
-            <span class="success-tick" id="analog-alerts-tick" style="display:none;">✔</span>
-          </div>
-        </form>
-      `;
-}
-
-// ===================== Energy Meter render + handlers =====================
-// Updated helper functions for Energy Meter registers and alerts
-function getEnergyBrandRegisters(brandKey, slaveId) {
-  const { brands } = getEnergyBrands();
-  return brands[brandKey]?.registersBySlave?.[slaveId] || [];
-}
-
-function getEnergyBrandSlaves(brandKey) {
-  const { brands } = getEnergyBrands();
-  return brands[brandKey]?.slaves?.map((s) => s.id.toString()) || [];
-}
-
-// ===================== Updated Energy Meter with Register Tabs =====================
-function renderEnergyMeterSection(
-  selectedBrand = "",
-  selectedSlave = "",
-  selectedRegister = ""
-) {
-  const mount = document.getElementById("em-section");
-  if (!mount) return;
-
-  const { brands, order } = getEnergyBrands();
-  if (!selectedBrand || !selectedSlave || !selectedRegister) {
-    const pick = pickFirstEnergyBrandAndSlave();
-    selectedBrand = selectedBrand || pick.brandKey;
-    selectedSlave = selectedSlave || pick.slaveId;
-    const firstReg = getEnergyBrandRegisters(selectedBrand, selectedSlave)[0];
-    selectedRegister = selectedRegister || (firstReg ? firstReg.name : "");
-  }
-
-  const brandTabs = (order.length ? order : Object.keys(brands))
-    .filter((k) => brands[k])
-    .map((bk) => {
-      const label = brands[bk]?.label || bk;
-      const active = bk === selectedBrand;
-      return `<button class="em-brand" data-brand="${bk}" style="${tabBtnStyle(
-        active
-      )}"
-          onmouseenter="if(!this.classList.contains('active')) this.style.background='#f3f4f6'"
-          onmouseleave="if(!this.classList.contains('active')) this.style.background='#fff'"
-        >${label}</button>`;
-    })
-    .join("");
-
-  const slaveTabs = getEnergyBrandSlaves(selectedBrand)
-    .map((sid) => {
-      const active = sid === selectedSlave;
-      return `<button class="em-slave" data-slave="${sid}" style="${tabBtnStyle(
-        active
-      )}"
-          onmouseenter="if(!this.classList.contains('active')) this.style.background='#f3f4f6'"
-          onmouseleave="if(!this.classList.contains('active')) this.style.background='#fff'"
-        >Slave ${sid}</button>`;
-    })
-    .join("");
-
-  // SHOW ALL REGISTERS - removed .filter(r => r.enabled)
-  const registerTabs = getEnergyBrandRegisters(selectedBrand, selectedSlave)
-    .map((reg) => {
-      const active = reg.name === selectedRegister;
-      return `<button class="em-register" data-register="${
-        reg.name
-      }" style="${tabBtnStyle(active)}"
-          onmouseenter="if(!this.classList.contains('active')) this.style.background='#f3f4f6'"
-          onmouseleave="if(!this.classList.contains('active')) this.style.background='#fff'"
-        >${reg.name}</button>`;
-    })
-    .join("");
-
-  const registerRow =
-    registerTabs ||
-    '<span style="color:${UI_MUTED}; font-size:14px;">No registers available</span>';
-
-  mount.innerHTML = `
-      <div style="display:flex; flex-wrap:wrap; align-items:center;">${brandTabs}</div>
-      <div style="display:flex; flex-wrap:wrap; align-items:center; margin-top:6px;">${slaveTabs}</div>
-      <div style="display:flex; flex-wrap:wrap; align-items:center; margin-top:6px;">
-        ${registerRow}
-      </div>
-      <div style="margin-top:10px; background:#fff; border:1px solid ${UI_BORDER}; border-radius:10px; padding:12px;">
-        ${renderEnergyAlertsTable(
-          selectedBrand,
-          selectedSlave,
-          selectedRegister
-        )}
-      </div>
-    `;
-
-  // Rest of the event handlers remain the same...
-  mount.querySelectorAll(".em-brand").forEach((btn) => {
-    btn.onclick = () => {
-      const newBrand = btn.dataset.brand;
-      const firstSlave = getEnergyBrandSlaves(newBrand)[0] || "";
-      const firstReg = getEnergyBrandRegisters(newBrand, firstSlave)[0];
-      renderEnergyMeterSection(
-        newBrand,
-        firstSlave,
-        firstReg ? firstReg.name : ""
-      );
-    };
-  });
-
-  mount.querySelectorAll(".em-slave").forEach((btn) => {
-    btn.onclick = () => {
-      const newSlave = btn.dataset.slave;
-      const firstReg = getEnergyBrandRegisters(selectedBrand, newSlave)[0];
-      renderEnergyMeterSection(
-        selectedBrand,
-        newSlave,
-        firstReg ? firstReg.name : ""
-      );
-    };
-  });
-
-  mount.querySelectorAll(".em-register").forEach((btn) => {
-    btn.onclick = () =>
-      renderEnergyMeterSection(
-        selectedBrand,
-        selectedSlave,
-        btn.dataset.register
-      );
-  });
-
-  setupEnergyHandlers(selectedBrand, selectedSlave, selectedRegister);
-}
-
-function getRegisterProcessRange(brandKey, slaveId, registerName) {
-  const regs = getEnergyBrandRegisters(brandKey, slaveId);
-  const reg = regs.find((r) => r.name === registerName);
-  if (!reg) return { min: null, max: null };
-
-  const min = reg.process_min !== "" ? Number(reg.process_min) : null;
-  const max = reg.process_max !== "" ? Number(reg.process_max) : null;
-  return { min, max };
-}
-
-function renderEnergyAlertsTable(brandKey, slaveId, registerName) {
-  const alerts = (() => {
-    const a = getModbusAlerts(brandKey, slaveId, registerName);
-    return Array.isArray(a) ? a : [];
-  })();
-
-  const rows = alerts
-    .map(
-      (row, i) => `
-      <tr data-row="${i}">
-        <td style="${tdStyle} color:${UI_MUTED};">${i + 1}</td>
-        <td style="${tdStyle}">${brandKey}</td>
-        <td style="${tdStyle}">${slaveId}</td>
-        <td style="${tdStyle}">${registerName}</td>
-        <td style="${tdStyle}">
-          <select name="condition_${i}" style="${inputStyle()}">
-            <option ${row.condition === "<=" ? "selected" : ""}>&lt;=</option>
-            <option ${row.condition === "<" ? "selected" : ""}>&lt;</option>
-            <option ${row.condition === ">=" ? "selected" : ""}>&gt;=</option>
-            <option ${row.condition === ">" ? "selected" : ""}>&gt;</option>
-          </select>
-        </td>
-        <td style="${tdStyle}"><input type="number" step="any" name="threshold_${i}" value="${
-        row.threshold ?? ""
-      }" style="${inputStyle("100px")}"></td>
-        <td style="${tdStyle}"><input type="email" name="email_${i}" value="${
-        row.email ?? ""
-      }" placeholder="email@example.com" style="${inputStyle("120px")}"></td>
-        <td style="${tdStyle}"><input type="text" name="contact_${i}" value="${
-        row.contact ?? ""
-      }" style="${inputStyle("140px")}"></td>
-        <td style="${tdStyle}"><input type="text" name="message_${i}" value="${
-        row.message ?? ""
-      }" style="${inputStyle("160px")}"></td>
-        <td style="${tdStyle}; text-align:center;"><input type="checkbox" name="enabled_${i}" ${
-        row.enabled ? "checked" : ""
-      }></td>
-        <td style="${tdStyle}; text-align:center;">
-          <button type="button" class="em-del" data-idx="${i}" style="border:1px solid #ef4444; color:#ef4444; background:#fff; padding:4px 8px; border-radius:4px; font-size:11px; cursor:pointer;">Remove</button>
-        </td>
-      </tr>
-    `
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(
+        logging.Formatter(
+            "%(asctime)s %(levelname)-8s %(threadName)-12s %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
     )
-    .join("");
 
-  return `
-      <form id="em-form" onsubmit="return false;" data-brand="${brandKey}" data-slave="${slaveId}" data-register="${registerName}">
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
-          <div style="color:${UI_MUTED}; font-size:13px;">
-            Brand <span style="color:${UI_TEXT}; font-weight:600;">${brandKey}</span> · 
-            Slave <span style="color:${UI_TEXT}; font-weight:600;">${slaveId}</span> · 
-            Register <span style="color:${UI_TEXT}; font-weight:600;">${registerName}</span>
-          </div>
-          <div style="display:flex; gap:8px;">
-            <button type="button" id="em-add" style="${btnPrimaryStyle()}">+ Add Alert</button>
-            <button type="submit" id="em-save" style="${btnDarkStyle()}">Save</button>
-            <span id="em-tick" style="display:none; color:${UI_ACCENT}; font-weight:600; align-self:center;">Saved ✔</span>
-          </div>
-        </div>
-        <div style="overflow:auto; border:1px solid ${UI_BORDER}; border-radius:8px;">
-          <table style="width:100%; border-collapse:separate; border-spacing:0;">
-            <thead>
-              <tr>
-                <th style="${thStyle}">#</th>
-                <th style="${thStyle}">Brand</th>
-                <th style="${thStyle}">Slave ID</th>
-                <th style="${thStyle}">Register</th>
-                <th style="${thStyle}">Condition</th>
-                <th style="${thStyle}">Threshold</th>
-                <th style="${thStyle}">Email</th>
-                <th style="${thStyle}">Contact</th>
-                <th style="${thStyle}">Message</th>
-                <th style="${thStyle}; text-align:center;">Enabled</th>
-                <th style="${thStyle}; text-align:center;">Delete</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${
-                rows ||
-                `<tr><td colspan="11" style="padding:20px; color:${UI_MUTED}; text-align:center;">
-                No alerts for ${brandKey} · Slave ${slaveId} · ${registerName}. Click "+ Add Alert".
-              </td></tr>`
-              }
-            </tbody>
-          </table>
-        </div>
-      </form>
-    `;
+    # Alarm-specific handler (separate file)
+    alarm_handler = TimedRotatingFileHandler(
+        log_dir / "alarms.log",
+        when="midnight",
+        interval=1,
+        backupCount=7,
+        encoding="utf-8",
+    )
+    alarm_handler.setLevel(logging.WARNING)
+    alarm_handler.setFormatter(logging.Formatter("%(asctime)s ALARM %(message)s"))
+
+    logger.addHandler(console_handler)
+    logger.addHandler(file_handler)
+    logger.addHandler(alarm_handler)
+
+    # Custom alarm level
+    logging.ALARM = 35
+    logging.addLevelName(logging.ALARM, "ALARM")
+
+    def alarm(self, message, *args, **kwargs):
+        if self.isEnabledFor(logging.ALARM):
+            self._log(logging.ALARM, message, args, **kwargs)
+
+    logging.Logger.alarm = alarm
+
+    return logger
+
+
+# Initialize logging immediately
+logger = setup_logging()
+logger.info("🚀 Gateway started with daily log rotation enabled")
+# === Load full configuration JSON ===
+
+
+BASE_DIR = (
+    "/home/gateway/GATEWAY-COMPLETE/Demo application/Main Application"
+)
+CONFIG_FILE_PATH = f"{BASE_DIR}/config.json"
+config = None
+
+def normalize_digital_pins(di_channels, do_channels):
+    """
+    Convert pin strings → int
+    Filter invalid entries safely
+    """
+    for ch in di_channels:
+        try:
+            ch["pin"] = int(ch["pin"])
+        except Exception:
+            ch["pin"] = None
+
+    for ch in do_channels:
+        try:
+            ch["pin"] = int(ch["pin"])
+        except Exception:
+            ch["pin"] = None
+
+
+GPIO.setmode(GPIO.BCM)
+GPIO.setwarnings(False)
+
+# def setup_digital_gpio(di_channels, do_channels):
+#     for ch in di_channels:
+#         if ch.get("enabled") and ch.get("pin") is not None:
+#             GPIO.setup(ch["pin"], GPIO.IN)
+
+#     for ch in do_channels:
+#         if ch.get("pin") is not None:
+#             GPIO.setup(ch["pin"], GPIO.OUT)
+
+
+
+"""
+What: Load the JSON configuration from CONFIG_FILE_PATH and return its dict.
+Calls: json.load()
+Required by: update_global_config(), start_config_monitor(), any place needing config.
+Notes: Returns None on error; caller should handle fallbacks/logging.
+Side effects: None.
+"""
+
+
+def load_config():
+    try:
+        with open(CONFIG_FILE_PATH, "r") as f:
+            return json.load(f)
+    except Exception as e:
+        log_error(f"[ERROR] Failed to load config: {e}")
+        return None
+
+
+# === GLOBAL VARIABLE DECLARATIONS (at module level) ===
+# Global configuration variables (shared across functions)
+
+
+# Logging convenience functions to replace all print statements
+def log_info(msg):
+    logger.info(msg)
+
+
+def log_debug(msg):
+    logger.debug(msg)
+
+
+def log_warn(msg):
+    logger.warning(msg)
+
+
+def log_error(msg):
+    logger.error(msg)
+
+
+def log_alarm(msg):
+    logger.alarm(msg)
+
+
+UPDATED = False
+# Com Port Configuration (global)
+CONNECTION_TYPE = None
+COM_PORT = None
+FIRMWARE = None
+SERIAL_NUMBER = None
+COM_BAUD_RATE = None
+
+# I/O Settings (global)
+MODBUS_ENABLED = None
+ANALOG_ENABLED = None
+DIGITAL_INPUT_ENABLED = None
+
+# Digital Input Configuration (global)
+DIGITAL_SAVE_LOG = None
+DIGITAL_MODE = None
+DIGITAL_CHANNELS = None
+DIGITAL_INPUT_CONFIG = None
+DIGITAL_OUTPUT_CHANNELS = None
+DIGITAL_COUNTS = None
+DIGITAL_TIMES = None
+
+# Analog Configuration (global)
+ANALOG_POLLING_INTERVAL = None
+ANALOG_POLLING_UNIT = None
+ANALOG_SAVE_LOG = None
+ANALOG_CHANNELS = None
+ANALOG_CONFIG = None
+EXTENSION_ADC = None
+SCALING_CONFIG = None
+
+# Modbus Configuration (global)
+MODBUS_BAUD_RATE = None
+MODBUS_DATA_BIT = None
+MODBUS_PARITY_MAP = None
+MODBUS_PARITY = None
+MODBUS_STOP_BIT = None
+
+# Modbus Register configurations (global)
+MODBUS_R1_CFG = None
+MODBUS_R2_CFG = None
+MODBUS_R3_CFG = None
+POLLING_INTERVALS = None
+
+# Wireless Configuration (global)
+COMMUNICATION_MEDIA = None
+SEND_FORMAT = None
+FTP_CONFIG = None
+WIRELESS_POLLING_INTERVAL = None
+WIRELESS_POLLING_UNIT = None
+APN = None
+JSON_ENDPOINT = None
+
+# WiFi-specific
+WIFI_SSID = None
+WIFI_PASSWORD = None
+WIFI_IP_MODE = None
+WIFI_IP = None
+WIFI_SUBNET = None
+WIFI_GATEWAY = None
+WIFI_DNS1 = None
+WIFI_DNS2 = None
+
+
+# Ethernet Configuration (global)
+RECV_IP = None
+RECV_PORT = None
+SEND_TARGETS = None
+
+# PLC configurations
+SIEMENS_CONFIGS = []
+COMBINED_CONFIG = []
+
+# RS485 Configuration (global)
+RS485_PORT = None
+RS485_BAUD_RATE = None
+MODEM_PORT = "/dev/ttyUSB2"
+
+# Kafka Configuration (global)
+KAFKA_BROKERS = None
+KAFKA_TOPIC = None
+KAFKA_CERT_FILES = None
+kafka_topic = None
+
+kafka_producer = None
+kafka_last_err = 0
+
+# Alarm Settings (global)
+DIGITAL_IO_ALARMS = None
+ANALOG_ALARMS = None
+MODBUS_ALARMS = None
+
+# Offline Data Configuration (global)
+OFFLINE_ENABLED = None
+OFFLINE_MODE = None
+OFFLINE_FTP = None
+OFFLINE_SCHEDULE = None
+
+# Legacy configurations (global)
+CSV_FILENAME = None
+LAST_SENT_FILE = None
+LTE_INTERFACE = None
+DATABASE = None
+MYSQL_CONFIG = None
+
+# ADC I2C address (global)
+ADC_I2C_ADDRESS = None
+
+# Global data storage
+data_map = None
+analog_readings = None
+digital_readings = None
+modbus_readings = None
+
+# File to DB
+TABLE_PARAMETER_COLUMN = {
+    "RECompactibility": ("Compactibility", "Compactability"),
+    "REDCGTemp": ("Temperature", "Temperature"),
+    "REDWT": ("Strength", "Strength(WTS)"),
+    "REMoisture": ("Moisture", "Moisture"),
+    "REPermeability": ("Permeability", "Permeability"),
+    "REDSMMaster": ("Strength", "Strength(GCS)"),
 }
 
-function setupEnergyHandlers(brandKey, slaveId, registerName) {
-  const form = document.getElementById("em-form");
-  if (!form) return;
+# Global I2C bus (initialize once)
+bus = None
 
-  // Add/Delete handlers
-  form.addEventListener("click", (e) => {
-    const add = e.target.closest("#em-add");
-    if (add) {
-      const list = ensureModbusAlerts(brandKey, slaveId, registerName);
-      list.push({
-        condition: "<=",
-        threshold: "",
-        email: "",
-        contact: "",
-        message: `${brandKey} S${slaveId} ${registerName}`,
-        enabled: true,
-      });
-      if (typeof saveConfig === "function") saveConfig();
-      renderEnergyMeterSection(brandKey, slaveId, registerName);
-      return;
+# ==================================================
+# UTILITY FUNCTIONS
+# ==================================================
+
+
+def apply_serial_settings(inst, settings):
+    """
+    Apply ModbusRTU.settings to a MinimalModbus instrument.
+    settings example:
+      { "baudRate": "9600", "parity": "Even", "dataBits": 8, "stopBits": 1 }
+    """
+    # Defaults
+    baud = int(settings.get("baudRate", "9600"))
+    parity_name = settings.get("parity", "Even")  # None/Even/Odd/Mark/Space
+    data_bits = int(settings.get("dataBits", 8))
+    stop_bits = int(settings.get("stopBits", 1))
+
+    inst.serial.baudrate = baud
+    inst.serial.bytesize = data_bits
+
+    p = parity_name.lower()
+    if p == "none":
+        inst.serial.parity = minimalmodbus.serial.PARITY_NONE
+    elif p == "even":
+        inst.serial.parity = minimalmodbus.serial.PARITY_EVEN
+    elif p == "odd":
+        inst.serial.parity = minimalmodbus.serial.PARITY_ODD
+    elif p == "mark":
+        inst.serial.parity = minimalmodbus.serial.PARITY_MARK
+    elif p == "space":
+        inst.serial.parity = minimalmodbus.serial.PARITY_SPACE
+    else:
+        inst.serial.parity = minimalmodbus.serial.PARITY_EVEN
+
+    inst.serial.stopbits = stop_bits
+    inst.serial.timeout = 1.0
+
+
+"""
+What: Create and configure minimalmodbus.Instrument objects for all enabled Modbus R1/R2/R3 entries.
+Calls: minimalmodbus.Instrument()
+Required by: main_data_collection_loop() to get instruments; read_modbus_registers() consumes the mapping created here.
+Notes: Uses RS485_PORT, MODBUS_BAUD_RATE, MODBUS_DATA_BIT, MODBUS_PARITY, MODBUS_STOP_BIT, and MODBUS_Rx_CFG.
+        Keys returned look like 'R1_slave_{id}' / 'R2_slave_{id}' / 'R3_slave_{id}'.
+Side effects: Opens serial configuration on instruments.
+"""
+
+
+def setup_modbus_instruments():
+    """
+    Build MinimalModbus instruments for all enabled RS485 slaves.
+    Each slave uses its own RS485 port and serial settings.
+    """
+    instruments = {}
+    log_info("[MODBUS] Initializing RTU instruments")
+
+    brands = get_energy_brand_blocks(config)
+
+    for brand_key, brand in brands:
+        log_info(f"[MODBUS] Processing brand: {brand_key}")
+
+        for s in brand.get("slaves", []):
+
+            sid = s.get("id")
+            if not sid:
+                continue
+
+            if not s.get("enabled", True):
+                log_info(f"[MODBUS] Slave {brand_key}_{sid} disabled, skipping")
+                continue
+
+            # 🔥 USB slaves handled elsewhere
+            if s.get("use_usb") is True:
+                log_info(f"[MODBUS] Slave {brand_key}_{sid} uses USB, skipping RTU")
+                continue
+
+            port = s.get("rs485_port")
+            if not port:
+                log_error(f"[MODBUS] Slave {brand_key}_{sid} has no RS485 port")
+                continue
+
+            try:
+                inst = minimalmodbus.Instrument(port, int(sid))
+
+                # 🔥 APPLY PER-SLAVE SERIAL SETTINGS
+                inst.serial.baudrate = int(s.get("baudRate", 9600))
+                inst.serial.parity   = {
+                    "None": minimalmodbus.serial.PARITY_NONE,
+                    "Even": minimalmodbus.serial.PARITY_EVEN,
+                    "Odd":  minimalmodbus.serial.PARITY_ODD,
+                }.get(s.get("parity", "Even"), minimalmodbus.serial.PARITY_EVEN)
+
+                inst.serial.bytesize = int(s.get("dataBits", 8))
+                inst.serial.stopbits = int(s.get("stopBits", 1))
+                inst.serial.timeout  = 1.0
+
+                # Optional but recommended
+                inst.clear_buffers_before_each_transaction = True
+                inst.close_port_after_each_call = False
+
+                key = f"{brand_key}_{sid}"
+                instruments[key] = inst
+
+                log_info(
+                    f"[MODBUS] Ready: {key} "
+                    f"port={port} "
+                    f"baud={inst.serial.baudrate} "
+                    f"parity={s.get('parity')} "
+                    f"dbits={inst.serial.bytesize} "
+                    f"sbits={inst.serial.stopbits}"
+                )
+
+            except Exception as e:
+                log_error(f"[MODBUS][ERROR] {brand_key} slave {sid}: {e}")
+
+    return instruments
+
+"""
+What: Convert a numeric interval with unit into seconds.
+Calls: None
+Required by: main_data_collection_loop() for analog/wireless intervals, and Modbus polling scheduling.
+Notes: Units supported: Sec, Min, Hour, Day (default multiplier 1 if unknown).
+Side effects: None.
+"""
+
+
+def convert_polling_interval_to_seconds(interval, unit):
+    multipliers = {"Sec": 1, "Min": 60, "Hour": 3600, "Day": 86400}
+    return interval * multipliers.get(unit, 1)
+
+
+"""
+What: Load config and populate all global variables, initialize I2C bus and in-memory stores.
+Calls: load_config(), smbus.SMBus(1)
+Required by: start_config_monitor() initially and on config changes; other logic expects globals to be set.
+Notes: Sets UPDATED=True on success. Initializes bus (I2C), data_map, analog/digital/modbus reading dicts.
+        Parses numerous nested sections from config.json. Sets ADC_I2C_ADDRESS to 0x48.
+Side effects: Mutates many globals; opens I2C bus.
+Failure modes: Prints errors and returns False; callers should stop or retry.
+"""
+
+
+def update_global_config():
+    global config, CONNECTION_TYPE, COM_PORT, FIRMWARE, SERIAL_NUMBER, COM_BAUD_RATE, SIEMENS_CONFIGS, COMBINED_CONFIG
+    global MODBUS_ENABLED, ANALOG_ENABLED, DIGITAL_INPUT_ENABLED, MODBUS_TCP_ENABLED
+    global DIGITAL_SAVE_LOG, DIGITAL_MODE, DIGITAL_CHANNELS, DIGITAL_COUNTS, DIGITAL_TIMES, DIGITAL_OUTPUT_CHANNELS,DIGITAL_INPUT_CONFIG
+    global ANALOG_POLLING_INTERVAL, ANALOG_POLLING_UNIT, ANALOG_SAVE_LOG, ANALOG_CHANNELS,ANALOG_CONFIG
+    global EXTENSION_ADC, SCALING_CONFIG, MODBUS_BAUD_RATE, MODBUS_DATA_BIT
+    global MODBUS_PARITY, MODBUS_STOP_BIT, MODBUS_R1_CFG, MODBUS_R2_CFG, MODBUS_R3_CFG
+    global POLLING_INTERVALS, COMMUNICATION_MEDIA, SEND_FORMAT, FTP_CONFIG
+    global WIRELESS_POLLING_INTERVAL, WIRELESS_POLLING_UNIT, APN, JSON_ENDPOINT
+    global MODBUS_TCP_MAC, MODBUS_TCP_IP, MODBUS_TCP_SUBNET, MODBUS_TCP_GATEWAY
+    global MODBUS_TCP_INTERVAL, MODBUS_TCP_LOG, MODBUS_TCP_TABLE, RECV_IP, RECV_PORT
+    global SEND_TARGETS, RS485_PORT, RS485_BAUD_RATE, KAFKA_BROKERS, KAFKA_TOPIC
+    global KAFKA_CERT_FILES, DIGITAL_IO_ALARMS, ANALOG_ALARMS, OFFLINE_ENABLED, MODBUS_ALARMS
+    global OFFLINE_MODE, OFFLINE_FTP, OFFLINE_SCHEDULE, LTE_INTERFACE, MYSQL_CONFIG
+    global CSV_FILENAME, LAST_SENT_FILE, DATABASE
+    global ADC_I2C_ADDRESS, data_map
+    global analog_readings, digital_readings, modbus_readings, bus, MODBUS_PARITY_MAP
+    global UPDATED, NETWORK
+    global WIFI_SSID, WIFI_PASSWORD, WIFI_IP_MODE, WIFI_IP, WIFI_SUBNET, WIFI_GATEWAY, WIFI_DNS1, WIFI_DNS2
+
+    log_info("[INFO] 🔄 Updating global configuration variables...")
+
+    # Load fresh config
+    config = load_config()
+    
+    if config is None:
+        log_error("[ERROR] Failed to load configuration")
+        return False
+
+    NETWORK = config.get("network",{})
+
+    # Com Port Configuration
+
+
+
+    com_port_cfg = config.get("comPort", {})
+    CONNECTION_TYPE = com_port_cfg.get("connectionType", "USB")
+    COM_PORT = com_port_cfg.get("comPort", "COM7")
+    FIRMWARE = com_port_cfg.get("firmware", "RDL V2.00.1")
+    SERIAL_NUMBER = com_port_cfg.get("serial", "RDL0009")
+    COM_BAUD_RATE = int(com_port_cfg.get("baudRate", "19200"))
+
+    # I/O Settings
+    io_settings = config.get("ioSettings", {})
+    settings = io_settings.get("settings", {})
+    MODBUS_ENABLED = settings.get("modbus", True)
+    ANALOG_ENABLED = settings.get("analog", True)
+    DIGITAL_INPUT_ENABLED = settings.get("digitalInput", True)
+    MODBUS_TCP_ENABLED = settings.get("modbusTCP", False)
+
+    # Digital Input Configuration
+    digital_input_cfg = io_settings.get("digitalInput", {})
+    DIGITAL_INPUT_CONFIG = digital_input_cfg
+    digital_output_cfg = io_settings.get("digitalOutput", {})
+    DIGITAL_SAVE_LOG = digital_input_cfg.get("saveLog", False)
+    DIGITAL_MODE = digital_input_cfg.get("mode", "time")
+    DIGITAL_CHANNELS = digital_input_cfg.get("channels")
+    DIGITAL_OUTPUT_CHANNELS = digital_output_cfg.get("channels")
+    normalize_digital_pins(
+        DIGITAL_CHANNELS,
+        DIGITAL_OUTPUT_CHANNELS
+    )
+    # setup_digital_gpio(DIGITAL_CHANNELS, DIGITAL_OUTPUT_CHANNELS)
+
+    DIGITAL_COUNTS = digital_input_cfg.get("counts", [1, 0, 0, 0])
+    DIGITAL_TIMES = digital_input_cfg.get("times", [0, 5, 0, 0])
+
+    # Analog Configuration
+    analog_cfg = io_settings.get("analog", {})
+    ANALOG_POLLING_INTERVAL = analog_cfg.get("pollingInterval", 30)
+    ANALOG_POLLING_UNIT = analog_cfg.get("pollingIntervalUnit", "Sec")
+    ANALOG_SAVE_LOG = analog_cfg.get("saveLog", True)
+    ANALOG_CHANNELS = analog_cfg.get("channels", [])
+    ANALOG_CONFIG = analog_cfg
+    print(ANALOG_CONFIG)
+    EXTENSION_ADC = analog_cfg.get("extensionADC", {})
+    SCALING_CONFIG = analog_cfg.get("scaling", {})
+
+    # Modbus Configuration
+    modbus_cfg = config.get("modbus", {})
+    modbus_com = modbus_cfg.get("comPort", {})
+    MODBUS_BAUD_RATE = int(modbus_com.get("baudRate", "9600"))
+    MODBUS_DATA_BIT = (
+        int(modbus_com.get("dataBit", "8 bit").split()[0])
+        if modbus_com.get("dataBit")
+        else 8
+    )
+    MODBUS_PARITY_MAP = {
+        "None": "N",
+        "Even": "E",
+        "Odd": "O",
+        "Mark": "M",
+        "Space": "S",
     }
+    MODBUS_PARITY = MODBUS_PARITY_MAP.get(modbus_com.get("parity", "None"), "N")
+    MODBUS_STOP_BIT = (
+        int(modbus_com.get("stopBit", "1 bit").split()[0])
+        if modbus_com.get("stopBit")
+        else 1
+    )
 
-    const del = e.target.closest(".em-del");
-    if (del) {
-      const idx = Number(del.dataset.idx);
-      const list = ensureModbusAlerts(brandKey, slaveId, registerName);
-      if (idx >= 0 && idx < list.length) {
-        list.splice(idx, 1);
-        if (typeof saveConfig === "function") saveConfig();
-        renderEnergyMeterSection(brandKey, slaveId, registerName);
-      }
-    }
-  });
+    # Modbus Register configurations
+    MODBUS_R1_CFG = modbus_cfg.get("modbusR1", {})
+    MODBUS_R2_CFG = modbus_cfg.get("modbusR2", {})
+    MODBUS_R3_CFG = modbus_cfg.get("modbusR3", {})
+    POLLING_INTERVALS = modbus_cfg.get("pollingInterval", {})
 
-  // Save handler
-  form.addEventListener("submit", (e) => {
-    e.preventDefault();
-    try {
-      const { min: processMin, max: processMax } = getRegisterProcessRange(
-        brandKey,
-        slaveId,
-        registerName
-      );
+    # Wireless Configuration
+    wireless_cfg = config.get("wireless", {})
+    COMMUNICATION_MEDIA = wireless_cfg.get("communicationMedia", "4G/LTE")
+    SEND_FORMAT = wireless_cfg.get("sendFormat", "MQTT")
+    FTP_CONFIG = wireless_cfg.get("ftp", {})
+    WIRELESS_POLLING_INTERVAL = wireless_cfg.get("pollingInterval", 5)
+    WIRELESS_POLLING_UNIT = wireless_cfg.get("pollingTimeUnit", "Sec")
+    APN = wireless_cfg.get("apn", "airtelgprs.com")
+    JSON_ENDPOINT = wireless_cfg.get(
+        "jsonEndpoint", "https://github.com/srinivas2200030392"
+    )
 
-      const trs = Array.from(form.querySelectorAll("tbody tr"));
+    # WiFi Credentials
+    WIFI_SSID = wireless_cfg.get("wifiSsid", "")
+    WIFI_PASSWORD = wireless_cfg.get("wifiPassword", "")
 
-      const rows = trs.map((tr, i) => {
-        const condition =
-          tr.querySelector(`select[name="condition_${i}"]`)?.value || "<=";
+    # WiFi IP Configuration
+    WIFI_IP_MODE = wireless_cfg.get("wifiIpMode", "DHCP")
+    WIFI_IP = wireless_cfg.get("wifiIp", "")
+    WIFI_SUBNET = wireless_cfg.get("wifiSubnet", "")
+    WIFI_GATEWAY = wireless_cfg.get("wifiGateway", "")
+    WIFI_DNS1 = wireless_cfg.get("wifiDns1", "")
+    WIFI_DNS2 = wireless_cfg.get("wifiDns2", "")
 
-        const thresholdRaw = tr.querySelector(
-          `input[name="threshold_${i}"]`
-        )?.value;
+    # --- Start of PLC Configuration Processing ---
+    plc_configurations = config.get("plc_configurations", [])
+    DATABASE = config.get("Database")
 
-        const threshold = thresholdRaw === "" ? null : Number(thresholdRaw);
+    # ---- Central Database Config ----
+    global_db = config.get("Database", {})
+    if not global_db:
+        raise ValueError("Central Database config missing")
 
-        // ---- VALIDATION ----
-        if (threshold !== null) {
-          if (
-            (condition === "<" || condition === "<=") &&
-            processMin !== null
-          ) {
-            if (threshold < processMin) {
-              throw new Error(
-                `Row ${
-                  i + 1
-                }: Threshold (${threshold}) cannot be less than process minimum (${processMin})`
-              );
+    # Clear previous configs
+    SIEMENS_CONFIGS.clear()
+    COMBINED_CONFIG.clear()
+
+
+    def normalize_item(item, plc_type):
+        """
+        Normalize Siemens / Allen-Bradley read items
+        """
+        if plc_type == "Siemens":
+            return {
+                "name": item["content"],
+                "type": item["type"].lower()
             }
-          }
 
-          if (
-            (condition === ">" || condition === ">=") &&
-            processMax !== null
-          ) {
-            if (threshold > processMax) {
-              throw new Error(
-                `Row ${
-                  i + 1
-                }: Threshold (${threshold}) cannot exceed process maximum (${processMax})`
-              );
+        elif plc_type in ["Allen Bradley","Delta"]:
+            return {
+                "name": item["tag"],
+                "type": item["datatype"].lower()
             }
-          }
+
+        raise ValueError(f"Unsupported PLC type: {plc_type}")
+
+
+    def build_schema(read_items, plc_type):
+        schema = {
+            "id": "BIGINT AUTO_INCREMENT PRIMARY KEY",
+            "ts": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
         }
 
-        return {
-          condition,
-          threshold: thresholdRaw || "",
-          email: tr.querySelector(`input[name="email_${i}"]`)?.value || "",
-          contact: tr.querySelector(`input[name="contact_${i}"]`)?.value || "",
-          message:
-            tr.querySelector(`input[name="message_${i}"]`)?.value ||
-            `${brandKey} S${slaveId} ${registerName}`,
-          enabled:
-            tr.querySelector(`input[name="enabled_${i}"]`)?.checked || false,
-        };
-      });
+        for item in read_items:
+            normalized = normalize_item(item, plc_type)
+            name = normalized["name"]
+            dtype = normalized["type"]
 
-      setModbusAlerts(brandKey, slaveId, registerName, rows);
+            if dtype in ("real", "float","int", "dint", "word", "uint"):
+                schema[name] = "DOUBLE DEFAULT NULL"
+            elif dtype in ("bool", "boolean"):
+                schema[name] = "TINYINT(1) DEFAULT NULL"
+            else:
+                schema[name] = "VARCHAR(255) DEFAULT NULL"
 
-      const tick = document.getElementById("em-tick");
-      if (tick) {
-        tick.style.display = "inline-block";
-        setTimeout(() => (tick.style.display = "none"), 1100);
-      }
+        return schema
 
-      if (typeof saveConfig === "function") saveConfig();
-    } catch (ex) {
-      alert(ex.message); // ← IMPORTANT: show user exactly what’s wrong
-      console.error("[EM] Save failed", ex);
-    }
-  });
-}
+    for plc_entry in plc_configurations:
+        plc_type = plc_entry.get("plcType")
+        plc_data = plc_entry.get("PLC", {})
 
-// ===================== PLC render + handlers =====================
-function renderPlcSection(selectedBrand = "", selectedSlave = "") {
-  const mount = document.getElementById("plc-section");
-  if (!mount) return;
+        # ---- Validate table name ----
+        table_name = plc_data.get("Database", {}).get("table_name")
+        if not table_name:
+            raise ValueError(f"{plc_type} PLC missing Database.table_name")
 
-  const map = getPlcBrandsAndSlaves();
-  const brands = Object.keys(map);
-  if (!selectedBrand || !selectedSlave) {
-    const pick = pickFirstPlcBrandAndSlave();
-    selectedBrand = selectedBrand || pick.brandKey;
-    selectedSlave = selectedSlave || pick.slaveId;
-  }
+        # ---- Build schema ----
+        read_items = plc_data.get("address_access", {}).get("read", [])
+        schema = build_schema(read_items, plc_type)
+        plc_db_cfg = plc_data["Database"]
 
-  const brandTabs = brands
-    .map((bk) => {
-      const active = bk === selectedBrand;
-      return `<button class="plc-brand" data-brand="${bk}" style="${tabBtnStyle(
-        active
-      )}"
-          onmouseenter="if(!this.classList.contains('active')) this.style.background='#f3f4f6'"
-          onmouseleave="if(!this.classList.contains('active')) this.style.background='#fff'"
-        >${bk}</button>`;
-    })
-    .join("");
+        plc_data["Database"]["targets"] = {}
 
-  const slaveTabs = (map[selectedBrand] || [])
-    .map((sid) => {
-      const active = sid === selectedSlave;
-      return `<button class="plc-slave" data-slave="${sid}" style="${tabBtnStyle(
-        active
-      )}"
-          onmouseenter="if(!this.classList.contains('active')) this.style.background='#f3f4f6'"
-          onmouseleave="if(!this.classList.contains('active')) this.style.background='#fff'"
-        >Slave ${sid}</button>`;
-    })
-    .join("");
+        # LOCAL
+        if plc_db_cfg.get("upload_local"):
+            plc_data["Database"]["targets"]["local"] = {
+                "enabled": True,
+                "cred": DATABASE["local"]["cred"],
+                "database": plc_db_cfg["db_name"],
+                "table_name": plc_db_cfg["table_name"],
+                "schema": schema
+            }
 
-  mount.innerHTML = `
-        <div style="display:flex; flex-wrap:wrap; align-items:center;">${brandTabs}</div>
-        <div style="display:flex; flex-wrap:wrap; align-items:center; margin-top:6px;">${slaveTabs}</div>
-        <div style="margin-top:10px; background:#fff; border:1px solid ${UI_BORDER}; border-radius:10px; padding:12px;">
-          ${renderPlcAlertsTable(selectedBrand, selectedSlave)}
-        </div>
-      `;
+        # CLOUD
+        if plc_db_cfg.get("upload_cloud"):
+            plc_data["Database"]["targets"]["cloud"] = {
+                "enabled": True,
+                "cred": DATABASE["cloud"]["cred"],
+                "database": plc_db_cfg["db_name"],
+                "table_name": plc_db_cfg["table_name"],
+                "schema": schema
+            }
 
-  mount.querySelectorAll(".plc-brand").forEach((btn) => {
-    btn.onclick = () => {
-      const newBrand = btn.dataset.brand;
-      const firstSlave =
-        map[newBrand] && map[newBrand][0] ? map[newBrand][0] : "";
-      renderPlcSection(newBrand, firstSlave);
-    };
-  });
-  mount.querySelectorAll(".plc-slave").forEach((btn) => {
-    btn.onclick = () => renderPlcSection(selectedBrand, btn.dataset.slave);
-  });
+        if not plc_data["Database"]["targets"]:
+            raise ValueError(f"{plc_type} PLC has no enabled DB targets")
 
-  setupPlcHandlers(selectedBrand, selectedSlave);
-}
+        for db_name, db in global_db.items():
 
-function renderPlcAlertsTable(brandKey, slaveId) {
-  const alerts = getPlcAlerts(brandKey, slaveId);
+            plc_data["Database"]["targets"][db_name] = {
+                "cred": db["cred"],
+                "table_name": table_name,
+                "schema": schema,
+                "enabled":db["enabled"]
+            }
 
-  const rows = alerts
-    .map(
-      (row, i) => `
-        <tr data-row="${i}">
-          <td style="${tdStyle} color:${UI_MUTED};">${i + 1}</td>
-          <td style="${tdStyle}">${brandKey}</td>
-          <td style="${tdStyle}">${slaveId}</td>
-          <td style="${tdStyle}">
-            <select name="condition_${i}" style="${inputStyle()}">
-              <option ${row.condition === "<=" ? "selected" : ""}>&lt;=</option>
-              <option ${row.condition === "<" ? "selected" : ""}>&lt;</option>
-              <option ${row.condition === ">=" ? "selected" : ""}>&gt;=</option>
-              <option ${row.condition === ">" ? "selected" : ""}>&gt;</option>
-            </select>
-          </td>
-          <td style="${tdStyle}"><input type="number" step="any" name="threshold_${i}" value="${
-        row.threshold ?? ""
-      }" style="${inputStyle("120px")}"></td>
-          <td style="${tdStyle}"><input type="text" name="contact_${i}" value="${
-        row.contact ?? ""
-      }" style="${inputStyle("180px")}"></td>
-          <td style="${tdStyle}"><input type="text" name="message_${i}" value="${
-        row.message ?? ""
-      }" style="${inputStyle("220px")}"></td>
-          <td style="${tdStyle}; text-align:center;"><input type="checkbox" name="enabled_${i}" ${
-        row.enabled ? "checked" : ""
-      }></td>
-          <td style="${tdStyle}; text-align:center;">
-            <button type="button" class="plc-del" data-idx="${i}" style="border:1px solid #ef4444; color:#ef4444; background:#fff; padding:6px 10px; border-radius:6px; font-size:12px; cursor:pointer;">Remove</button>
-          </td>
-        </tr>
-      `
+        if not plc_data["Database"]["targets"]:
+            raise ValueError("No enabled database targets found")
+
+        # ---- Common runtime settings ----
+        plc_data["log_path"] = "/home/gateway/logs"
+        plc_data["data_reading_freq(in secs)"] = plc_data["data_freq_sec"]
+
+        # ---- Route PLCs ----
+        if plc_type == "Siemens":
+            SIEMENS_CONFIGS.append({"PLC": plc_data,"generate_random": plc_entry.get("generate_random", False)})
+
+        elif plc_type in ["Allen Bradley","Delta"]:
+            COMBINED_CONFIG.append({"PLC": plc_data,"generate_random": plc_entry.get("generate_random", False)})
+
+        else:
+            raise ValueError(f"Unknown PLC type: {plc_type}")
+
+
+    # print(SIEMENS_CONFIGS)
+    log_info(f"[INFO] Loaded {len(SIEMENS_CONFIGS)} Siemens configurations.")
+    log_info(f"[INFO] Loaded {len(COMBINED_CONFIG)} Combined configurations")
+
+    # Ethernet Configuration
+    ethernet_cfg = config.get("ethernet", {})
+    RECV_IP = ethernet_cfg.get("recvIp", "0.0.0.0")
+    RECV_PORT = ethernet_cfg.get("recvPort", 12345)
+    SEND_TARGETS = ethernet_cfg.get("sendTargets", [])
+
+    # RS485 Configuration
+    rs485_cfg = config.get("rs485", {})
+    RS485_PORT = rs485_cfg.get("port", "/dev/ttyAMA5")
+    RS485_BAUD_RATE = int(rs485_cfg.get("baud", 115200))
+
+    # Kafka Configuration
+    kafka_cfg = config.get("kafka", {})
+    KAFKA_BROKERS = kafka_cfg.get("brokers", ["broker1:9092"])
+    KAFKA_TOPIC = kafka_cfg.get("topic", "create-commands")
+    KAFKA_CERT_FILES = kafka_cfg.get("certFiles", {})
+
+    # Alarm Settings
+    alarm_settings = config.get("alarmSettings", {})
+    DIGITAL_IO_ALARMS = alarm_settings.get("Digital I/O", {})
+    ANALOG_ALARMS = alarm_settings.get("Analog", {})
+    MODBUS_ALARMS = alarm_settings.get("Modbus", {})
+
+    # Offline Data Configuration
+    offline_data_cfg = config.get("offlineData", {})
+    OFFLINE_ENABLED = offline_data_cfg.get("enabled", True)
+    OFFLINE_MODE = offline_data_cfg.get("mode", "schedule")
+    OFFLINE_FTP = offline_data_cfg.get("ftp", {})
+    OFFLINE_SCHEDULE = offline_data_cfg.get("schedule", {})
+
+    # Legacy configurations
+    CSV_FILENAME = "data_log.csv"
+    LAST_SENT_FILE = (
+        "/home/gateway/GATEWAY-COMPLETE/Demo application/Main Application/last_sent.txt"
     )
-    .join("");
+    LTE_INTERFACE = config.get("lteInterface", "usb0")
+    MYSQL_CONFIG = config.get(
+        "mysqlConfig",
+        {
+            "user": "gateway",
+            "password": "gateway",
+            "host": "localhost",
+            "database": "gateway",
+        },
+    )
+    # ADC I2C address
+    ADC_I2C_ADDRESS = 0x48
 
-  return `
-        <form id="plc-form" onsubmit="return false;" data-brand="${brandKey}" data-slave="${slaveId}">
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
-            <div style="color:${UI_MUTED}; font-size:13px;">Brand <span style="color:${UI_TEXT}; font-weight:600;">${brandKey}</span> · Slave <span style="color:${UI_TEXT}; font-weight:600;">${slaveId}</span></div>
-            <div style="display:flex; gap:8px;">
-              <button type="button" id="plc-add" style="${btnPrimaryStyle()}">+ Add Alert</button>
-              <button type="submit" id="plc-save" style="${btnDarkStyle()}">Save</button>
-              <span id="plc-tick" style="display:none; color:${UI_ACCENT}; font-weight:600; align-self:center;">Saved</span>
-            </div>
-          </div>
-          <div style="overflow:auto; border:1px solid ${UI_BORDER}; border-radius:8px;">
-            <table style="width:100%; border-collapse:separate; border-spacing:0;">
-              <thead>
-                <tr>
-                  <th style="${thStyle}">#</th>
-                  <th style="${thStyle}">Brand</th>
-                  <th style="${thStyle}">Slave ID</th>
-                  <th style="${thStyle}">Condition</th>
-                  <th style="${thStyle}">Threshold</th>
-                  <th style="${thStyle}">Contact</th>
-                  <th style="${thStyle}">Message</th>
-                  <th style="${thStyle}; text-align:center;">Enabled</th>
-                  <th style="${thStyle}; text-align:center;">Delete</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${
-                  rows ||
-                  `<tr><td colspan="9" style="padding:14px; color:${UI_MUTED}; text-align:center;">No alerts for <span style="color:${UI_TEXT}; font-weight:600;">${brandKey}</span> · <span style="color:${UI_TEXT}; font-weight:600;">Slave ${slaveId}</span>. Click “Add Alert”.</td></tr>`
+    # Data storage initialization
+    if data_map is None:
+        data_map = {}
+    if analog_readings is None:
+        analog_readings = {}
+    if digital_readings is None:
+        digital_readings = {}
+    if modbus_readings is None:
+        modbus_readings = {}
+
+    # Initialize I2C bus if not already done
+    if bus is None:
+        try:
+            bus = smbus.SMBus(1)
+        except Exception as e:
+            log_error(f"[ERROR] Failed to initialize I2C bus: {e}")
+
+    log_info("[INFO] ✅ Global configuration variables updated successfully")
+    log_info(
+        f"[INFO] Key settings - Analog: {ANALOG_ENABLED}, Digital: {DIGITAL_INPUT_ENABLED}"
+    )
+    log_info(
+        f"[INFO] Key settings - Modbus: {MODBUS_ENABLED}, ModbusTCP: {MODBUS_TCP_ENABLED}"
+    )
+    try:
+        f2db = config.get("fileToDb", {}) or {}
+        file_items = f2db.get("files", []) or []
+        for fcfg in file_items:
+            # start background poll thread per file
+            log_info(f"FCFG: {fcfg}")
+            if fcfg.get("_internal").get("enabled"):
+                t = threading.Thread(
+                    target=file_to_db_poll_loop, args=(fcfg,), daemon=True
+                )
+                t.start()
+        log_info(f"[INFO] Started {len(file_items)} file-to-db poller(s).")
+    except Exception as e:
+        log_error(f"[ERROR] Failed to start file-to-db pollers: {e}")
+
+    UPDATED = True
+    # connect_wifi()
+    return True
+
+
+"""
+What: Check is_updated.json for a text boolean ('true'/'false') within first two lines to trigger config reload.
+Calls: Path.exists(), built-in file I/O
+Required by: config_monitor_loop()
+Notes: Returns True/False/None. Uses first two lines but substitutes second into first if present.
+Side effects: None.
+"""
+
+
+def read_update_flag(file_path=f"{BASE_DIR}/is_updated.json"):
+    try:
+        update_file = Path(file_path)
+        if not update_file.exists():
+            return None
+ 
+        with open(update_file, "r") as f:
+            # Read up to 2 lines safely
+            lines = []
+            for _ in range(2):
+                line = f.readline()
+                if not line:
+                    break
+                lines.append(line.strip().lower())
+ 
+        if not lines:
+            return None
+ 
+        # Accept either line being "true"
+        flag_line = lines[0]
+        if len(lines) > 1 and lines[1]:
+            flag_line = lines[1]   # prefer second line if present (UI writes there)
+ 
+        if flag_line.startswith("true"):
+            return True
+        if flag_line.startswith("false"):
+            return False
+        return None
+ 
+    except Exception as e:
+        log_error(f"[ERROR] Failed to read update flag: {e}")
+        return None
+
+"""
+What: Write 'false' to is_updated.json to acknowledge config reload completion.
+Calls: built-in file I/O
+Required by: config_monitor_loop() after successful update_global_config().
+Notes: Prevents repeated reloads.
+Side effects: Overwrites file content.
+"""
+
+
+def clear_update_flag(file_path=f"{BASE_DIR}/is_updated.json"):
+    try:
+        with open(file_path, "w") as f:
+            f.write("false")
+        log_info(f"[INFO] Cleared update flag in {file_path}")
+    except Exception as e:
+        log_error(f"[ERROR] Failed to clear update flag: {e}")
+
+def _connect_smb_and_open(smb_cfg, file_cfg=None):
+    # smb_cfg: dict with smb_share (//host/share), creds
+    # file_cfg: parent dict, used to pick file_keyword
+    try:
+        smb_url = smb_cfg.get("smb_share", "")
+        if not smb_url.startswith("//"):
+            return None, None
+
+        # Split into server + share
+        parts = smb_url[2:].split("/", 1)
+        server = parts[0]
+        share_and_path = parts[1] if len(parts) > 1 else ""
+        if "/" in share_and_path:
+            share_name, share_rel_path = share_and_path.split("/", 1)
+        else:
+            share_name, share_rel_path = share_and_path, ""
+
+        user = smb_cfg.get("share_username") or ""
+        pwd = smb_cfg.get("share_password") or ""
+        client_name = os.uname().nodename if hasattr(os, "uname") else "client"
+        server_name = server
+
+        conn = SMBConnection(user, pwd, client_name, server_name, use_ntlm_v2=True, is_direct_tcp=True)
+        if not conn.connect(server, 445, timeout=30):
+            print("[WARN] SMB Connection failed")
+            return None, None
+
+        # Build file path
+        if share_rel_path:  
+            # Full path already provided
+            read_path = share_rel_path
+        else:
+            # No file path → use file_keyword
+            keyword = ""
+            if file_cfg:
+                keyword = file_cfg.get("file_details", {}).get("file_keyword", "")
+            if not keyword:
+                print("[WARN] No file_keyword provided for SMB file lookup")
+                return None, None
+            read_path = keyword + ".csv"
+
+        fbuf = io.BytesIO()
+        conn.retrieveFile(share_name, "/" + read_path.lstrip("/"), fbuf)
+        fbuf.seek(0)
+        return fbuf.read(), os.path.basename(read_path)
+
+    except Exception as e:
+        print(f"[WARN] SMB read failed: {e}")
+        return None, None
+
+def _load_file_to_df(file_bytes, file_path_hint, file_type):
+    # Supports json, csv, excel based on file_type or extension
+    try:
+        if file_type == "json" or (not file_type and str(file_path_hint).lower().endswith(".json")):
+            # JSON can be array or lines
+            try:
+                data = json.loads(file_bytes.decode("utf-8"))
+                return pd.json_normalize(data) if isinstance(data, list) else pd.json_normalize([data])
+            except Exception:
+                # Try line-delimited JSON
+                return pd.read_json(io.BytesIO(file_bytes), lines=True)
+        elif file_type == "csv" or str(file_path_hint).lower().endswith(".csv"):
+            return pd.read_csv(io.BytesIO(file_bytes))
+        elif file_type == "excel" or str(file_path_hint).lower().endswith((".xlsx", ".xls")):
+            return pd.read_excel(io.BytesIO(file_bytes))
+        else:
+            # Fallback try JSON
+            data = json.loads(file_bytes.decode("utf-8"))
+            return pd.json_normalize(data) if isinstance(data, list) else pd.json_normalize([data])
+    except Exception as e:
+        print(f"[ERROR] Failed to parse file: {e}")
+        return pd.DataFrame()
+
+def _apply_datetime_handling(df, internal_cfg):
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        return df
+    created_on = datetime.now(timezone.utc).astimezone(ZoneInfo("Asia/Kolkata")).strftime('%Y-%m-%d %H:%M:%S')
+    df["created_on"] = pd.to_datetime(created_on)
+    # Combine date/time if separate
+    if internal_cfg and internal_cfg.get("hasDatetime"):
+        dtinfo = internal_cfg.get("datetimeInfo") or {}
+        if dtinfo.get("type") == "combined":
+            col = dtinfo.get("datetimeColumn")
+            if col in df.columns:
+                df[col] = pd.to_datetime(df[col], errors="coerce", utc=True)
+        elif dtinfo.get("type") == "separate":
+            dcol = dtinfo.get("dateColumn")
+            tcol = dtinfo.get("timeColumn")
+            if dcol in df.columns and tcol in df.columns:
+                # Combine date and time into datetime
+                df["datetime"] = pd.to_datetime(df[dcol].astype(str) + " " + df[tcol].astype(str), errors="coerce", utc=True)  # [6][12][15]
+    return df
+
+def _infer_schema_from_df(df, table_name):
+    # Build MySQL schema dict: id, file_name, created_on + columns
+    schema = {
+        "id": "INT AUTO_INCREMENT PRIMARY KEY",  # [7][13]
+        "file_name": "VARCHAR(255)",
+        "created_on": "TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP(6)"
+    }
+    for col, dtype in df.dtypes.items():
+        col_l = str(col).lower()
+        if col in ("id", "file_name", "created_on"):
+            continue
+        if "datetime" in col_l or "time" in col_l or str(dtype).startswith(("datetime64", "datetime")):
+            schema[col] = "DATETIME"
+        elif "int" in str(dtype):
+            schema[col] = "INT"
+        elif "float" in str(dtype) or "double" in str(dtype):
+            schema[col] = "DOUBLE"
+        else:
+            # default text size
+            schema[col] = "VARCHAR(255)"
+    return schema
+
+def _ensure_table(conn, db_name, table_name, schema):
+    cur = conn.cursor()
+    print("Create table started")
+    cur.execute(f"CREATE DATABASE IF NOT EXISTS `{db_name}`")
+    cur.execute(f"USE `{db_name}`")
+    # Create table if not exists with base columns; then add missing columns
+    cols_sql = ", ".join([f"`{c}` {t}" for c, t in schema.items()])
+    cur.execute(f"CREATE TABLE IF NOT EXISTS `{table_name}` ({cols_sql}) ENGINE=InnoDB")
+    # Ensure columns exist
+    cur.execute(f"SHOW COLUMNS FROM `{table_name}`")
+    existing = {row for row in cur.fetchall()}
+    existing = [i[0] for i in existing]
+    print("Existing: ",existing)
+    for c, t in schema.items():
+        if c not in ["id"] and c not in existing:
+            print("Not Existing",c,t)
+            cur.execute(f"ALTER TABLE `{table_name}` ADD COLUMN `{c}` {t}")
+    conn.commit()
+    cur.close()
+
+def _make_row_hash(row, key_cols):
+    # Build a simple hashable tuple for dedup
+    return tuple((k, row.get(k)) for k in key_cols if k in row)
+
+def _insert_new_rows(conn, db_name, table, df, filter_cols, file_name_value):
+    if df.empty:
+        return 0
+
+    cur = conn.cursor(dictionary=True)
+    cur.execute(f"USE `{db_name}`")
+
+    # Detect datetime columns
+    dt_cols = [c for c in df.columns if "datetime" in c.lower()]
+
+    if dt_cols:
+        # Use the first datetime column for dedup
+        dt_col = dt_cols[0]
+
+        # Get distinct datetime values in the dataframe
+        incoming_dt = df[dt_col].dropna().unique().tolist()
+        if not incoming_dt:
+            cur.close()
+            return 0
+
+        # Check if any of these already exist in DB
+        placeholders = ", ".join(["%s"] * len(incoming_dt))
+        cur.execute(
+            f"SELECT `{dt_col}` FROM `{table}` WHERE `{dt_col}` IN ({placeholders}) LIMIT 1",
+            tuple(incoming_dt),
+        )
+        exists = cur.fetchone()
+
+        if exists:
+            cur.close()
+            return 0  # Skip entire insert
+
+    # Otherwise, proceed with normal dedup based on filter_cols
+    if filter_cols:
+        key_list = ", ".join([f"`{c}`" for c in filter_cols if c in df.columns])
+        cur.execute(f"SELECT {key_list} FROM `{table}` ORDER BY id DESC LIMIT 10000")
+        existing = {_make_row_hash(r, filter_cols) for r in cur.fetchall()}
+    else:
+        key_cols = df.columns[:1].tolist()
+        key_list = ", ".join([f"`{c}`" for c in key_cols])
+        cur.execute(f"SELECT {key_list} FROM `{table}` ORDER BY id DESC LIMIT 10000")
+        existing = {_make_row_hash(r, key_cols) for r in cur.fetchall()}
+
+    insert_cols = list(df.columns)
+    if "file_name" not in insert_cols:
+        insert_cols = ["file_name"] + insert_cols
+
+    rows = []
+    for _, r in df.iterrows():
+        rd = r.to_dict()
+        rh = _make_row_hash(rd, filter_cols or key_cols)
+        if rh in existing:
+            continue
+        existing.add(rh)
+        rd["file_name"] = file_name_value or ""
+        rows.append([rd.get(c) for c in insert_cols])
+
+    if not rows:
+        cur.close()
+        return 0
+
+    placeholders = ", ".join(["%s"] * len(insert_cols))
+    cols_sql = ", ".join([f"`{c}`" for c in insert_cols])
+    cur.executemany(
+        f"INSERT INTO `{table}` ({cols_sql}) VALUES ({placeholders})",
+        rows,
+    )
+    conn.commit()
+    cur.close()
+    return len(rows)
+
+def _poll_file_source_loop(file_cfg):
+    # Runs in thread, polls each data_freq seconds
+    db_name = "sensor_readings"  # configurable if needed
+    table_name = file_cfg.get("storing_database", {}).get("table_name") or file_cfg.get("file_details", {}).get("file_keyword") or "file_data"
+    freq = int(file_cfg.get("data_freq(in secs)", 60))
+    log_path = file_cfg.get("log_file_path", "")
+    file_type = file_cfg.get("file_details", {}).get("file_type", "json")
+    internal = file_cfg.get("_internal", {}) or {}
+    skip_lines = int(internal.get("skipLines", 0))
+    columns = file_cfg.get("file_details", {}).get("columns_to_fetch") or []
+    filter_field = internal.get("filterField") or None
+    smb_cfg = file_cfg.get("SMBShare", {}) or {}
+
+    # MySQL connection (adjust as per deployment)
+    conn = mysql.connector.connect(user="grafana", password="grafana_pass", host="localhost", database=db_name)
+    last_schema = None
+
+    while True:
+        try:
+            file_bytes = None
+            file_name = None
+            # Prefer explicit log_file_path local file if exists
+            if log_path and os.path.exists(log_path):
+                with open(log_path, "rb") as f:
+                    file_bytes = f.read()
+                file_name = os.path.basename(log_path)
+                print("Log Path: ",file_name)
+            else:
+                # Try SMB if configured
+                if smb_cfg.get("smb_share"):
+                    file_bytes, file_name = _connect_smb_and_open(smb_cfg,file_cfg)
+                    # If no target_path in SMB config and local_mount_point is provided and exists, try that too
+                    # print("File bytes: ",file_bytes)
+                    print("File Name: ",file_name)
+                if not file_bytes and smb_cfg.get("local_mount_point") and os.path.exists(smb_cfg["local_mount_point"]):
+                    mp = smb_cfg["local_mount_point"]
+                    # If file_keyword is present, prefer matching file
+                    file_keyword = file_cfg.get("file_details", {}).get("file_keyword") or ""
+                    candidate = None
+                    if os.path.isdir(mp):
+                        # find first matching file by keyword
+                        for fn in os.listdir(mp):
+                            if not file_keyword or file_keyword in fn:
+                                candidate = os.path.join(mp, fn)
+                                break
+                    else:
+                        candidate = mp
+                    if candidate and os.path.exists(candidate):
+                        with open(candidate, "rb") as f:
+                            file_bytes = f.read()
+                        file_name = os.path.basename(candidate)
+
+            if not file_bytes:
+                print("[WARN] No file bytes read this cycle.")
+                time.sleep(freq)
+                continue
+
+            df = _load_file_to_df(file_bytes, log_path or file_name, file_type)
+            if skip_lines and not df.empty:
+                df = df.iloc[skip_lines:].reset_index(drop=True)
+            print("SMB DF: ",df)
+            # Project to selected columns if specified
+            if columns:
+                keep_cols = [c for c in columns if c in df.columns]
+                if keep_cols:
+                    df = df[keep_cols]
+            # Datetime handling + created_on
+            print("DF After columns: ",df)
+            df = _apply_datetime_handling(df, internal)
+            print("Date time DF: ",df)
+            # Ensure schema
+            schema = _infer_schema_from_df(df, table_name)
+            if last_schema != schema:
+                _ensure_table(conn, db_name, table_name, schema)
+                last_schema = schema
+            print("Schema: ",schema)
+            # Dedup and insert
+            filter_cols = [filter_field] if (filter_field and filter_field in df.columns) else None
+            print("Filter_cols: ",filter_cols)
+            inserted = _insert_new_rows(conn, db_name, table_name, df, filter_cols, file_name_value=file_name)
+            if inserted:
+                print(f"[INFO] Inserted {inserted} new rows into {table_name}.")
+            else:
+                print("[INFO] No new rows (duplicates skipped).")
+
+        except Exception as e:
+            print(f"[ERROR] Polling error for {table_name}: {e}")
+
+        time.sleep(freq)
+
+
+def start_enabled_threads():
+    global MANAGED_THREADS
+
+    STOP_EVENT.clear()
+
+    with THREAD_LOCK:
+        MANAGED_THREADS = []
+
+        def start(name, target):
+            t = threading.Thread(
+                target=target,
+                daemon=True,      # 🔴 IMPORTANT
+                name=name
+            )
+            t.start()
+            MANAGED_THREADS.append(t)
+            log_info(f"[THREAD] {name} started")
+
+        start("NetworkWatcher", network_watcher_loop)
+        # start("SystemStatus", system_status_monitor)
+
+        if ANALOG_ENABLED:
+            start("AnalogReader", analog_reader_loop)
+
+        if DIGITAL_INPUT_ENABLED:
+            start("DigitalReader", digital_io_loop)
+            start("DigitalWriter", digital_db_writer_loop)
+
+        if MODBUS_ENABLED:
+            start("ModbusReader", modbus_reader_loop)
+            start("ModbusDBWriter",modbus_db_writer_loop)
+
+        if MODBUS_TCP_ENABLED:
+            start("ModbusTCP", modbus_tcp_handler)
+
+
+def stop_all_threads():
+    global MANAGED_THREADS, PLC_REGISTRY
+    log_info("[THREAD] Stopping all background tasks...")
+    STOP_EVENT.set()  # Signal every loop to stop
+ 
+    with THREAD_LOCK:
+        # Join generic managed threads
+        for t in MANAGED_THREADS:
+            if t.is_alive():
+                log_info(f"[THREAD] Waiting for {t.name} to exit...")
+                t.join(timeout=3.0)
+        MANAGED_THREADS.clear()
+ 
+        # Also join PLC threads (poll_plc threads tracked separately)
+        for tid, t in list(PLC_REGISTRY.items()):
+            if t.is_alive():
+                log_info(f"[THREAD] Waiting for PLC thread {tid} to exit...")
+                t.join(timeout=3.0)
+        PLC_REGISTRY.clear()
+ 
+    # Drain queues so stale data from the old config is not written
+    # with the new schema.
+    try:
+        while not DIGITAL_QUEUE.empty():
+            DIGITAL_QUEUE.get_nowait()
+            DIGITAL_QUEUE.task_done()
+    except Exception:
+        pass
+    try:
+        while not MODBUS_DB_QUEUE.empty():
+            MODBUS_DB_QUEUE.get_nowait()
+            MODBUS_DB_QUEUE.task_done()
+    except Exception:
+        pass
+ 
+    log_info("[THREAD] All tasks fully stopped.")
+
+"""
+What: Background loop that watches is_updated.json and reloads global config when it becomes true.
+Calls: read_update_flag(), update_global_config(), clear_update_flag()
+Required by: start_config_monitor() (spawns as thread)
+Notes: Sleeps 5s between checks; tracks last_flag_state to avoid duplicate logs.
+Side effects: Mutates globals via update_global_config(); writes is_updated.json via clear_update_flag().
+"""
+
+CONFIG_VERSION = 0
+
+def config_monitor_loop():
+    global CONFIG_VERSION
+    log_info("[CONFIG] Monitor started — watching is_updated.json")
+ 
+    while True:   # NOTE: don't gate on STOP_EVENT, monitor must survive restarts
+        try:
+            flag = read_update_flag(f"{BASE_DIR}/is_updated.json")
+ 
+            if flag is True:
+                log_info("[CONFIG] 🔄 Update flag TRUE detected")
+                log_info("[CONFIG] Step 1/4: stopping all threads...")
+                stop_all_threads()
+ 
+                log_info("[CONFIG] Step 2/4: reloading config.json into globals...")
+                reload_ok = update_global_config()
+ 
+                if not reload_ok:
+                    log_error("[CONFIG] Reload failed — keeping old threads stopped. "
+                              "Will retry on next flag toggle.")
+                    # Clear STOP_EVENT so next successful load can restart
+                    STOP_EVENT.clear()
+                    clear_update_flag(f"{BASE_DIR}/is_updated.json")
+                    time.sleep(5)
+                    continue
+ 
+                # Bump version so any stragglers exit their inner loops
+                with THREAD_LOCK:
+                    CONFIG_VERSION += 1
+ 
+                log_info(f"[CONFIG] Step 3/4: starting enabled threads "
+                         f"(version={CONFIG_VERSION})...")
+                STOP_EVENT.clear()          # 🔴 critical — release the stop signal
+                start_enabled_threads()
+ 
+                log_info("[CONFIG] Step 4/4: clearing is_updated.json flag")
+                clear_update_flag(f"{BASE_DIR}/is_updated.json")
+ 
+                log_info(f"[CONFIG] ✅ Reload complete — version {CONFIG_VERSION}")
+ 
+            time.sleep(2)
+ 
+        except Exception as e:
+            log_error(f"[CONFIG] Monitor error: {e}")
+            time.sleep(5)
+ 
+
+"""
+What: Ensure initial configuration is loaded, then spawn config_monitor_loop() as a daemon thread.
+Calls: update_global_config(), threading.Thread(target=config_monitor_loop)
+Required by: main() when bootstrapping background services.
+Notes: Returns the thread object for tracking in main().
+Side effects: Starts a background thread; may exit(1) if initial config load fails.
+"""
+
+
+def start_config_monitor():
+    # Initialize global configuration first
+    if not UPDATED:
+        if not update_global_config():
+            log_error("[CRITICAL] Initial configuration load failed. Exiting.")
+            exit(1)
+
+    # Start monitoring thread
+    config_thread = threading.Thread(target=config_monitor_loop, daemon=True)
+    config_thread.start()
+    log_info("[INFO] 🚀 Configuration monitor thread started")
+    return config_thread
+
+
+# ==================================================
+# ANALOG READING FUNCTIONS
+# ==================================================
+
+"""
+What: Read one analog channel from ADS1115 via I2C, apply optional scaling, and return voltage.
+Calls: bus.write_word_data(), bus.read_word_data()
+Required by: read_all_analog_channels()
+Notes: Uses ANALOG_CHANNELS config and ADC_I2C_ADDRESS. On exceptions returns a random fallback value (simulated).
+        Performs byte swap and signed conversion; scales using linear mapping if configured.
+Side effects: Prints diagnostic info; touches I2C device.
+"""
+
+def read_analog_channel(channel_idx, real=True):
+    try:
+        if channel_idx >= len(ANALOG_CHANNELS):
+            return None
+
+        ch = ANALOG_CHANNELS[channel_idx]
+        if not ch.get("enabled", False):
+            return None
+
+        mode = ch.get("mode", "0-10V")
+        scale_range = ch.get("range", "0-10")
+        adc_addr = ch.get("address")
+
+        if adc_addr is None:
+            log_error(f"[ANALOG] CH{channel_idx} invalid I2C address")
+            return None
+
+        # ---------------- SIMULATION ----------------
+        if not real:
+            if mode == "0-10V":
+                max_v = 10.0 if scale_range == "0-10" else 5.0
+                value = round(random.uniform(0.0, max_v), 2)
+                log_info(f"[SIM] CH{channel_idx} {scale_range}V = {value}")
+                return value
+
+            elif mode == "4-20mA":
+                value = round(random.uniform(4.0, 20.0), 2)
+                log_info(f"[SIM] CH{channel_idx} 4–20mA = {value}")
+                return value
+
+            return None
+
+        # ---------------- REAL ADC ----------------
+        config_value = 0xC000 | (channel_idx << 12)
+        bus.write_word_data(adc_addr, 0x01, config_value)
+        time.sleep(0.1)
+
+        raw = bus.read_word_data(adc_addr, 0x00)
+        raw = ((raw << 8) & 0xFF00) | (raw >> 8)
+        if raw >= 0x8000:
+            raw -= 0x10000
+
+        voltage = raw * 2.048 / 32768.0  # DO NOT TOUCH
+
+        # ---------------- SCALING ----------------
+        if mode == "0-10V":
+            max_v = 10.0 if scale_range == "0-10" else 5.0
+            value = (voltage / 2.048) * max_v
+            value = round(max(0.0, min(value, max_v)), 2)
+            log_info(f"[ANALOG] CH{channel_idx} {scale_range}V = {value}")
+            return value
+
+        elif mode == "4-20mA":
+            value = 4.0 + (voltage / 2.048) * 16.0
+            value = round(max(4.0, min(value, 20.0)), 2)
+            log_info(f"[ANALOG] CH{channel_idx} 4–20mA = {value}")
+            return value
+
+        log_error(f"[ANALOG] Unsupported mode {mode}")
+        return None
+
+    except Exception as e:
+        log_error(f"[ANALOG][ERROR] CH{channel_idx}: {e}")
+        return None
+
+
+"""
+What: Read all enabled local ADC channels plus optional extension ADC simulated channels.
+Calls: read_analog_channel()
+Required by: main_data_collection_loop() (to gather sensor data periodically)
+Notes: EXTENSION_ADC readings are simulated with random values; replace with real driver if needed.
+Side effects: Console logging; returns dict like {'analog_ch_0': x, 'ext_adc_ch_0': y, ...}
+"""
+
+
+def read_all_analog_channels():
+    readings = {}
+    for idx, channel in enumerate(ANALOG_CHANNELS):
+        if channel.get("enabled", False):
+            voltage = read_analog_channel(idx, ANALOG_CONFIG["generate_random"])
+            if voltage is not None:
+                readings[f"analog_ch_{idx}"] = voltage
+
+    # Read extension ADC if enabled
+    # if EXTENSION_ADC.get("enabled", False):
+    #     ext_data = EXTENSION_ADC.get("data", [])
+    #     for idx, _ext_channel in enumerate(ext_data):
+    #         # Simulate reading extension ADC
+    #         voltage = round(random.uniform(2.0, 8.0), 2)
+    #         readings[f"ext_adc_ch_{idx}"] = voltage
+    #         print(f"[INFO] Extension ADC Channel {idx}: {voltage:.2f} V")
+
+    return readings
+
+
+# ==================================================
+# DIGITAL I/O FUNCTIONS
+# ==================================================
+
+def setup_gpio_once(gpio_num, direction="out"):
+    """
+    Ensures the GPIO is exported and the direction is set.
+    """
+    base_path = f"/sys/class/gpio/gpio{gpio_num}"
+    
+    # 1. Export the pin if the directory doesn't exist
+    if not os.path.exists(base_path):
+        try:
+            with open("/sys/class/gpio/export", "w") as f:
+                f.write(str(gpio_num))
+            # Critical: Give the OS time to create the file nodes
+            time.sleep(0.1) 
+        except OSError as e:
+            # Error 16 is "Device or resource busy", which is fine
+            if e.errno != 16:
+                raise
+
+    # 2. Set the direction (in or out)
+    direction_path = f"{base_path}/direction"
+    with open(direction_path, "w") as f:
+        f.write(direction)
+
+
+def write_sysfs_gpio(gpio_num, value):
+    """
+    Prepares the pin and writes the value (1 or 0).
+    """
+    try:
+        # Step A: Setup (Ensure exported and set to 'out')
+        setup_gpio_once(gpio_num, "out")
+        
+        # Step B: Write Value
+        path = f"/sys/class/gpio/gpio{gpio_num}/value"
+        with open(path, "w") as f:
+            f.write("1" if value else "0")
+            
+    except Exception as e:
+        # Assuming log_error is defined in your environment
+        log_error(f"[SYSFS GPIO ERROR] gpio{gpio_num}: {e}")
+
+
+def read_digital_outputs(do_channels):
+    outputs = {}
+
+    for idx, ch in enumerate(do_channels):
+        state = 1 if ch.get("state") in [1, "1", True] else 0
+        outputs[f"digital_out_{idx}"] = state
+
+    return outputs
+
+
+def apply_digital_outputs(do_channels):
+    """
+    Iterates through channels and applies states.
+    """
+    for idx, ch in enumerate(do_channels):
+        pin = ch.get("pin")
+        # Ensure state is handled as boolean/int 1/0
+        state = 1 if ch.get("state") in [1, "1", True] else 0
+
+        if pin is None:
+            continue
+
+        try:
+            write_sysfs_gpio(pin, state)
+            log_info(f"[DO] CH{idx} GPIO{pin} ← {state}")
+        except Exception as e:
+            log_error(f"[DO][ERROR] CH{idx} (pin={pin}): {e}")
+
+
+def apply_digital_outputs_gpio(do_channels):
+    for idx, ch in enumerate(do_channels):
+        pin = ch.get("pin")
+        state = ch.get("state", 0)
+
+        if pin is None:
+            continue
+
+        try:
+            GPIO.output(pin, GPIO.HIGH if state else GPIO.LOW)
+            log_info(f"[DO] CH{idx} GPIO {pin} ← {state}")
+        except Exception as e:
+            log_error(f"[DO][ERROR] CH{idx} (pin={pin}): {e}")
+
+
+
+_LAST_DO_STATE = [None, None]
+
+
+"""
+What: Sample enabled digital inputs and return states, also check digital alarms per channel.
+Calls: check_digital_alarm()
+Required by: main_data_collection_loop()
+Notes: Currently simulates inputs randomly (0/1). Replace with GPIO reads as needed.
+Side effects: May emit alarm printouts via check_digital_alarm().
+"""
+
+def get_digital_interval():
+    try:
+        cfg = DIGITAL_INPUT_CONFIG
+        return convert_polling_interval_to_seconds(
+            cfg.get("pollingInterval", 1),
+            cfg.get("pollingIntervalUnit", "Sec"),
+        )
+    except Exception as e:
+        log_error(f"[DIGITAL] Interval error, using default: {e}")
+        return 10.0
+
+def digital_db_writer_loop():
+    log_info("[THREAD] DigitalDBWriter started")
+
+    while not STOP_EVENT.is_set():
+        try:
+            ts, readings = DIGITAL_QUEUE.get(timeout=0.5)
+            insert_digital_data(ts, readings)
+            DIGITAL_QUEUE.task_done()
+
+        except queue.Empty:
+            continue
+
+        except Exception as e:
+            log_error(f"[DIGITAL][DB] {e}")
+
+
+def digital_io_loop():
+    log_info("[THREAD] DigitalReader started")
+
+    interval = get_digital_interval()  # seconds
+
+    while not STOP_EVENT.is_set():
+        try:
+            ts = datetime.now(
+                ZoneInfo("Asia/Kolkata")
+            ).strftime("%Y-%m-%d %H:%M:%S")
+
+            with GPIO_LOCK:
+                apply_digital_outputs(DIGITAL_OUTPUT_CHANNELS)
+
+                di_readings = read_digital_inputs(
+                    DIGITAL_CHANNELS,
+                    DIGITAL_INPUT_CONFIG.get("generate_random", False)
+                )
+
+                do_readings = read_digital_outputs(DIGITAL_OUTPUT_CHANNELS)
+
+                readings = {}
+                if isinstance(di_readings, dict):
+                    readings.update(di_readings)
+
+                readings.update(do_readings)
+
+            if readings:
+                DIGITAL_QUEUE.put_nowait((ts, readings))
+
+        except queue.Full:
+            log_warn("[DIGITAL] Queue full, dropping sample")
+
+        except Exception as e:
+            log_error(f"[DIGITAL] Error: {e}")
+
+        STOP_EVENT.wait(timeout=interval)
+
+
+"""
+What: Evaluate a digital input state against configured alarm thresholds and report alarms.
+Calls: None
+Required by: read_digital_inputs()
+Notes: Uses DIGITAL_IO_ALARMS config with up to 5 levels; prints [ALARM] lines when triggered.
+Side effects: Print to console; could be extended to send notifications.
+"""
+
+
+DIGITAL_ALARM_STATE = {}   # {(channel, alert_index): bool}
+DIGITAL_ALARM_TIMER = {}  # {(channel, alert_index): first_trigger_time}
+
+def normalize_digital_channel_key(key):
+    if isinstance(key, int):
+        return key
+
+    if isinstance(key, str):
+        key = key.strip()
+        if key.isdigit():
+            return int(key)
+        if key.lower().startswith("channel"):
+            try:
+                return int(key.split()[-1]) - 1
+            except Exception:
+                pass
+
+    return None
+
+
+def check_digital_alarm(channel, state):
+    now = time.time()
+    log_info(f"[INFO] Channel is {channel}")
+    # Find matching config block
+    channel_cfg = None
+    for k, v in DIGITAL_IO_ALARMS.items():
+        ch = normalize_digital_channel_key(k)
+        log_info(f"[INFO] Channel ch is {ch}")
+        if ch == channel:
+            channel_cfg = v
+            log_info(f"[INFO] Channel is {channel}")
+            break
+
+    if not channel_cfg:
+        log_info(f'[INFO] No channel_cfg found')
+        return
+
+    alerts = channel_cfg.get("alerts", [])
+    if not isinstance(alerts, list):
+        return
+
+    for idx, alert in enumerate(alerts):
+        if not alert.get("enabled", False):
+            DIGITAL_ALARM_STATE.pop((channel, idx), None)
+            DIGITAL_ALARM_TIMER.pop((channel, idx), None)
+            continue
+
+        trigger = alert.get("trigger", "").strip().upper()
+        delay = int(alert.get("delay", 0))
+        email = alert.get("email", "")
+        contact = alert.get("contact", "")
+        message = alert.get("message", "")
+
+        # Trigger logic (ACTIVE-LOW aware)
+        if trigger == "HIGH":
+            triggered = state == 1
+        elif trigger == "LOW":
+            triggered = state == 0
+        else:
+            log_error(f"[DIGITAL ALARM] Invalid trigger '{trigger}'")
+            continue
+
+        key = (channel, idx)
+        prev_state = DIGITAL_ALARM_STATE.get(key, False)
+
+        if triggered:
+            if key not in DIGITAL_ALARM_TIMER:
+                DIGITAL_ALARM_TIMER[key] = now
+                log_info(
+                    f"[DIGITAL ALARM] CH{channel} trigger detected, delay started ({delay}s)"
+                )
+
+            if now - DIGITAL_ALARM_TIMER[key] < delay:
+                continue
+
+            # 🔴 Rising edge after delay
+            if not prev_state:
+                DIGITAL_ALARM_STATE[key] = True
+                DIGITAL_ALARM_TIMER.pop(key, None)
+
+                subject = f"[DIGITAL ALARM] Channel {channel + 1} - {trigger}"
+                body = (
+                    f"Digital Alarm Triggered\n\n"
+                    f"Channel: Channel {channel + 1}\n"
+                    f"Trigger: {trigger}\n"
+                    f"State: {state}\n"
+                    f"Message: {message}\n"
+                    f"Contact: {contact}\n"
+                )
+
+                log_warn(f"[DIGITAL ALARM] CH{channel + 1}: {message}")
+
+                if email:
+                    send_email(email, subject, body)
+                else:
+                    log_error(
+                        f"[DIGITAL ALARM] No email configured for CH{channel + 1}"
+                    )
+
+        else:
+            # Condition cleared → reset latch & timer
+            DIGITAL_ALARM_STATE.pop(key, None)
+            DIGITAL_ALARM_TIMER.pop(key, None)
+
+
+
+
+# ==================================================
+# MODBUS FUNCTIONS
+# ==================================================
+
+
+def check_modbus_alarms(readings):
+    """
+    Checks all MODBUS alarms (alerts and per-channel configs) and calls send_sms if triggered.
+    """
+    # --- ALERTS: list-of-dict conditions (generic) ---
+    for alert in MODBUS_ALARMS.get("alerts", []):
+        log_info("Hello1")
+        if not alert.get("enabled"):
+            continue
+        slave_id = alert.get("slave_id")
+        threshold = float(alert.get("threshold"))
+        cond = alert.get("condition")
+        contact = alert.get("contact")
+        message = alert.get("message", "")
+
+        # Reading keys use e.g. "R1_S{slave_id}_{start}"
+        for key in readings:
+            # Only match keys for this slave_id
+            if f"S{slave_id}_" in key or f"slave_{slave_id}" in key:
+                value = None
+                v = readings[key]
+                # Try to extract numerical value
+                if isinstance(v, list):
+                    if v:
+                        value = v[0]
+                elif isinstance(v, (int, float)):
+                    value = v
+                try:
+                    if value is not None:
+                        triggered = (
+                            (cond == "<=" and value <= threshold)
+                            or (cond == "<" and value < threshold)
+                            or (cond == ">=" and value >= threshold)
+                            or (cond == ">" and value > threshold)
+                            or (cond == "==" and value == threshold)
+                        )
+                        if triggered:
+                            log_info("Hello")
+                            send_sms(
+                                contact,
+                                text=f"{message}: value={value} ({cond} {threshold})",
+                            )
+                except Exception as e:
+                    log_warn(f"[WARN] SMS alarm check error: {e}")
+
+    # --- CHANNEL ALARMS: per-channel structure ---
+    for channel_name, channel_cfg in MODBUS_ALARMS.items():
+        # Skip lists and settings
+        if channel_name in ["alerts", "Settings"] or not isinstance(channel_cfg, dict):
+            continue
+        if channel_cfg.get("alert_enable") != "Enable":
+            continue
+        # Loop through all alert levels
+        for i in range(5):
+            if channel_cfg.get(f"level_enable_{i}") != "Enable":
+                continue
+            try:
+                threshold = float(channel_cfg.get(f"level_threshold_{i}", 0))
+                contact = channel_cfg.get(f"level_contact_{i}", "")
+                message = channel_cfg.get(f"level_message_{i}", "")
+                # You may need to define which reading to check: if your key naming allows, match on channel or slave
+                # Here, just check every reading
+                for key, value in readings.items():
+                    if isinstance(value, list):
+                        values = value
+                    else:
+                        values = [value]
+                    for v in values:
+                        try:
+                            triggered = v >= threshold
+                            if triggered:
+                                send_sms(
+                                    contact,
+                                    text=f"{message}: value={v} (>= {threshold})",
+                                )
+                        except Exception as e:
+                            pass
+            except Exception as e:
+                continue
+
+
+"""
+What: Convert a list of 16-bit registers into floats.
+    - regs: list of integers from Modbus
+    - byte_order: 'big' or 'little' for each 16-bit register
+    - word_order: 'big' or 'little' for the two-register float
+Returns:
+    floats: list of valid floats
+    leftover: list of leftover registers that can't form a float.
+Calls: struct.unpack()
+Required by: read_modbus_registers() when conversion == "Float: Big Endian"
+Notes: Default uses big-endian bytes and little-endian word order; adjust per device documentation.
+Side effects: None.
+"""
+import struct
+
+
+def regs_to_float(regs):
+    """
+    Schneider EM6436H float:
+    - 2 registers per float
+    - word-swapped (CDAB)
+    - big-endian float
+    """
+    floats = []
+
+    for i in range(0, len(regs) - 1, 2):
+        hi = regs[i + 1].to_bytes(2, 'big')
+        lo = regs[i].to_bytes(2, 'big')
+        raw = hi + lo
+        floats.append(struct.unpack('>f', raw)[0])
+
+    log_info(f"[INFO] Floats are converted {floats}")
+    return floats
+
+
+
+def convert_regs(regs, conversion, length):
+    """
+    conversion: "Float: Big Endian" or "Integer"
+    length: number of 16-bit regs requested
+    Returns a list of numeric values
+    """
+
+    if conversion == "Float: Big Endian":
+        floats = []
+        for i in range(0, length, 2):
+            b1 = regs[i].to_bytes(2, "big")
+            b2 = regs[i + 1].to_bytes(2, "big")
+            raw_bytes = b1 + b2
+            floats.append(struct.unpack(">f", raw_bytes)[0])
+        return floats
+
+    elif conversion == "Integer":
+        if length == 1:
+            return [int(regs[0])]
+        return [int(x) for x in regs[:length]]
+
+    return [int(x) for x in regs[:length]]
+
+
+
+def safe_column_name(name):
+    # Basic sanitizer for column names: lowercase, spaces -> underscores, drop non-alnum/underscore
+    s = (name or "").strip().lower().replace(" ", "_")
+    s = re.sub(r"[^a-z0-9_]", "", s)
+    if not s:
+        s = "col_" + datetime.now(timezone.utc).astimezone(ZoneInfo("Asia/Kolkata")).strftime('%Y-%m-%d %H:%M:%S')
+    return s[:64]  # limit length
+
+def get_energy_brand_blocks(config):
+    modbus_rtu = config.get("ModbusRTU", {})
+    energy = modbus_rtu.get("Devices", {})
+    brands = energy.get("brands", {})
+    order = energy.get("order", [])
+
+    result = []
+
+    # Respect order first
+    for key in order:
+        if key in brands:
+            result.append((key, brands[key]))
+
+    # Add remaining brands not in order
+    for key, val in brands.items():
+        if key not in order:
+            result.append((key, val))
+
+    if not result:
+        log_info("[INFO] NO brands found")
+
+    return result
+
+
+def get_serial_settings(config):
+    """
+    Returns ModbusRTU.settings with defaults if missing.
+    Example: { "baudRate": "9600", "parity": "Even", "dataBits": 8, "stopBits": 1 }
+    """
+    return (config.get("ModbusRTU") or {}).get("settings") or {}
+
+
+"""
+What: Iterate configured Modbus tables (R1/R2) and fetch registers for each enabled slave.
+Calls: minimalmodbus.Instrument.read_registers()/read_input_registers(), regs_to_float()
+Required by: main_data_collection_loop()
+Notes: Uses MODBUS_R1_CFG/MODBUS_R2_CFG tables and per-reg conversion rules (Integer/Float/Hex).
+        Adds entries in the returned dict with keys like 'R1_S{slave}_{start}'.
+Side effects: Console logs; serial comms to Modbus slaves; catches and logs errors per register.
+"""
+
+
+def parse_eng_unit(eng_unit):
+    """
+    Parse engineering unit like:
+    "1-5V", "4-20mA", "0-10V", "2.5-7.5V"
+
+    Returns (eng_min, eng_max) or (None, None)
+    """
+    if not eng_unit or not isinstance(eng_unit, str):
+        return None, None
+
+    # Extract numbers like 1, 5 or 2.5
+    nums = re.findall(r"[-+]?\d*\.?\d+", eng_unit)
+    if len(nums) != 2:
+        return None, None
+
+    try:
+        return abs(float(nums[0])), abs(float(nums[1]))
+    except ValueError:
+        return None, None
+
+def scale_value(raw, eng_min, eng_max, proc_min, proc_max):
+    try:
+        raw = float(raw)/1000.0
+        eng_min = float(eng_min)
+        eng_max = float(eng_max)
+        proc_min = float(proc_min)
+        proc_max = float(proc_max)
+
+        if eng_max == eng_min:
+            return None
+
+        return ((raw - eng_min) / (eng_max - eng_min)) * (proc_max - proc_min) + proc_min
+    except Exception:
+        return None
+
+
+
+USB_INSTRUMENTS = {}
+
+
+def read_usb_register(brand_key, slave_id, start, length, reg_type):
+    slave_cfg = None
+    brands = config.get("ModbusRTU", {}).get("Devices", {}).get("brands", {})
+
+    for b in brands.values():
+        for s in b.get("slaves", []):
+            if s.get("id") == slave_id:
+                slave_cfg = s
+                break
+
+    if not slave_cfg:
+        raise RuntimeError(f"USB slave config not found for slave {slave_id}")
+
+    port = "/dev/energy_meter_usb"
+
+    if not port:
+        raise RuntimeError(f"usb_port missing for USB slave {slave_id}")
+
+    key = f"{port}_{slave_id}"
+
+    if key not in USB_INSTRUMENTS:
+        inst = minimalmodbus.Instrument(port, int(slave_id))
+        inst.serial.baudrate = int(config["ModbusRTU"]["settings"]["baudRate"])
+        inst.serial.bytesize = serial.EIGHTBITS
+        inst.serial.parity = serial.PARITY_NONE
+        inst.serial.stopbits = serial.STOPBITS_TWO
+        inst.serial.timeout = 1.0
+        inst.mode = minimalmodbus.MODE_RTU
+        inst.clear_buffers_before_each_transaction = True
+        USB_INSTRUMENTS[key] = inst
+
+    inst = USB_INSTRUMENTS[key]
+
+    fc = 4 if "input" in reg_type.lower() else 3
+
+    try:
+        regs = inst.read_registers(start, length)
+        print(f"Raw registers at {start}: {regs}")
+        floats = []
+        for i in range(0, length, 2):
+            f = regs_to_float_energy(regs[i], regs[i+1], byte_order='big', word_order='little')
+            floats.append(f)
+        return floats
+
+    except Exception as e:
+        raise RuntimeError(
+            f"USB Modbus read failed [{brand_key} slave {slave_id} @ {port}]: {e}"
+        )
+
+def regs_to_float_energy(reg1, reg2, byte_order='big', word_order='little'):
+    """
+    Convert two 16-bit registers to a float with configurable byte and word order.
+    
+    Parameters:
+    - reg1, reg2: integer register values
+    - byte_order: 'big' or 'little' (order of bytes inside each register)
+    - word_order: 'big' or 'little' (order of registers)
+    
+    Returns:
+    - float decoded value
+    """
+    if byte_order == 'big':
+        b1 = reg1.to_bytes(2, 'big')
+        b2 = reg2.to_bytes(2, 'big')
+    else:
+        b1 = reg1.to_bytes(2, 'little')
+        b2 = reg2.to_bytes(2, 'little')
+        
+    if word_order == 'big':
+        raw_bytes = b1 + b2
+    else:
+        raw_bytes = b2 + b1
+    
+    return struct.unpack('>f', raw_bytes)[0]
+
+def safe_read(inst, start, length, fc):
+    """
+    Tries to read registers, handling variations in library support.
+    """
+    try:
+        # Most modern versions of MinimalModbus use this:
+        return inst.read_registers(start, int(length), functioncode=fc)
+    except Exception as e:
+        # Fallback for older libraries or specific instrument types
+        try:
+            return inst.read_registers(start, int(length))
+        except Exception as e_inner:
+            raise Exception(f"Modbus Read Failed: {e_inner}")
+
+
+def read_modbus_devices(instruments):
+    readings = {}
+
+    devices = (
+        config.get("ModbusRTU", {})
+        .get("Devices", {})
+        .get("brands", {})
+    )
+
+    for brand_key, brand in devices.items():
+        registers_by_slave = brand.get("registersBySlave", {})
+        slaves = brand.get("slaves", [])
+
+        for slave in slaves:
+            slave_id = slave.get("id")
+            if slave_id is None:
+                continue
+
+            generate = bool(slave.get("generate_random", False))
+            use_usb = bool(slave.get("use_usb", False))
+            regs = registers_by_slave.get(str(slave_id), [])
+            inst_key = f"{brand_key}_{slave_id}"
+            inst = instruments.get(inst_key)
+
+            if not generate and not use_usb and not inst:
+                log_warn(f"[ENERGY] Instrument missing for {inst_key}")
+                continue
+
+            for reg in regs:
+                if not reg.get("enabled"):
+                    continue
+
+                name = reg.get("name", "unknown")
+                key = f"{brand_key}_S{slave_id}_{name}"
+
+                try:
+                    # ===== RANDOM MODE =====
+                    if generate:
+                        # min_v = safe_float(reg.get("process_min"), 0.0)
+                        # max_v = safe_float(reg.get("process_max"), 100.0)
+                        min_v = 0
+                        max_v = 250
+                        if min_v > max_v:
+                            min_v, max_v = max_v, min_v
+                        value = round(random.uniform(min_v, max_v), 3)
+                        readings[key] = value
+                        log_info(f"[ENERGY][RANDOM] {key} = {value}")
+                        continue
+
+                    # ===== REAL MODBUS =====
+                    else:
+                        start = int(reg["start"])+int(reg["offset"])
+                        length = int(reg.get("length", 1))
+                        reg_type = reg.get("type", "Input Register")
+                        conversion = reg.get("conversion", "Integer")
+
+                        fc = 4 if "input" in reg_type.lower() else 3
+                        if use_usb:
+                            # 🔌 USB READ PATH
+                            raw = read_usb_register(
+                                brand_key=brand_key,
+                                slave_id=slave_id,
+                                start=start,
+                                length=length,
+                                reg_type=reg_type
+                            )
+                            value = float(raw[0])
+                            if value=="nan":
+                                value = "NULL"
+                            readings[key] = value
+                            print(f"Values for usb read: {value}")
+                            continue
+                        else:
+                            # 🔁 RS485 RTU
+                            log_info(f"[INFO] Reading from {start} of length {length}")
+                            raw = safe_read(inst, start, length, fc)
+                        if length == 1:
+                            vals = [float(raw[0])]
+                        else:
+                            vals = []
+                            for i in range(0, length, 2):
+                                f = regs_to_float_energy(
+                                    raw[i],
+                                    raw[i+1],
+                                    byte_order='big',
+                                    word_order='little'
+                                )
+                                vals.append(f)
+
+                        # vals = raw
+                        print(f"Values for sid {slave_id} are", raw)
+                        value = vals[0] if vals is not None and len(vals) > 0 else None
+
+                        print(f"Values after convert regs {vals} for sid {slave_id} and value is {value}")
+                        # ---- multiply / divide ----
+                        mul = safe_float(reg.get("multiply"), 1.0)
+                        div = safe_float(reg.get("divide"), 1.0)
+                        log_info(f"[INFO] Multiplication Factor {mul} for sid {slave_id}")
+                        log_info(f"[INFO] Division Factor {div} for sid {slave_id}")
+                        if div == 0:
+                            div = 1.0
+                        value = (value * mul) / div
+                        log_info(f"[INFO] Value after applying mul and div {value} for sid {slave_id}")
+
+                        if reg.get("eng_unit")=="none":
+                        # ---- parse eng_unit ----
+                            if value=="nan":
+                                value = "NULL"
+                            readings[key] = value
+                            print(f"Values for read: {value}")
+                            continue
+                        log_info(
+                            f"[DEBUG] REG OBJ ID={id(reg)} "
+                            f"NAME={reg.get('name')} "
+                            f"ENG_UNIT={reg.get('eng_unit')}"
+)
+                        eng_min, eng_max = parse_eng_unit(reg.get("eng_unit"))
+                        log_info(f"[INFO] ENG_MIN: {eng_min}, ENG_MAX {eng_max}")
+
+                        # ---- process range ----
+                        proc_min = safe_float(reg.get("process_min"),1.0)
+                        proc_max = safe_float(reg.get("process_max"),100)
+
+                        log_info(f"[INFO] Process_MIN: {proc_min}, Process_MAX {proc_max} for sid {slave_id}")
+
+                        # ---- apply scaling only if ALL present ----
+                        if (
+                            eng_min is not None
+                            and eng_max is not None
+                            and proc_min not in ("", None)
+                            and proc_max not in ("", None)
+                        ):
+                            scaled = scale_value(value, eng_min, eng_max, proc_min, proc_max)
+                            if scaled is not None:
+                                value = round(scaled, 3)
+                        log_info(f"[INFO] Value after scaling {value} for sid {slave_id}")
+
+                        if isinstance(value, (int, float)):
+                            if math.isnan(value) or math.isinf(value):
+                                value = None
+                    if not generate:
+                        readings[key] = value
+                        log_info(f"[INFO] The reading for {slave_id} after conversion is {value} for sid {slave_id}")
+
+                except Exception as e:
+                    log_error(f"[ENERGY] Failed {key}: {e}")
+
+    return readings
+
+
+
+def read_modbus_devices_setup_every_time(instruments):
+    readings = {}
+    channel_meta = {}  # 🔥 NEW
+
+    devices = (
+        config.get("ModbusRTU", {})
+        .get("Devices", {})
+        .get("brands", {})
+    )
+
+    for brand_key, brand in devices.items():
+        registers_by_slave = brand.get("registersBySlave", {})
+        slaves = brand.get("slaves", [])
+
+        for slave in slaves:
+            slave_id = slave.get("id")
+            if slave_id is None:
+                continue
+
+            # generate = bool(slave.get("generate_random", False))
+            generate = False
+            use_usb = bool(slave.get("use_usb", False))
+            regs = registers_by_slave.get(str(slave_id), [])
+            inst_key = f"{brand_key}_{slave_id}"
+            inst = instruments.get(inst_key)
+
+            if not generate and not use_usb and not inst:
+                log_warn(f"[ENERGY] Instrument missing for {inst_key}")
+                continue
+
+            for reg in regs:
+                if not reg.get("enabled"):
+                    continue
+
+                name = reg.get("name", "unknown")
+                key = f"{brand_key}_S{slave_id}_{name}"
+
+
+                # ADD THIS IMMEDIATELY
+                channel_meta[key] = {
+                    "column": name,
+                    "sensor_type": reg.get("sensor_type"),
+                    "eng_symbol": reg.get("eng_symbol")
                 }
-              </tbody>
-            </table>
-          </div>
-        </form>
-      `;
-}
+                try:
+                    # ===== RANDOM MODE =====
+                    if generate:
+                        min_v = safe_float(reg.get("process_min"), 0.0)
+                        max_v = safe_float(reg.get("process_max"), 100.0)
+                        if min_v > max_v:
+                            min_v, max_v = max_v, min_v
+                        value = round(random.uniform(min_v, max_v), 3)
+                        log_info(f"[ENERGY][RANDOM] {key} = {value}")
 
-function setupPlcHandlers(brandKey, slaveId) {
-  const form = document.getElementById("plc-form");
-  if (!form) return;
+                    # ===== REAL MODBUS =====
+                    else:
+                        start = int(reg["start"])+int(reg["offset"])
+                        length = int(reg.get("length", 1))
+                        reg_type = reg.get("type", "Input Register")
+                        conversion = reg.get("conversion", "Integer")
 
-  form.addEventListener("click", (e) => {
-    const add = e.target.closest("#plc-add");
-    if (add) {
-      const list = ensurePlcAlerts(brandKey, slaveId);
-      list.push({
-        condition: "<=",
-        threshold: "",
-        contact: "",
-        message: `${brandKey} S${slaveId}`,
-        enabled: true,
-      });
-      if (typeof saveConfig === "function") {
-        try {
-          saveConfig();
-        } catch (e) {}
-      }
-      renderPlcSection(brandKey, slaveId);
-      return;
-    }
-    const del = e.target.closest(".plc-del");
-    if (del) {
-      const idx = Number(del.dataset.idx);
-      const list = ensurePlcAlerts(brandKey, slaveId);
-      if (idx >= 0 && idx < list.length) {
-        list.splice(idx, 1);
-        if (typeof saveConfig === "function") {
-          try {
-            saveConfig();
-          } catch (e) {}
+                        fc = 4 if "input" in reg_type.lower() else 3
+                        inst.serial.baudrate = int(slave.get("baudRate", 9600))
+                        inst.serial.stopbits = int(slave.get("stopBits", 1))
+                        inst.serial.parity = {
+                            "None": "N",
+                            "Even": "E",
+                            "Odd": "O"
+                        }.get(slave.get("parity", "None"), "N")
+
+                        if use_usb:
+                            # 🔌 USB READ PATH
+                            raw = read_usb_register(
+                                brand_key=brand_key,
+                                slave_id=slave_id,
+                                start=start,
+                                length=length,
+                                reg_type=reg_type
+                            )
+                            value = float(raw[0])
+                            if value=="nan":
+                                value = "NULL"
+                            readings[key] = value
+                            print(f"Values for usb read: {value}")
+                            continue
+                        else:
+                            # 🔁 RS485 RTU
+                            log_info(f"[INFO] Reading from {start} of length {length}")
+                            raw = safe_read(inst, start, length, fc)
+                        if length == 1:
+                            vals = [float(raw[0])]
+                        else:
+                            vals = []
+                            for i in range(0, length, 2):
+                                f = regs_to_float_energy(
+                                    raw[i],
+                                    raw[i+1],
+                                    byte_order='big',
+                                    word_order='little'
+                                )
+                                vals.append(f)
+
+                        # vals = raw
+                        print(f"Values for sid {slave_id} are", raw)
+                        value = vals[0] if vals is not None and len(vals) > 0 else None
+
+                        print(f"Values after convert regs {vals} for sid {slave_id} and value is {value}")
+                        # ---- multiply / divide ----
+                        mul = safe_float(reg.get("multiply"), 1.0)
+                        div = safe_float(reg.get("divide"), 1.0)
+                        log_info(f"[INFO] Multiplication Factor {mul} for sid {slave_id}")
+                        log_info(f"[INFO] Division Factor {div} for sid {slave_id}")
+                        if div == 0:
+                            div = 1.0
+                        value = (value * mul) / div
+                        log_info(f"[INFO] Value after applying mul and div {value} for sid {slave_id}")
+
+                        if reg.get("eng_unit")=="none":
+                        # ---- parse eng_unit ----
+                            if value=="nan":
+                                value = "NULL"
+                            readings[key] = value
+                            print(f"Values for read: {value}")
+                            continue
+                        log_info(
+                            f"[DEBUG] REG OBJ ID={id(reg)} "
+                            f"NAME={reg.get('name')} "
+                            f"ENG_UNIT={reg.get('eng_unit')}"
+)
+                        eng_min, eng_max = parse_eng_unit(reg.get("eng_unit"))
+                        log_info(f"[INFO] ENG_MIN: {eng_min}, ENG_MAX {eng_max}")
+
+                        # ---- process range ----
+                        proc_min = safe_float(reg.get("process_min"),1.0)
+                        proc_max = safe_float(reg.get("process_max"),100)
+
+                        log_info(f"[INFO] Process_MIN: {proc_min}, Process_MAX {proc_max} for sid {slave_id}")
+
+                        # ---- apply scaling only if ALL present ----
+                        if (
+                            eng_min is not None
+                            and eng_max is not None
+                            and proc_min not in ("", None)
+                            and proc_max not in ("", None)
+                        ):
+                            scaled = scale_value(value, eng_min, eng_max, proc_min, proc_max)
+                            if scaled is not None:
+                                value = round(scaled, 3)
+                        log_info(f"[INFO] Value after scaling {value} for sid {slave_id}")
+
+                        if isinstance(value, (int, float)):
+                            if math.isnan(value) or math.isinf(value):
+                                value = None
+                        
+                    readings[key] = value
+                    log_info(f"[INFO] The reading for {slave_id} after conversion is {value} for sid {slave_id}")
+
+                except Exception as e:
+                    log_error(f"[ENERGY] Failed {key}: {e}")
+    
+    return readings, channel_meta
+
+
+def safe_float(val, default):
+    try:
+        if val is None or val == "":
+            return default
+        return float(val)
+    except Exception:
+        return default
+
+def infer_sql_type(value):
+    if isinstance(value, bool):
+        return "TINYINT(1)"
+    if isinstance(value, int):
+        return "INT"
+    if isinstance(value, float):
+        return "FLOAT"
+    return "VARCHAR(255)"
+
+
+def insert_energy_data(timestamp, readings, channel_meta):
+    """
+    Insert energy readings into per-slave DB & table
+    using ONLY tag name as column.
+    """
+    if not isinstance(readings, dict) or not readings:
+        return
+
+    brands = (
+        config.get("ModbusRTU", {})
+        .get("Devices", {})
+        .get("brands", {})
+    )
+
+    DATABASE_CFG = config.get("Database", {})
+
+    grouped = {}  # {(brand, slave_id): {tag: value}}
+
+    for key, value in readings.items():
+        try:
+            # dvp_plc_S1_Current_L1
+            brand, rest = key.split("_S", 1)
+            slave_id, tag = rest.split("_", 1)
+            slave_id = int(slave_id)
+        except Exception:
+            log_warn(f"[ENERGY][DB] Invalid key format: {key}")
+            continue
+
+        col = tag  # ONLY tag name
+        grouped.setdefault((brand, slave_id), {})[col] = value
+
+    for (brand, slave_id), values in grouped.items():
+        brand_cfg = brands.get(brand)
+        if not brand_cfg:
+            continue
+
+        slave_cfg = next(
+            (s for s in brand_cfg.get("slaves", []) if s.get("id") == slave_id),
+            None,
+        )
+        if not slave_cfg:
+            continue
+
+        db_name = slave_cfg.get("db_name")
+        table = slave_cfg.get("table_name") or f"S{slave_id}"
+
+        if not db_name:
+            log_warn(f"[ENERGY][DB] db_name missing for {brand} S{slave_id}")
+            continue
+
+        # ---------------- LOCAL DB ----------------
+        local_cfg = DATABASE_CFG.get("local")
+        if (
+            isinstance(local_cfg, dict)
+            and slave_cfg.get("upload_local") is True
+            and isinstance(local_cfg.get("cred"), dict)
+        ):
+            try:
+                insert_energy_into_single_db(
+                    local_cfg["cred"],
+                    table,
+                    db_name,
+                    timestamp,
+                    values,
+                    channel_meta
+                )
+            except Exception as e:
+                log_error(f"[ENERGY][LOCAL] Insert failed: {e}")
+
+        # ---------------- CLOUD DB ----------------
+        cloud_cfg = DATABASE_CFG.get("cloud")
+        if (
+            isinstance(cloud_cfg, dict)
+            and slave_cfg.get("upload_cloud") is True
+            and isinstance(cloud_cfg.get("cred"), dict)
+        ):
+            try:
+                insert_energy_into_single_db(
+                    cloud_cfg["cred"],
+                    table,
+                    db_name,
+                    timestamp,
+                    values,
+                    channel_meta
+                )
+            except Exception as e:
+                log_error(f"[ENERGY][CLOUD] Insert failed: {e}")
+
+
+def insert_energy_into_single_db(db_cred, table, database, timestamp, values,  channel_meta):
+    conn = None
+    try:
+        conn = get_db_connection(db_cred, timeout=3)
+        if not conn:
+            return
+
+        cur = conn.cursor()
+        cur.execute(f"CREATE DATABASE IF NOT EXISTS `{database}`")
+        conn.database = database
+
+        cur.execute(f"""
+            CREATE TABLE IF NOT EXISTS `{table}` (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                ts DATETIME NOT NULL
+            ) ENGINE=InnoDB;
+        """)
+
+        meta_table = f"{table}_channels"
+        cur.execute(f"""
+            CREATE TABLE IF NOT EXISTS `{meta_table}` (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                column_name VARCHAR(64) NOT NULL,
+                sensor_type VARCHAR(32),
+                eng_unit VARCHAR(32),
+                UNIQUE KEY uniq_col (column_name)
+            ) ENGINE=InnoDB;
+        """)
+
+        cur.execute(f"SHOW COLUMNS FROM `{table}`")
+        existing = {r[0] for r in cur.fetchall()}
+
+        for col in values:
+            if col not in existing:
+                cur.execute(
+                    f"ALTER TABLE `{table}` ADD COLUMN `{col}` DOUBLE DEFAULT NULL"
+                )
+
+        for key, meta in channel_meta.items():
+            if meta["column"] not in values:
+                continue
+
+            cur.execute(f"""
+                INSERT INTO `{meta_table}`
+                (column_name, sensor_type, eng_unit)
+                VALUES (%s,%s,%s)
+                ON DUPLICATE KEY UPDATE
+                    sensor_type=VALUES(sensor_type),
+                    eng_unit=VALUES(eng_unit)
+            """, (
+                meta["column"],
+                meta["sensor_type"],
+                meta["eng_symbol"]
+            ))
+
+        
+        cols = ["ts"] + list(values.keys())
+        placeholders = ", ".join(["%s"] * len(cols))
+        cols_sql = ", ".join(f"`{c}`" for c in cols)
+
+        cur.execute(
+            f"INSERT INTO `{table}` ({cols_sql}) VALUES ({placeholders})",
+            [timestamp] + list(values.values()),
+        )
+
+        conn.commit()
+        log_info(
+            f"[ENERGY][DB] Inserted {len(values)} values into {database}.{table}"
+        )
+
+    except Exception as e:
+        log_error(f"[ENERGY][DB] Insert failed: {e}")
+    finally:
+        if conn:
+            conn.close()
+
+
+# ==================================================
+# DATABASE AND LOGGING FUNCTIONS
+# ==================================================
+
+"""
+What: Insert numeric readings into MySQL table sensor_readings (auto-creates table).
+Calls: mysql.connector.connect(), cursor.execute(), conn.commit()
+Required by: main_data_collection_loop(), process_rs485_data()
+Notes: Only inserts values that are int/float; others skipped. Uses MYSQL_CONFIG.
+Side effects: Writes to MySQL; creates table if missing.
+"""
+
+
+def insert_readings_mysql(timestamp, readings):
+    try:
+        conn = mysql.connector.connect(**MYSQL_CONFIG)
+        cursor = conn.cursor()
+
+        # Create tables for different types of readings
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS io_readings (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                sensor_type VARCHAR(50),
+                sensor_id VARCHAR(50),
+                value FLOAT,
+                unit VARCHAR(20)
+            )
+        """
+        )
+
+        # Insert readings
+        for sensor_id, value in readings.items():
+            if isinstance(value, (int, float)):
+                cursor.execute(
+                    "INSERT INTO io_readings (timestamp, sensor_type, sensor_id, value) VALUES (%s, %s, %s, %s)",
+                    (timestamp, "mixed", sensor_id, float(value)),
+                )
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+        log_info(f"[INFO] Inserted {len(readings)} readings into MySQL")
+
+    except Exception as e:
+        log_error(f"[ERROR] MySQL insert failed: {e}")
+
+
+"""
+What: Choose CSV output path, preferring mounted SD card (/media/*) else home directory.
+Calls: psutil.disk_partitions()
+Required by: main_data_collection_loop() prior to write_to_csv()
+Notes: Returns a full file path for CSV_FILENAME.
+Side effects: None (just selects a path).
+"""
+
+
+def get_csv_path():
+    for part in psutil.disk_partitions():
+        if "/media/" in part.mountpoint:
+            log_info(f"[INFO] SD card found at {part.mountpoint}")
+            return os.path.join(part.mountpoint, CSV_FILENAME)
+    log_warn("[WARN] SD card not inserted, using internal path")
+    return os.path.join(Path.home(), CSV_FILENAME)
+
+
+"""
+What: Append buffered readings (data_map) to CSV with a header and rows per timestamp.
+Calls: built-in file I/O
+Required by: main_data_collection_loop() for local logging and preparing temp file to send.
+Notes: readings_data is a dict: {timestamp: {sensor_id: value}}.
+        IMPORTANT: The original header-writing line had a bug (",".join(header[0])) which splits 'timestamp'
+                    into characters; fixed below to join the full list.
+Side effects: Writes/creates CSV files; can be called for SD card and temp files.
+"""
+
+
+def write_to_csv(path, readings_data):
+    try:
+        file_exists = os.path.isfile(path)
+        needs_header = not file_exists or os.path.getsize(path) == 0
+        header = ["timestamp"]
+        if readings_data:
+            # Use the first timestamp's keys as header columns
+            first_ts = next(iter(readings_data))
+            for sensor_id in readings_data.get(first_ts, {}).keys():
+                header.append(sensor_id)
+        with open(path, "a", newline="") as csvfile:
+            if needs_header:
+                # FIX: write the entire header list
+                csvfile.write(",".join(header) + "\n")
+
+            # Write data
+            for ts, readings in readings_data.items():
+                row = [ts]
+                for sensor_id in header[1:]:  # Skip timestamp column
+                    value = readings.get(sensor_id, "")
+                    row.append(str(value))
+                csvfile.write(",".join(row) + "\n")
+
+        log_info(f"[INFO] Logged {len(readings_data)} entries to CSV")
+
+    except Exception as e:
+        log_error(f"[ERROR] Failed to write CSV: {e}")
+
+
+# ==================================================
+# DATABASE AND LOGGING FUNCTIONS (updated)
+# ==================================================
+
+
+def get_table_columns(cursor, table_name):
+    cursor.execute(f"SHOW COLUMNS FROM `{table_name}`")
+    return [row[0] for row in cursor.fetchall()]
+
+
+def ensure_column(cursor, conn, table, col, col_type="FLOAT"):
+    cols = set(get_table_columns(cursor, table))
+    if col not in cols:
+        cursor.execute(f"ALTER TABLE `{table}` ADD COLUMN `{col}` {col_type} NULL")
+        conn.commit()
+
+
+def rename_column(cursor, conn, table, old_col, new_col, col_type="FLOAT"):
+    cursor.execute(
+        f"ALTER TABLE `{table}` CHANGE COLUMN `{old_col}` `{new_col}` {col_type} NULL"
+    )
+    conn.commit()
+
+
+def ensure_mapping_table(cursor, conn):
+    cursor.execute(
+        """
+    CREATE TABLE IF NOT EXISTS energy_meter_map (
+        address INT PRIMARY KEY,
+        column_name VARCHAR(128) NOT NULL
+    )
+    """
+    )
+    conn.commit()
+
+
+def load_mapping(cursor):
+    cursor.execute("SELECT address, column_name FROM energy_meter_map")
+    return {int(a): c for (a, c) in cursor.fetchall()}
+
+
+def upsert_mapping(cursor, conn, address, column_name):
+    cursor.execute(
+        """
+        INSERT INTO energy_meter_map (address, column_name)
+        VALUES (%s, %s)
+        ON DUPLICATE KEY UPDATE column_name = VALUES(column_name)
+    """,
+        (int(address), column_name),
+    )
+    conn.commit()
+
+
+def ensure_energy_dynamic_table(cursor, conn, table_name="energy_meter_readings"):
+    cursor.execute(
+        f"""
+    CREATE TABLE IF NOT EXISTS `{table_name}` (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        time DATETIME DEFAULT CURRENT_TIMESTAMP
+        -- dynamic columns added later
+    ) ENGINE=InnoDB
+    """
+    )
+    conn.commit()
+
+
+def insert_energy_row(cursor, conn, row_data, table_name="energy_meter_readings"):
+    if not row_data:
+        return
+    cols = list(row_data.keys())
+    placeholders = ", ".join(["%s"] * len(cols))
+    collist = ", ".join(f"`{c}`" for c in cols)
+    sql = f"INSERT INTO `{table_name}` ({collist}) VALUES ({placeholders})"
+    cursor.execute(sql, [row_data[c] for c in cols])
+    conn.commit()
+
+
+# ==================================================
+# GENERIC WIDE-TABLE UTILITIES (edited/new)
+# ==================================================
+
+
+def ensure_wide_base(cursor, conn, table_name):
+    """
+    Ensures a wide table exists with at least id PK and timestamp.
+    Additional columns are added dynamically.
+    """
+    cursor.execute(
+        f"""
+        CREATE TABLE IF NOT EXISTS `{table_name}` (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB
+    """
+    )
+    conn.commit()
+
+
+def add_missing_columns(cursor, conn, table_name, columns_to_add, col_type):
+    """
+    Add missing columns (list of names) to a table using provided SQL type.
+    """
+    if not columns_to_add:
+        return
+    existing = set(get_table_columns(cursor, table_name))
+    for col in columns_to_add:
+        if col not in existing:
+            cursor.execute(
+                f"ALTER TABLE `{table_name}` ADD COLUMN `{col}` {col_type} NULL"
+            )
+    conn.commit()
+
+
+def insert_wide_row_v2(
+    cursor,
+    conn,
+    table_name,
+    timestamp,
+    values_dict,
+    zero_fill_cols=None,
+    col_type="DOUBLE",
+):
+    """
+    Insert one wide row:
+      - Ensures table exists and all columns exist.
+      - values_dict: dict of column -> numeric value to set.
+      - zero_fill_cols: iterable of columns that must be present; if absent in values_dict, value=0 is inserted.
+      - col_type: SQL type for dynamically added columns (e.g., DOUBLE, TINYINT(1)).
+    Behavior:
+      - Columns are created dynamically if missing.
+      - Row contains provided values plus zero for any zero_fill_cols not present.
+    """
+    if zero_fill_cols is None:
+        zero_fill_cols = []
+
+    ensure_wide_base(cursor, conn, table_name)
+
+    # Determine final columns to have in this row
+    row_map = {}
+    # Numeric sanitize and collect provided values
+    for k, v in (values_dict or {}).items():
+        try:
+            row_map[k] = float(v)
+        except Exception:
+            # Skip non-numeric quietly
+            pass
+
+    # Force zero for all requested zero-fill columns that are missing
+    for col in zero_fill_cols:
+        if col not in row_map:
+            row_map[col] = 0.0
+
+    # Ensure columns exist before insert
+    all_needed_cols = list(row_map.keys())
+    add_missing_columns(cursor, conn, table_name, all_needed_cols, col_type)
+
+    # Build deterministic column ordering for insert
+    ordered_cols = sorted(row_map.keys())
+    placeholders = ", ".join(["%s"] * (1 + len(ordered_cols)))  # +1 for timestamp
+    col_list_sql = ", ".join(["`timestamp`"] + [f"`{c}`" for c in ordered_cols])
+    sql = f"INSERT INTO `{table_name}` ({col_list_sql}) VALUES ({placeholders})"
+    args = [timestamp] + [row_map[c] for c in ordered_cols]
+
+    cursor.execute(sql, args)
+    conn.commit()
+
+
+# ==================================================
+# ANALOG/DIGITAL WIDE INSERTS
+# ==================================================
+
+
+def get_db_connection(db_cred, timeout=3):
+    try:
+        return mariadb.connect(
+            host=db_cred["host"],
+            user=db_cred["user"],
+            password=db_cred["password"],
+            port=db_cred.get("port", 3306),
+            autocommit=False if db_cred.get("autocommit", False) in ['false',False] else True,
+            connect_timeout=timeout,
+        )
+    except Exception as e:
+        log_error(f"[DB] Connection failed ({db_cred.get('host')}): {e}")
+        return None
+
+
+def insert_into_single_db(db_cred, table, database, column, timestamp, value):
+    conn = None
+    try:
+        conn = get_db_connection(db_cred, timeout=3)
+        if not conn:
+            log_error("DB Not connected")
+            return  # HARD skip, do not block others
+
+        cur = conn.cursor()
+
+        cur.execute(f"""
+            CREATE DATABASE IF NOT EXISTS `{database}`;
+        """)
+
+        log_info("DB created")
+        # 2. Switch DB
+        conn.database = database   # ← THIS is the correct switch
+        log_info("DB changed")
+
+        # Create table
+        cur.execute(f"""
+            CREATE TABLE IF NOT EXISTS `{table}` (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                ts DATETIME NOT NULL
+            ) ENGINE=InnoDB;
+        """)
+        log_info("Table created")
+        # Add column if missing
+        cur.execute(f"SHOW COLUMNS FROM `{table}` LIKE %s", (column,))
+        if not cur.fetchone():
+            cur.execute(
+                f"ALTER TABLE `{table}` ADD COLUMN `{column}` DOUBLE DEFAULT 0"
+            )
+        
+        log_info("Columns added")
+        # Insert
+        cur.execute(
+            f"INSERT INTO `{table}` (ts, `{column}`) VALUES (%s, %s)",
+            (timestamp, value),
+        )
+        log_info("Data inserted")
+        conn.commit()
+        log_info(f"[DB] Inserted into {db_cred['host']}:{table}")
+
+    except Exception as e:
+        log_error(f"[DB] Insert failed ({db_cred.get('host')}): {e}")
+
+    finally:
+        try:
+            if conn:
+                conn.close()
+        except Exception:
+            pass
+
+def insert_analog_data(timestamp, readings):
+    try:
+        if not readings:
+            log_info("Not Received readings")
+            return
+
+        analog_cfg = ANALOG_CONFIG
+        db_cfg = DATABASE
+        analog_db_cfg = analog_cfg.get("db", {})
+
+        database = analog_db_cfg.get("db_name")
+        table = analog_db_cfg.get("table_name") or "analog_reading"
+        column = analog_cfg.get("name", "analog")
+        print(
+            "INSERT_ANALOG_DATA:",
+            "upload_local=", analog_cfg.get("db", {}).get("upload_local"),
+            "db_name=", analog_cfg.get("db", {}).get("db_name"),
+            "table=", analog_cfg.get("db", {}).get("table_name"),
+        )
+
+
+        # Aggregate value (example: average)
+        try:
+            value = sum(readings.values()) / len(readings)
+        except Exception:
+            log_error("[ANALOG] Failed to aggregate readings")
+            return
+
+        # ---------- LOCAL DB ----------
+        if analog_db_cfg.get("upload_local"):
+            try:
+                log_info("Inserting into Local DB")
+                print("DB_CFG_LOCAL =", db_cfg.get("local"))
+                print("DB_CFG_LOCAL_CRED =", db_cfg.get("local", {}).get("cred"))
+
+                insert_into_single_db(
+                    db_cfg["local"]["cred"],
+                    table,
+                    database,
+                    column,
+                    timestamp,
+                    value,
+                )
+            except Exception as e:
+                log_error(f"[LOCAL DB] Unexpected error: {e}")
+
+        # ---------- CLOUD DB ----------
+        if analog_db_cfg.get("upload_cloud"):
+            try:
+                insert_into_single_db(
+                    db_cfg["cloud"]["cred"],
+                    table,
+                    database,
+                    column,
+                    timestamp,
+                    value,
+                )
+            except Exception as e:
+                log_error(f"[CLOUD DB] Unexpected error: {e}")
+
+    except Exception as e:
+        log_error(f"[ANALOG INSERT] Fatal error: {e}")
+
+
+def normalize_state(v):
+    if isinstance(v, bool):
+        return 1 if v else 0
+    if isinstance(v, (int, float)):
+        return 0 if float(v) == 0.0 else 1
+    if isinstance(v, str):
+        s = v.strip().lower()
+        if s in ("1", "true", "on", "high"):
+            return 1
+        if s in ("0", "false", "off", "low"):
+            return 0
+    return None
+
+
+def expected_digital_columns():
+    cols = []
+    try:
+        if "DIGITAL_CHANNELS" in globals() and DIGITAL_CHANNELS:
+            for i, ch in enumerate(DIGITAL_CHANNELS):
+                if ch.get("enabled", False):
+                    cols.append(f"digitalch{i}")
+    except Exception:
+        pass
+    return cols
+
+
+def insert_digital_wide(timestamp, readings):
+    """
+    Write to digital_wide table with a column per digital sensor_id (0/1).
+    Missing expected sensors are written as 0.
+    """
+    try:
+        conn = mysql.connector.connect(**MYSQL_CONFIG)
+        cur = conn.cursor()
+        zero_cols = expected_digital_columns()
+        normalized = {}
+        for k, v in (readings or {}).items():
+            st = normalize_state(v)
+            if st is not None:
+                normalized[k] = int(st)
+        # Cast to DOUBLE or TINYINT(1); use TINYINT(1) here
+        insert_wide_row_v2(
+            cur,
+            conn,
+            "digital_wide",
+            timestamp,
+            normalized,
+            zero_fill_cols=zero_cols,
+            col_type="TINYINT(1)",
+        )
+        cur.close()
+        conn.close()
+        log_info(
+            f"[INFO] digital_wide inserted at {timestamp} with {len(normalized)} values (zeros padded for {len(zero_cols)})"
+        )
+    except Exception as e:
+        log_error(f"[ERROR] insert_digital_wide: {e}")
+
+
+# ==================================================
+# PER-BRAND, PER-SLAVE WIDE TABLES
+# ==================================================
+
+
+def brand_slave_table_name(brand_key, slave_id):
+    """
+    Build table name for a specific brand+slave.
+    Format: {brand}_S1{slave_id}
+    """
+    return f"{str(brand_key).lower()}_S1{int(slave_id)}"
+
+
+def safe_col_name(name):
+    # Keep alnum and underscores; replace spaces and special chars
+    return "".join(ch if ch.isalnum() or ch == "_" else "_" for ch in str(name))
+
+
+def insert_brand_slave_wide(
+    timestamp, brand_key, slave_id, tag_values, zero_pad_tags=None, tag_type="DOUBLE"
+):
+    """
+    Insert into a per-brand-per-slave wide table:
+      - Table name: {brand}_S1{slave_id}
+      - tag_values: dict of tag/point name -> numeric value
+      - zero_pad_tags: iterable of tag names that must exist with 0 if missing
+      - tag_type: SQL type for dynamic columns (DOUBLE by default)
+    """
+    try:
+        conn = mysql.connector.connect(**MYSQL_CONFIG)
+        cur = conn.cursor()
+        table = brand_slave_table_name(brand_key, slave_id)
+
+        # Sanitize column names and numeric values
+        vals = {}
+        for k, v in (tag_values or {}).items():
+            col = safe_col_name(k)
+            try:
+                vals[col] = float(v)
+            except Exception:
+                pass
+
+        zero_cols = [safe_col_name(z) for z in (zero_pad_tags or [])]
+
+        insert_wide_row_v2(
+            cur,
+            conn,
+            table,
+            timestamp,
+            vals,
+            zero_fill_cols=zero_cols,
+            col_type=tag_type,
+        )
+
+        cur.close()
+        conn.close()
+        log_info(
+            f"[INFO] {table} inserted at {timestamp} with {len(vals)} tags (zeros padded for {len(zero_cols)})"
+        )
+    except Exception as e:
+        log_error(f"[ERROR] insert_brand_slave_wide: {e}")
+
+
+# ==================================================
+# COMMUNICATION FUNCTIONS
+# ==================================================
+
+"""
+What: Power ON the 4G module via GPIO using gpioset.
+Calls: subprocess.run()
+Required by: main() when COMMUNICATION_MEDIA == "4G/LTE"
+Notes: Requires root privileges and correct GPIO chip/index on target.
+Side effects: Toggles hardware GPIO; blocks ~5s for stabilization.
+"""
+
+
+def enable_4g_module():
+    try:
+        subprocess.run(["sudo", "gpioset", "0", "6=0"], check=True)
+        # subprocess.run(["gpioset", "0", "6=0"], check=True)
+        log_info("[INFO] 4G module powered ON (GPIO6=0)")
+        time.sleep(5)
+    except subprocess.CalledProcessError as e:
+        log_error(f"[ERROR] Failed to power ON 4G module: {e}")
+
+
+"""
+What: Request DHCP lease on LTE_INTERFACE using dhclient.
+Calls: subprocess.run()
+Required by: main() when COMMUNICATION_MEDIA == "4G/LTE"
+Notes: Assumes modem provides a network interface and DHCP server; may need APN/ppp for some modems.
+Side effects: Network config; interface state changes.
+"""
+
+
+def connect_4g():
+    try:
+        subprocess.run(
+            ["sudo", "dhclient", "-v", "-e", "IF_METRIC=600", LTE_INTERFACE], check=True
+        )
+        # subprocess.run(["dhclient", "-v", "-e", "IF_METRIC=600", LTE_INTERFACE], check=True)
+        log_info(f"[INFO] Connected via 4G LTE on {LTE_INTERFACE}")
+    except subprocess.CalledProcessError as e:
+        log_error(f"[ERROR] 4G LTE network setup failed: {e}")
+
+
+def encrypt_bytes_aes128_gcm(key: bytes, plaintext: bytes) -> bytes:
+    """
+    Returns: nonce(12) || ciphertext || tag(16)
+    AESGCM.encrypt returns ciphertext||tag, so we prepend nonce.
+    """
+    aesgcm = AESGCM(key)
+    nonce = os.urandom(12)  # 96-bit recommended for GCM
+    ct_and_tag = aesgcm.encrypt(nonce, plaintext, associated_data=None)
+    return nonce + ct_and_tag
+
+
+"""
+What: POST a file (CSV) to JSON_ENDPOINT over HTTP.
+Calls: requests.post()
+Required by: main_data_collection_loop() when sending buffered data.
+Notes: Expects JSON_ENDPOINT to accept multipart/form-data; adjust to application/json if needed.
+Side effects: Network egress; prints error/status.
+"""
+
+
+def send_data_via_4g(filepath):
+    key_b64 = os.environ.get("ENCRYPTION_KEY")
+    if not key_b64:
+        log_error("[ERROR] ENCRYPTION_KEY env var not set")
+        return
+
+    try:
+        key = base64.b64decode(key_b64)
+    except Exception as e:
+        log_error(f"[ERROR] Invalid ENCRYPTION_KEY (must be base64): {e}")
+        return
+
+    if len(key) != 16:
+        log_error(
+            "[ERROR] ENCRYPTION_KEY must be 16 bytes (AES-128). Provide base64 of 16 raw bytes."
+        )
+        return
+
+    try:
+        with open(filepath, "rb") as f:
+            plaintext = f.read()
+
+        payload_bytes = encrypt_bytes_aes128_gcm(key, plaintext)
+
+        # Send as file named <original>.enc and include original filename in a form field
+        files = {
+            "file": (os.path.basename(filepath) + ".enc", io.BytesIO(payload_bytes))
         }
-        renderPlcSection(brandKey, slaveId);
-      }
-    }
-  });
+        data = {"orig_filename": os.path.basename(filepath)}
+        response = requests.post(
+            JSON_ENDPOINT, files=files, data=data, timeout=20, verify=True
+        )
 
-  form.addEventListener("submit", (e) => {
-    e.preventDefault();
-    try {
-      const trs = Array.from(form.querySelectorAll("tbody tr"));
-      const rows = trs.map((tr, i) => ({
-        condition:
-          tr.querySelector(`select[name="condition_${i}"]`)?.value || "<=",
-        threshold:
-          tr.querySelector(`input[name="threshold_${i}"]`)?.value || "",
-        contact: tr.querySelector(`input[name="contact_${i}"]`)?.value || "",
-        message:
-          tr.querySelector(`input[name="message_${i}"]`)?.value ||
-          `${brandKey} S${slaveId}`,
-        enabled:
-          tr.querySelector(`input[name="enabled_${i}"]`)?.checked || false,
-      }));
-      setPlcAlerts(brandKey, slaveId, rows);
-      const tick = document.getElementById("plc-tick");
-      if (tick) {
-        tick.style.display = "inline-block";
-        setTimeout(() => (tick.style.display = "none"), 1100);
-      }
-    } catch (ex) {
-      console.error("[PLC] Save failed", ex);
-    }
-  });
-}
+        if response.status_code in (200, 201):
+            log_info("[INFO] Data uploaded via 4G successfully")
+        else:
+            log_error(
+                f"[ERROR] Upload failed: HTTP {response.status_code} - {response.text}"
+            )
+    except Exception as e:
+        log_error(f"[ERROR] 4G upload failed: {e}")
 
-// ===================== Keep existing Digital/Analog handlers intact =====================
-// setupTabHandlers should continue to attach listeners for Digital I/O and Analog cases,
-// and it will not interfere with Modbus because Modbus uses its own containers and forms.
 
-function setupTabHandlers(mainTab, subTab) {
-  setTimeout(() => {
-    // Digital I/O handlers
-    if (mainTab === "Digital I/O") {
-      const addBtn = document.getElementById("add-digital-alert-btn");
-      if (addBtn) {
-        addBtn.onclick = () => {
-          const channelStore = config.alarmSettings["Digital I/O"][subTab];
-          channelStore.alerts.push({
-            trigger: "High",
-            contact: "",
-            message: "",
-            enabled: false,
-          });
-          renderAlarmSettings("Digital I/O", subTab);
-        };
-      }
+"""
+What: Spawn a TCP server to receive incoming data and append to a file, also echo to Kafka.
+Calls: socket library; kafka_publish() internally for decoded messages
+Required by: main() as a background thread
+Notes: Binds to RECV_IP:RECV_PORT; per-connection handler writes 'received_data.txt' and pushes to Kafka.
+Side effects: Opens listening socket; creates/updates received_data.txt; emits Kafka messages.
+"""
 
-      const form = document.getElementById("digital-io-alerts-form");
-      if (form) {
-        // Delete row via event delegation
-        form.addEventListener("click", (e) => {
-          const btn = e.target.closest(".del-alert");
-          if (!btn) return;
-          const idx = Number(btn.getAttribute("data-index"));
-          if (!Number.isInteger(idx)) return;
-          const channelStore = config.alarmSettings["Digital I/O"][subTab];
-          if (idx >= 0 && idx < channelStore.alerts.length) {
-            channelStore.alerts.splice(idx, 1);
-            renderAlarmSettings("Digital I/O", subTab);
-          }
-        });
 
-        // Save alerts
-        form.onsubmit = (ev) => {
-          ev.preventDefault();
-          const channelStore = config.alarmSettings["Digital I/O"][subTab];
-          const rows = channelStore.alerts;
+def start_tcp_server():
+    def handle_client(client_socket, addr):
+        """
+        What: Per-connection handler that receives data, stores to file, and attempts Kafka publish.
+        Calls: kafka_publish()
+        Required by: start_tcp_server() internal use
+        Side effects: Appends to file; network I/O.
+        """
+        log_info(f"[INFO] Incoming TCP connection from {addr}")
+        try:
+            with open("received_data.txt", "ab") as f:
+                while True:
+                    data = client_socket.recv(4096)
+                    if not data:
+                        break
+                    f.write(data)
+                    try:
+                        decoded = data.decode(errors="ignore")
+                        # kafka_publish("tcp", {"ts": datetime.now(timezone.utc).isoformat(), "data": decoded})
+                    except Exception:
+                        pass
+            log_info(f"[INFO] Data received and saved from {addr}")
+        except Exception as e:
+            log_error(f"[ERROR] TCP server error: {e}")
+        finally:
+            client_socket.close()
 
-          for (let i = 0; i < rows.length; i++) {
-            const trigger = form[`trigger_${i}`]?.value;
-            const contact = form[`contact_${i}`]?.value;
-            const message = form[`message_${i}`]?.value;
-            const enabled = form[`enabled_${i}`]?.checked;
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.bind((RECV_IP, RECV_PORT))
+    server.listen(5)
+    log_info(f"[INFO] TCP Server listening on {RECV_IP}:{RECV_PORT}")
 
-            rows[i] = {
-              trigger: trigger || "High",
-              contact: contact || "",
-              message: message || "",
-              enabled: !!enabled,
-            };
-          }
+    while True:
+        client_sock, addr = server.accept()
+        threading.Thread(
+            target=handle_client, args=(client_sock, addr), daemon=True
+        ).start()
 
-          saveConfig();
-          const tick = document.getElementById("digital-io-alerts-tick");
-          if (tick) {
-            tick.style.display = "inline";
-            setTimeout(() => (tick.style.display = "none"), 1200);
-          }
-        };
-      }
-    }
 
-    // Modbus handlers
-    if (mainTab === "Modbus") {
-      const addBtn = document.getElementById("add-modbus-alert-btn");
-      if (addBtn) {
-        addBtn.onclick = () => {
-          const modbusStore = config.alarmSettings.Modbus;
-          modbusStore.alerts.push({
-            slave_id: "",
-            condition: "<=",
-            threshold: "",
-            contact: "",
-            message: "",
-            enabled: false,
-          });
-          renderAlarmSettings("Modbus", "Alerts");
-        };
-      }
+# ==================================================
+# ALARMS
+# ==================================================
 
-      const form = document.getElementById("modbus-alerts-form");
-      if (form) {
-        // Delete row via event delegation
-        form.addEventListener("click", (e) => {
-          const btn = e.target.closest(".del-alert");
-          if (!btn) return;
-          const idx = Number(btn.getAttribute("data-index"));
-          if (!Number.isInteger(idx)) return;
-          const modbusStore = config.alarmSettings.Modbus;
-          if (idx >= 0 && idx < modbusStore.alerts.length) {
-            modbusStore.alerts.splice(idx, 1);
-            renderAlarmSettings("Modbus", "Alerts");
-          }
-        });
 
-        // Save alerts
-        form.onsubmit = (ev) => {
-          ev.preventDefault();
-          const modbusStore = config.alarmSettings.Modbus;
-          const rows = modbusStore.alerts;
+def free_port(port):
+    """Kill any process using the serial port."""
+    try:
+        # Find processes using the port
+        output = subprocess.check_output(["fuser", port], stderr=subprocess.DEVNULL)
+        pids = [int(pid) for pid in output.decode().split()]
+        for pid in pids:
+            log_info(f"Killing process {pid} holding {port}")
+            os.kill(pid, 9)
+    except subprocess.CalledProcessError:
+        # fuser returns non-zero if no process is using it
+        pass
 
-          for (let i = 0; i < rows.length; i++) {
-            const slaveId = form[`slave_id_${i}`]?.value;
-            const cond = form[`condition_${i}`]?.value;
-            const thr = form[`threshold_${i}`]?.value;
-            const contact = form[`contact_${i}`]?.value;
-            const msg = form[`message_${i}`]?.value;
-            const en = form[`enabled_${i}`]?.checked;
 
-            rows[i] = {
-              slave_id:
-                slaveId !== undefined && slaveId !== ""
-                  ? parseInt(slaveId, 10)
-                  : "",
-              condition: cond || "<=",
-              threshold:
-                thr !== undefined && thr !== "" && !Number.isNaN(Number(thr))
-                  ? Number(thr)
-                  : "",
-              contact: contact || "",
-              message: msg || "",
-              enabled: !!en,
-            };
-          }
+def send_at(ser, cmd, delay=0.5):
+    ser.write((cmd + "\r").encode())
+    time.sleep(delay)
+    return ser.read_all().decode(errors="ignore")
 
-          config.alarmSettings.Modbus.alerts = rows;
-          saveConfig();
-          const tick = document.getElementById("modbus-alerts-tick");
-          if (tick) {
-            tick.style.display = "inline";
-            setTimeout(() => (tick.style.display = "none"), 1200);
-          }
-        };
-      }
-    }
 
-    // Analog handlers
-    if (mainTab === "Analog") {
-      const addBtn = document.getElementById("add-analog-alert-btn");
-      if (addBtn) {
-        addBtn.onclick = () => {
-          const channelStore = config.alarmSettings.Analog[subTab];
-          channelStore.alerts.push({
-            condition: "<=",
-            threshold: "",
-            delay: "",
-            contact: "",
-            message: "",
-            enabled: false,
-          });
-          renderAlarmSettings("Analog", subTab);
-        };
-      }
+def is_registered(ser):
+    resp = send_at(ser, "AT+CREG?")
+    log_info(f"CREG response: {resp.strip()}")
+    return "+CREG: 0,1" in resp or "+CREG: 0,5" in resp
 
-      const form = document.getElementById("analog-alerts-form");
-      if (form) {
-        // Delete row via event delegation
-        form.addEventListener("click", (e) => {
-          const btn = e.target.closest(".del-alert");
-          if (!btn) return;
-          const idx = Number(btn.getAttribute("data-index"));
-          if (!Number.isInteger(idx)) return;
-          const channelStore = config.alarmSettings.Analog[subTab];
-          if (idx >= 0 && idx < channelStore.alerts.length) {
-            channelStore.alerts.splice(idx, 1);
-            renderAlarmSettings("Analog", subTab);
-          }
-        });
 
-        // Save alerts
-        form.onsubmit = (ev) => {
-          ev.preventDefault();
-          const channelStore = config.alarmSettings.Analog[subTab];
-          const rows = channelStore.alerts;
+def is_attached(ser):
+    resp = send_at(ser, "AT+CGATT?")
+    log_info(f"CGATT response:{resp.strip()}")
+    return "+CGATT: 1" in resp
 
-          for (let i = 0; i < rows.length; i++) {
-            const cond = form[`condition_${i}`]?.value;
-            const thr = form[`threshold_${i}`]?.value;
-            const delay = form[`delay_${i}`]?.value;
-            const email = form[`email_${i}`]?.value;
-            const contact = form[`contact_${i}`]?.value;
-            const msg = form[`message_${i}`]?.value;
-            const en = form[`enabled_${i}`]?.checked;
 
-            rows[i] = {
-              condition: cond || "<=",
-              threshold:
-                thr !== undefined && thr !== "" && !Number.isNaN(Number(thr))
-                  ? Number(thr)
-                  : "",
-              delay:
-                delay !== undefined &&
-                delay !== "" &&
-                !Number.isNaN(Number(delay))
-                  ? Number(delay)
-                  : "",
-              email: email || "",
-              contact: contact || "",
-              message: msg || "",
-              enabled: !!en,
-            };
-          }
+def send_sms(number, text):
+    # Free the port before opening
+    try:
+        free_port(MODEM_PORT)
 
-          saveConfig();
-          const tick = document.getElementById("analog-alerts-tick");
-          if (tick) {
-            tick.style.display = "inline";
-            setTimeout(() => (tick.style.display = "none"), 1200);
-          }
-        };
-      }
-    }
-  }, 50);
-}
+        with serial.Serial(MODEM_PORT, RS485_BAUD_RATE, timeout=5) as ser:
+            if "OK" not in send_at(ser, "AT"):
+                log_info("Modem not responding.")
+                return
 
-function renderOfflineDataPanel() {
-  // Inject styles (only once)
-  if (!document.getElementById("offline-panel-styles")) {
-    const style = document.createElement("style");
-    style.id = "offline-panel-styles";
-    style.textContent = `
-      /* Container */
-      #offline-panel-container {
-        max-width: 75%;
-        margin: 24px auto;
-        border-radius: 14px;
-        padding: 28px 36px;
-        display: flex;
-        gap: 36px;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        color: #2e2e2e;
-        transition: all 0.3s ease;
-      }
+            if not is_registered(ser):
+                log_error("❌ SIM not registered on network.")
+                return
+            if not is_attached(ser):
+                log_error("❌ SIM not attached to packet service.")
+                return
 
-      /* Left & Right Sections */
-      #offline-panel-left {
-        flex: 1;
-      }
-      #offline-panel-right {
-        width: 260px;
-        border-radius: 12px;
-        height:200px;
-        margin-right:500%;
-      }
+            log_info(send_at(ser, "AT+CMGF=1"))
 
-      /* Headings */
-      #offline-panel-left h2,
-      #offline-panel-right h2 {
-        margin-bottom: 18px;
-        font-weight: 700;
-        color: #333;
-        letter-spacing: 0.5px;
-        font-size: 18px;
-      }
+            ser.write(f'AT+CMGS="{number}"\r'.encode())
+            time.sleep(0.5)
 
-      /* Labels */
-      label {
-        display: block;
-        margin-bottom: 10px;
-        font-weight: 600;
-        font-size: 14px;
-        cursor: pointer;
-        color: #444;
-      }
+            ser.write(text.encode() + b"\x1a")
+            time.sleep(5)
 
-      /* Inputs & Select */
-      input[type="text"],
-      input[type="password"],
-      input[type="number"],
-      input[type="date"],
-      select {
-        margin-top: 6px;
-        padding: 8px 12px;
-        font-size: 14px;
-        border-radius: 8px;
-        border: 1.5px solid #d0d0d0;
-        width: 100%;
-        max-width: 240px;
-        box-sizing: border-box;
-        background-color: #fff;
-        transition: border-color 0.25s ease, box-shadow 0.25s ease;
-      }
-      input:focus,
-      select:focus {
-        border-color: #4caf50;
-        box-shadow: 0 0 0 3px rgba(76,175,80,0.15);
-        outline: none;
-      }
+            response = ser.read_all().decode(errors="ignore")
+            log_info(f"Final response: {response}")
 
-      /* Radio Buttons */
-      input[type="radio"] {
-        transform: scale(1.15);
-        margin-right: 8px;
-        vertical-align: middle;
-      }
+            if "OK" in response and "+CMGS" in response:
+                log_info("✅ SMS sent successfully!")
+            else:
+                log_error("❌ SMS failed.")
+    except Exception as e:
+        log_error(f"❌ SMS sending error: {e}")
 
-      /* Section Cards */
 
-      .ftp-schedule{
-        display:flex;
-        gap:35px;
-      }
-      .section {
-        margin-bottom: 24px;
-        padding: 16px 20px;
-        width:250px;
-        background: #fafafa;
-        border-radius: 10px;
-        border: 1px solid #eee;
-      }
-      .section legend {
-        font-size: 15px;
-        font-weight: 700;
-        margin-bottom: 12px;
-        color: #4a4a4a;
-      }
+# SMB SHARE
 
-      /* Buttons */
-      button {
-        padding: 10px 18px;
-        font-size: 14px;
-        font-weight: 600;
-        border-radius: 8px;
-        cursor: pointer;
-        border: none;
-        color: white;
-        background-color: #4caf50;
-        transition: background-color 0.3s ease, transform 0.2s ease;
-      }
-      button:hover {
-        background-color: #43a047;
-        transform: translateY(-1px);
-      }
 
-      /* Log File Controls */
-      #logfile-controls {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin-top: 8px;
-      }
-      #logfile-dropdown {
-        padding: 8px 12px;
-        font-size: 14px;
-        border-radius: 6px;
-        border: 1.5px solid #ccc;
-        min-width: 140px;
-        background-color: white;
-      }
+# ==================================================
+# MAIN LOOP FUNCTIONS
+# ==================================================
 
-      /* Button Colors */
-      #refresh-btn, #download-btn, #delete-btn {
-        background-color: #2196f3;
-      }
-      #refresh-btn:hover {
-        background-color: #1976d2;
-      }
-      #delete-btn {
-        background-color: #f44336;
-      }
-      #delete-btn:hover {
-        background-color: #d32f2f;
-      }
-      #download-btn:hover {
-        background-color: #1565c0;
-      }
+"""
+What: The core scheduler/loop that periodically reads analog/digital/Modbus sensors,
+        persists to DB/CSV, and transmits via 4G/TCP per thresholds.
+Calls:
+    - setup_modbus_instruments()
+    - convert_polling_interval_to_seconds()
+    - read_all_analog_channels(), read_digital_inputs(), read_modbus_registers()
+    - insert_readings_mysql(), get_csv_path(), write_to_csv(), send_data_via_4g()
+    - kafka_publish() for aggregate payloads
+Required by: main() (runs in main thread)
+Notes:
+    - Manages per-source timers and batching via data_map.
+    - Sends via 4G when batch >=5 or time interval threshold; also TCP-broadcasts when len>=10.
+    - Clears data_map after sending.
+    - Robust to exceptions with short backoff.
+Side effects: DB writes, file writes (CSV), network sends, Kafka publish, console logs.
+"""
+# ==================================================
+# THREAD-SAFE BUFFER FOR CSV/SEND
+# ==================================================
+csv_buffer = {}  # { timestamp: {sensor_id: value, ...} }
+csv_lock = threading.Lock()
 
-      /* Status Icon */
-      #offline-panel-status {
-        font-size: 20px;
-        color: #4caf50;
-        margin-left: 16px;
-        vertical-align: middle;
-        display: none;
-      }
 
-      /* Schedule section hide */
-      #schedule-section.hidden {
-        display: none;
-      }
+def buffer_merge(timestamp, readings):
+    """Merge readings into the timestamp row for CSV/telemetry in a thread-safe way."""
+    if not readings:
+        return
+    with csv_lock:
+        row = csv_buffer.get(timestamp, {})
+        row.update(readings)
+        csv_buffer[timestamp] = row
 
-      /* Responsive */
-      @media (max-width: 780px) {
-        #offline-panel-container {
-          flex-direction: column;
-          padding: 20px;
-        }
-        #offline-panel-right {
-          width: 100%;
-          margin-top: 20px;
-        }
-      }
-    `;
 
-    document.head.appendChild(style);
-  }
+# ==================================================
+# SENSOR READER THREADS (PARALLEL)
+# ==================================================
 
-  const offlineCfg = config.offlineData || {
-    enabled: true,
-    mode: "schedule", // or "live"
-    ftp: {
-      server: "FTPserver",
-      user: "ftpusername",
-      pass: "",
-      port: 8080,
-      folder: "datalogger",
-    },
-    schedule: {
-      hour: 4,
-      min: 15,
-      sec: 0,
-    },
-  };
-  const today = new Date().toISOString().split("T")[0];
-  if (offlineCfg.schedule.date == null || offlineCfg.schedule.date < today)
-    offlineCfg.schedule.date = today; // Default to today
-  let logFiles = []; // to be loaded
 
-  document.getElementById("main-panel").innerHTML = `
-        <div id="offline-panel-container">
-          <div id="offline-panel-left">
-            <form id="offline-form">
-              <div class="section">
-                <legend>Offline File Upload</legend>
-                <label><input type="radio" name="enabled" value="true" ${
-                  offlineCfg.enabled ? "checked" : ""
-                }> Enable</label>
-                <label><input type="radio" name="enabled" value="false" ${
-                  !offlineCfg.enabled ? "checked" : ""
-                }> Disable</label>
-              </div>
-              <div class="section">
-                <legend>Mode</legend>
-                <label><input type="radio" name="mode" value="live" ${
-                  offlineCfg.mode === "live" ? "checked" : ""
-                }> Live</label>
-                <label><input type="radio" name="mode" value="schedule" ${
-                  offlineCfg.mode === "schedule" ? "checked" : ""
-                }> Schedule</label>
-              </div>
-              <section class="ftp-schedule">
-              <div class="section">
-                <legend>FTP Settings</legend>
-                <label>FTP Server IP: <input type="text" name="ftpserver" value="${
-                  offlineCfg.ftp.server
-                }"></label>
-                <label>Username: <input type="text" name="ftpuser" value="${
-                  offlineCfg.ftp.user
-                }"></label>
-                <label>Password: <input type="password" name="ftppass" value="${
-                  offlineCfg.ftp.pass
-                }"></label>
-                <label>Port Number: <input type="number" name="ftpport" value="${
-                  offlineCfg.ftp.port
-                }"></label>
-                <label>Backup Folder: <input type="text" name="ftpfolder" value="${
-                  offlineCfg.ftp.folder
-                }"></label>
-              </div>
-              <div class="section" id="schedule-section">
-                <legend>Schedule</legend>
-                <div>
-                  Time: h:
-                  <input type="number" name="hour" min="0" max="23" value="${
-                    offlineCfg.schedule.hour
-                  }" style="width: 50px;">
-                  m:
-                  <input type="number" name="min" min="0" max="59" value="${
-                    offlineCfg.schedule.min
-                  }" style="width: 50px;">
-                  s:
-                  <input type="number" name="sec" min="0" max="59" value="${
-                    offlineCfg.schedule.sec
-                  }" style="width: 50px;">
-                  (24 Hr Format)
-                </div>
-                <div style="margin-top: 12px;">
-                  Date: <input type="date" name="date" value="${
-                    offlineCfg.schedule.date
-                  }">
-                </div>
-              </div>
-              </section>
-              <div style="margin-top: 20px;">
-                <button type="submit" class="button primary">Read</button>
-                <span id="offline-panel-status">✔</span>
-              </div>
-            </form>
-          </div>
-          <div id="offline-panel-right">
-            <h2>Offline Log File</h2>
-            <form id="logfile-form" style="display: flex; align-items: center; gap: 12px;">
-              <select id="logfile-dropdown"></select>
-              <button type="button" id="refresh-btn" title="Refresh">↻</button>
-              <button type="button" id="download-btn">Download</button>
-              <button type="button" id="delete-btn">Delete</button>
-            </form>
-          </div>
-        </div>
-      `;
+def evaluate_condition(value, condition, threshold):
+    try:
+        if condition == "<":
+            log_info(f"[DEBUG] Evaluating: {value} < {threshold}")
+            return value < threshold
+        elif condition == "<=":
+            log_info(f"[DEBUG] Evaluating: {value} <= {threshold}")
+            return value <= threshold
+        elif condition == ">":
+            log_info(f"[DEBUG] Evaluating: {value} > {threshold}")
+            return value > threshold
+        elif condition == ">=":
+            log_info(f"[DEBUG] Evaluating: {value} >= {threshold}")
+            return value >= threshold
+        elif condition == "==":
+            log_info(f"[DEBUG] Evaluating: {value} == {threshold}")
+            return value == threshold
+        elif condition == "!=":
+            log_info(f"[DEBUG] Evaluating: {value} != {threshold}")
+            return value != threshold
+        else:
+            return False
+    except Exception:
+        return False
 
-  // Fetch and load log files into dropdown
-  function loadLogFiles() {
-    fetch("/api/logfiles")
-      .then((res) => res.json())
-      .then((files) => {
-        logFiles = files || [];
-        const dropdown = document.getElementById("logfile-dropdown");
-        dropdown.innerHTML = logFiles
-          .map((f) => `<option value="${f}">${f}</option>`)
-          .join("");
-      });
-  }
-  loadLogFiles();
 
-  document.getElementById("refresh-btn").onclick = loadLogFiles;
-  document.getElementById("download-btn").onclick = () => {
-    const sel = document.getElementById("logfile-dropdown");
-    if (!sel.value) return;
-    window.open(`/api/logfile/${encodeURIComponent(sel.value)}`);
-  };
-  document.getElementById("delete-btn").onclick = () => {
-    const sel = document.getElementById("logfile-dropdown");
-    if (!sel.value) return;
-    if (!confirm(`Delete log file "${sel.value}"?`)) return;
-    fetch(`/api/logfile/${encodeURIComponent(sel.value)}`, {
-      method: "DELETE",
-    }).then(() => {
-      alert("File deleted");
-      loadLogFiles();
-    });
-  };
+def map_alarm_channel_to_analog_key(ch_name):
+    ch_name = ch_name.strip().lower()
 
-  // Hide schedule when mode is set to live
-  const modeRadios = document.querySelectorAll('input[name="mode"]');
-  const scheduleSection = document.getElementById("schedule-section");
-  function updateScheduleVisibility() {
-    const mode = document.querySelector('input[name="mode"]:checked').value;
-    scheduleSection.style.display = mode === "schedule" ? "block" : "none";
-  }
-  modeRadios.forEach((radio) =>
-    radio.addEventListener("change", updateScheduleVisibility)
-  );
-  updateScheduleVisibility(); // initial call
+    if ch_name.startswith("a"):
+        # A1 → analog_ch_0
+        idx = int(ch_name[1:]) - 1
+        return f"analog_ch_{idx}"
 
-  // Handle form submission (Read button)
-  document.getElementById("offline-form").addEventListener("submit", (ev) => {
-    ev.preventDefault();
-    const form = ev.target;
+    if "channel" in ch_name:
+        # Channel 1 → analog_ch_0
+        idx = int(ch_name.split()[-1]) - 1
+        return f"analog_ch_{idx}"
 
-    // --- Build selected date+time ---
-    const selectedDateTime = new Date(
-      `${form.date.value}T${form.hour.value.padStart(
-        2,
-        "0"
-      )}:${form.min.value.padStart(2, "0")}:${form.sec.value.padStart(2, "0")}`
-    );
+    return None
 
-    // --- Build min allowed date+time from offlineCfg ---
-    const cfg = offlineCfg.schedule;
-    const minAllowedDateTime = new Date(
-      `${cfg.date}T${String(cfg.hour).padStart(2, "0")}:${String(
-        cfg.min
-      ).padStart(2, "0")}:${String(cfg.sec).padStart(2, "0")}`
-    );
+def process_modbus_tcp_alarms(
+    plc_type: str,
+    plc_key: str,
+    data: dict,
+):
+    """
+    Evaluate Modbus TCP alarms for one PLC cycle
+    """
 
-    // --- Compare ---
-    if (selectedDateTime < minAllowedDateTime) {
-      alert(
-        "Selected date/time cannot be earlier than the configured schedule!"
-      );
-      return; // cancel save
-    }
+    tcp_cfg = (
+        config
+        .get("alarmSettings", {})
+        .get("ModbusTCP", {})
+        .get(plc_type, {})
+        .get(plc_key, {})
+    )
 
-    // --- If OK, proceed ---
-    const payload = {
-      offlineData: {
-        enabled: form.enabled.value === "true",
-        mode: form.mode.value,
-        ftp: {
-          server: form.ftpserver.value,
-          user: form.ftpuser.value,
-          pass: form.ftppass.value,
-          port: parseInt(form.ftpport.value, 10),
-          folder: form.ftpfolder.value,
-        },
-        schedule: {
-          hour: parseInt(form.hour.value, 10),
-          min: parseInt(form.min.value, 10),
-          sec: parseInt(form.sec.value, 10),
-          date: form.date.value,
-        },
-      },
-    };
+    if not tcp_cfg:
+        log_warn(f"[WARN] No tcp configuration")
+        return
 
-    config.offlineData = payload.offlineData;
-    saveConfig();
+    log_info(f"[INFO] Modbus TCP Alarms config: {tcp_cfg}")
 
-    const status = document.getElementById("offline-panel-status");
-    status.style.display = "inline";
-    setTimeout(() => (status.style.display = "none"), 2000);
-  });
-}
+    for tag_name, alerts in tcp_cfg.items():
+        if tag_name not in data:
+            continue
 
-function file_to_db() {
-  let fileCount = 0;
-  const main = document.getElementById("main-panel");
+        value = data[tag_name]
 
-  // Panel skeleton with CSS for scroll behavior
-  main.innerHTML = `
-        <div class="panel-header">File to Database</div>
-        <style>
-          .file-content {
-            scrollbar-width: thin;
-            scrollbar-color: #007bff #f1f1f1;
-            box-sizing: border-box;
-            scrollbar-gutter: stable;
-          }
-          .file-content::-webkit-scrollbar {
-            width: 8px;
-          }
-          .file-content::-webkit-scrollbar-track {
-            background: #f1f1f1;
-            border-radius: 4px;
-          }
-          .file-content::-webkit-scrollbar-thumb {
-            background: #007bff;
-            border-radius: 4px;
-          }
-          .file-content::-webkit-scrollbar-thumb:hover {
-            background: #0056b3;
-          }
-        </style>
-        <div style="padding:15px;">
-          <div id="files-container">
-            <!-- File configurations will be added here -->
-          </div>
-          <button type="button" class="button-primary" id="add-file-btn">Add File</button>
-          <br><br>
-          <button type="submit" class="button-primary" id="process-files-btn">Process Files</button>
-          <span id="process-tick" style="display:none;font-size:18px;color:#49ba3c;">✓</span>
-        </div>
-      `;
 
-  // Helpers
-  function getFilenameWithoutExtension(filePath) {
-    const filename = (filePath || "").split(/[\\\/]/).pop() || "";
-    return filename.replace(/\.[^/.]+$/, "");
-  }
+        if value is None:
+            continue
 
-  // Add a complete file configuration panel
-  function addFileConfiguration(configData = null) {
-    fileCount++;
-    const fileId = `file-config-${fileCount}`;
+        value = data[tag_name]
 
-    // Extract values
-    const enabled = configData?._internal?.enabled !== false;
-    const collapsed = configData?._internal?.collapsed || false;
+        for alert in alerts:
+            if not alert.get("enabled", False):
+                continue
 
-    const dataFreq = configData?.["data_freq(in secs)"] ?? "";
-    const smbShare = configData?.SMBShare?.smb_share || "";
-    const shareUsername = configData?.SMBShare?.share_username || "";
-    const sharePassword = configData?.SMBShare?.share_password || "";
+            condition = alert.get("condition")
+            threshold = alert.get("threshold")
+            email = alert.get("email")
+            message = alert.get("message", "Modbus TCP Alarm")
 
-    const fileHtml = `
-          <div class="file-config" id="${fileId}" style="margin-bottom:20px;border:2px solid #007bff;border-radius:8px;background:#f8f9fa;">
-            <div class="file-header" style="display:flex;justify-content:space-between;align-items:center;padding:15px;cursor:pointer;" onclick="toggleFileContent('${fileId}')">
-              <div style="display:flex;align-items:center;gap:10px;">
-                <span class="collapse-icon" style="font-size:18px;transition:transform 0.3s ease;transform:rotate(0deg);">▼</span>
-                <h4 style="margin:0;color:#007bff;">File Configuration #${fileCount}</h4>
-              </div>
-              <div style="display:flex;align-items:center;gap:10px;" onclick="event.stopPropagation();">
-                <label style="font-weight:bold;">Enable:</label>
-                <label class="toggle-switch" style="position:relative;display:inline-block;width:50px;height:24px;">
-                  <input type="checkbox" class="file-enabled" ${
-                    enabled ? "checked" : ""
-                  } style="opacity:0;width:0;height:0;">
-                  <span class="slider" style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#ccc;transition:.4s;border-radius:24px;"></span>
-                </label>
-              </div>
-            </div>
+            if threshold in ("", None):
+                continue
 
-            <div class="file-content" style="max-height:${
-              collapsed ? "0px" : "500px"
-            };overflow-y:auto;overflow-x:hidden;padding:${
-      collapsed ? "0 15px" : "0 15px 15px 15px"
-    };opacity:${collapsed ? "0" : "1"};transition:all 0.3s ease;">
-              <div class="file-form">
-                <!-- SMB Details -->
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-bottom:15px;">
-                  <div>
-                    <label style="display:block;margin-bottom:5px;font-weight:bold;">SMB Share:</label>
-                    <input type="text" class="smb-share" placeholder="//server/share" value="${smbShare}" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;">
-                  </div>
-                  <div>
-                    <label style="display:block;margin-bottom:5px;font-weight:bold;">Data Frequency (in secs):</label>
-                    <input type="number" class="data-freq" placeholder="60" value="${dataFreq}" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;">
-                  </div>
-                </div>
+            try:
+                threshold = float(threshold)
+            except ValueError:
+                continue
 
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-bottom:15px;">
-                  <div>
-                    <label style="display:block;margin-bottom:5px;font-weight:bold;">Share Username:</label>
-                    <input type="text" class="share-username" placeholder="username" value="${shareUsername}" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;">
-                  </div>
-                  <div>
-                    <label style="display:block;margin-bottom:5px;font-weight:bold;">Share Password:</label>
-                    <input type="password" class="share-password" placeholder="password" value="${sharePassword}" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;">
-                  </div>
-                </div>
+            if not evaluate_condition(value, condition, threshold):
+                continue
+
+            subject = f"[ALERT] Modbus TCP Alarm – {plc_key}"
+
+            body = f"""
+            <html>
+            <body style="font-family: Arial, sans-serif;">
+              <h2 style="color:#b30000;">⚠ Modbus TCP Alarm Triggered</h2>
+              <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;">
+                <tr><td><b>PLC Type</b></td><td>{plc_type}</td></tr>
+                <tr><td><b>PLC</b></td><td>{plc_key}</td></tr>
+                <tr><td><b>Tag</b></td><td>{tag_name}</td></tr>
+                <tr><td><b>Current Value</b></td><td>{value}</td></tr>
+                <tr><td><b>Condition</b></td><td>{condition} {threshold}</td></tr>
+                <tr><td><b>Message</b></td><td>{message}</td></tr>
+                <tr><td><b>Timestamp (IST)</b></td>
+                  <td>{datetime.now(timezone.utc).astimezone(ZoneInfo("Asia/Kolkata")).strftime('%Y-%m-%d %H:%M:%S')}</td>
+                </tr>
+              </table>
+            </body>
+            </html>
+            """
+
+            if email:
+                log_info(f"[ALARM] Sending Modbus TCP email to {email}")
+                send_email(email, subject, body)
+
+            log_error(
+                f"[ALARM] Modbus TCP {plc_key}/{tag_name}: "
+                f"{value} {condition} {threshold}"
+            )
+
+ANALOG_ALARM_STATE = {}  # {(channel, alert_index): first_trigger_time}
+
+def process_analog_alarms(analog_readings):
+    analog_cfg = config.get("alarmSettings", {}).get("Analog", {})
+
+    now = time.time()
+
+    for channel_str, channel_cfg in analog_cfg.items():
+        try:
+            channel = int(channel_str)
+        except ValueError:
+            log_error(f"[ALARM] Invalid analog channel key: {channel_str}")
+            continue
+
+        if channel not in analog_readings:
+            continue
+
+        value = analog_readings[channel]
+        alerts = channel_cfg.get("alerts", [])
+
+        for idx, alert in enumerate(alerts):
+            if not alert.get("enabled", False):
+                ANALOG_ALARM_STATE.pop((channel, idx), None)
+                continue
+
+            condition = alert.get("condition")
+            threshold = alert.get("threshold")
+            delay = int(alert.get("delay", 0))
+            email = alert.get("email", "")
+            contact = alert.get("contact", "")
+            message = alert.get("message", "")
+
+            if threshold in ("", None):
+                continue
+
+            try:
+                threshold = float(threshold)
+            except ValueError:
+                continue
+
+            if evaluate_condition(value, condition, threshold):
+                key = (channel, idx)
+
+                # Start delay timer
+                if key not in ANALOG_ALARM_STATE:
+                    ANALOG_ALARM_STATE[key] = now
+                    log_info(
+                        f"[ALARM] Channel {channel} condition met, delay started ({delay}s)"
+                    )
+                    continue
+
+                # Check delay expiry
+                if now - ANALOG_ALARM_STATE[key] < delay:
+                    continue
+
+                # ---- ALARM FIRED ----
+                ANALOG_ALARM_STATE.pop(key, None)
+
+                subject = f"[ALERT] Analog Alarm – Channel {channel}"
+
+                body = f"""
+                <html>
+                <body style="font-family: Arial;">
+                    <h2 style="color:#b30000;">⚠ Analog Alarm Triggered</h2>
+                    <table border="1" cellpadding="6" cellspacing="0">
+                        <tr><td><b>Channel</b></td><td>{channel}</td></tr>
+                        <tr><td><b>Value</b></td><td>{value}</td></tr>
+                        <tr><td><b>Condition</b></td><td>{condition} {threshold}</td></tr>
+                        <tr><td><b>Message</b></td><td>{message}</td></tr>
+                        <tr><td><b>Timestamp (IST)</b></td>
+                            <td>{datetime.now(timezone.utc).astimezone(
+                                ZoneInfo("Asia/Kolkata")
+                            ).strftime('%Y-%m-%d %H:%M:%S')}</td>
+                        </tr>
+                    </table>
+                </body>
+                </html>
+                """
+
+                if email:
+                    log_info(f"[ALARM] Sending email to {email}")
+                    send_email(email, subject, body)
+
+                if contact:
+                    log_info(f"[ALARM] Contact configured (SMS pending): {contact}")
+                    # send_sms(contact, ...)
+
+                log_error(
+                    f"[ALARM] Channel {channel} violated: {value} {condition} {threshold}"
+                )
+
+            else:
+                # Reset delay timer if condition clears
+                ANALOG_ALARM_STATE.pop((channel, idx), None)
+
+
+def analog_reader_loop():
+    log_info("[THREAD] Analog reader started")
+    local_version = -1
+    last_run = 0
+    interval = 5 # Default
+
+    while not STOP_EVENT.is_set():
+        # Check for config updates specific to this thread
+        if local_version != CONFIG_VERSION:
+            interval = convert_polling_interval_to_seconds(ANALOG_POLLING_INTERVAL, ANALOG_POLLING_UNIT)
+            local_version = CONFIG_VERSION
+            log_info(f"[ANALOG] Settings refreshed (Interval: {interval}s)")
+
+        try:
+            now = time.time()
+            if ANALOG_ENABLED and (now - last_run) >= interval:
+                ts = datetime.now(timezone.utc).astimezone(ZoneInfo("Asia/Kolkata")).strftime('%Y-%m-%d %H:%M:%S')
                 
-                <button type="button" class="remove-file-btn" style="background:#dc3545;color:white;border:none;padding:10px 20px;border-radius:4px;cursor:pointer;margin-bottom:10px;">Remove File Configuration</button>
-              </div>
-            </div>
-          </div>
-        `;
+                with HW_LOCK: # Prevent I2C collision
+                    readings = read_all_analog_channels()
+                
+                if readings:
+                    insert_analog_data(ts, readings)
+                    process_analog_alarms(readings)
+                last_run = now
+        except Exception as e:
+            log_error(f"[ERROR] Analog reader: {e}")
+        
+        time.sleep(0.5)
 
-    document
-      .getElementById("files-container")
-      .insertAdjacentHTML("beforeend", fileHtml);
 
-    const fileConfig = document.getElementById(fileId);
-    if (!fileConfig) {
-      console.error(`File config element ${fileId} not found`);
-      return;
-    }
+def insert_digital_data(timestamp, readings):
+    try:
+        print("INSERT_DIGITAL_DATA:", readings)
 
-    // Toggle switch behavior
-    const slider = fileConfig.querySelector(".slider");
-    const checkbox = fileConfig.querySelector(".file-enabled");
-    if (checkbox && slider) {
-      checkbox.onchange = () => {
-        slider.style.backgroundColor = checkbox.checked ? "#007bff" : "#ccc";
-        const fileForm = fileConfig.querySelector(".file-form");
-        if (fileForm) {
-          fileForm.style.opacity = checkbox.checked ? "1" : "0.5";
-          fileForm.style.pointerEvents = checkbox.checked ? "auto" : "none";
-        }
-      };
-      slider.style.backgroundColor = checkbox.checked ? "#007bff" : "#ccc";
-      slider.innerHTML =
-        '<span style="position:absolute;content:"";height:18px;width:18px;left:3px;bottom:3px;background-color:white;transition:.4s;border-radius:50%;transform:translateX(' +
-        (checkbox.checked ? "26px" : "0px") +
-        ');"></span>';
-      const fileForm = fileConfig.querySelector(".file-form");
-      if (fileForm) {
-        fileForm.style.opacity = checkbox.checked ? "1" : "0.5";
-        fileForm.style.pointerEvents = checkbox.checked ? "auto" : "none";
-      }
-    }
+        if not isinstance(readings, dict):
+            log_error("[DIGITAL] readings is not a dict")
+            return
 
-    // Remove file configuration
-    const removeFileBtn = fileConfig.querySelector(".remove-file-btn");
-    if (removeFileBtn) {
-      removeFileBtn.onclick = () => {
-        fileConfig.remove();
-      };
-    }
-  }
+        digital_cfg = DIGITAL_INPUT_CONFIG
+        db_cfg = DATABASE
+        digital_db_cfg = digital_cfg.get("db", {})
 
-  // Collapse/expand
-  window.toggleFileContent = function (fileId) {
-    const fileConfig = document.getElementById(fileId);
-    if (!fileConfig) return;
-    const content = fileConfig.querySelector(".file-content");
-    const icon = fileConfig.querySelector(".collapse-icon");
-    if (!content || !icon) return;
-    const isCollapsed =
-      content.style.maxHeight === "0px" || content.style.opacity === "0";
-    if (!isCollapsed) {
-      content.style.maxHeight = "0px";
-      content.style.opacity = "0";
-      content.style.padding = "0 15px";
-      icon.style.transform = "rotate(-90deg)";
-    } else {
-      content.style.maxHeight = "500px";
-      content.style.opacity = "1";
-      content.style.padding = "0 15px 15px 15px";
-      icon.style.transform = "rotate(0deg)";
-    }
-  };
+        database = digital_db_cfg.get("db_name")
+        table = digital_db_cfg.get("table_name") or "digital_reading"
 
-  // Save configuration
-  function saveCurrentConfigurationState() {
-    const fileConfigs = document.querySelectorAll(".file-config");
-    const filesToProcess = [];
-    fileConfigs.forEach((configElement) => {
-      const content = configElement.querySelector(".file-content");
-      const isCollapsed =
-        content &&
-        (content.style.maxHeight === "0px" || content.style.opacity === "0");
-      const enabled =
-        configElement.querySelector(".file-enabled")?.checked || false;
+        if not database:
+            log_error("[DIGITAL] db_name missing in config")
+            return
 
-      const smbShare = configElement.querySelector(".smb-share")?.value || "";
-      const shareUsername =
-        configElement.querySelector(".share-username")?.value || "";
-      const sharePassword =
-        configElement.querySelector(".share-password")?.value || "";
+        di_channels = DIGITAL_INPUT_CONFIG.get("channels", [])
+        do_channels = DIGITAL_OUTPUT_CHANNELS
 
-      const dataFreqVal = parseInt(
-        configElement.querySelector(".data-freq")?.value
-      );
-      const dataFreqSecs = Number.isFinite(dataFreqVal) ? dataFreqVal : 60;
 
-      const configData = {
-        SMBShare: {
-          smb_share: smbShare,
-          share_username: shareUsername,
-          share_password: sharePassword,
-        },
-        storing_database: {
-          table_name: getFilenameWithoutExtension(smbShare), // Use SMB share for filename
-        },
-        processed_files_table: "",
-        "data_freq(in secs)": dataFreqSecs,
-        _internal: {
-          enabled: enabled,
-          collapsed: isCollapsed,
-        },
-      };
+        values = {}
+        
+        for key, raw_val in readings.items():
+            try:
+                idx = int(key.split("_")[-1])
+            except Exception:
+                log_error(f"[DIGITAL] Invalid reading key: {key}")
+                continue
 
-      filesToProcess.push(configData);
-    });
+            if key.startswith("digital_out_"):
+                ch_name = (
+                    do_channels[idx].get("name")
+                    if idx < len(do_channels)
+                    else f"digital_out_{idx}"
+                )
+            else:
+                ch_name = (
+                    di_channels[idx].get("name")
+                    if idx < len(di_channels)
+                    else f"digital_ch_{idx}"
+                )
 
-    config.fileToDb = { files: filesToProcess };
-    return saveConfig();
-  }
+            values[ch_name] = int(bool(raw_val))
 
-  // Initialize with saved config
-  async function initializeWithConfig() {
-    const fileToDbConfig = config.fileToDb || { files: [] };
-    if (fileToDbConfig.files && fileToDbConfig.files.length > 0) {
-      fileToDbConfig.files.forEach((fileConfigData) => {
-        addFileConfiguration(fileConfigData);
-      });
-    } else {
-      addFileConfiguration();
-    }
-  }
 
-  // Wire buttons
-  setTimeout(() => {
-    const addFileBtn = document.getElementById("add-file-btn");
-    if (addFileBtn) {
-      addFileBtn.onclick = () => addFileConfiguration();
-    }
-    const processFilesBtn = document.getElementById("process-files-btn");
-    if (processFilesBtn) {
-      processFilesBtn.onclick = async () => {
-        await saveCurrentConfigurationState();
-        const tick = document.getElementById("process-tick");
-        if (tick) {
-          tick.style.display = "inline";
-          setTimeout(() => (tick.style.display = "none"), 1500);
-        }
-        console.log("Configuration saved and files processed");
-      };
-    }
-  }, 100);
+        if not values:
+            log_error("[DIGITAL] No valid digital values to insert")
+            return
 
-  initializeWithConfig();
-}
+        # ---------- LOCAL DB ----------
+        local_cfg = db_cfg.get("local")
 
-function renderKafkaPanel() {
-  const kafkaConfig = config.kafka || {
-    brokers: ["broker1:9092"],
-    topic: "",
-    certFiles: {
-      ca: "",
-      cert: "",
-      key: "",
-    },
-  };
+        if (
+            digital_db_cfg.get("upload_local") is True
+            and isinstance(local_cfg, dict)
+            and local_cfg.get("enabled") is True
+            and isinstance(local_cfg.get("cred"), dict)
+        ):
+            insert_digital_into_single_db(
+                local_cfg["cred"],
+                table,
+                database,
+                timestamp,
+                values,
+            )
 
-  document.getElementById("main-panel").innerHTML = `
-        <h2>Kafka Configuration</h2>
-        <form id="kafka-form" enctype="multipart/form-data" novalidate>
-          <label>Brokers (comma-separated):<br>
-            <input type="text" name="brokers" style="width:100%" value="${kafkaConfig.brokers.join(
-              ","
-            )}">
-          </label><br><br>
+        # ---------- CLOUD DB ----------
+        cloud_cfg = db_cfg.get("cloud")
 
-          <label>Topic:<br>
-            <input type="text" name="topic" style="width:100%" value="${
-              kafkaConfig.topic
-            }">
-          </label><br><br>
-    <fieldset>
-      <legend>Certificates</legend>
+        if (
+            digital_db_cfg.get("upload_cloud") is True
+            and isinstance(cloud_cfg, dict)
+            and cloud_cfg.get("enabled") is True
+            and isinstance(cloud_cfg.get("cred"), dict)
+        ):
+            insert_digital_into_single_db(
+                cloud_cfg["cred"],
+                table,
+                database,
+                timestamp,
+                values,
+            )
 
-      <label>CA Certificate:</label>
-      ${
-        kafkaConfig.certFiles.ca
-          ? `<div>
-              <small>${kafkaConfig.certFiles.ca}</small>
-              <button type="button" class="change-btn" data-field="ca">Change</button>
-            </div>`
-          : `<input type="file" name="ca" id="caFile">`
-      }
-      <br>
+    except Exception as e:
+        log_error(f"[DIGITAL INSERT] Fatal error: {e}")
 
-      <label>Client Certificate:</label>
-      ${
-        kafkaConfig.certFiles.cert
-          ? `<div>
-              <small>${kafkaConfig.certFiles.cert}</small>
-              <button type="button" class="change-btn" data-field="cert">Change</button>
-            </div>`
-          : `<input type="file" name="cert" id="certFile">`
-      }
-      <br>
+def insert_digital_into_single_db(db_cred, table, database, timestamp, values):
+    conn = None
+    try:
+        if not isinstance(db_cred, dict):
+            log_error("[DIGITAL][DB] Invalid db_cred")
+            return
 
-      <label>Client Key:</label>
-      ${
-        kafkaConfig.certFiles.key
-          ? `<div>
-              <small>${kafkaConfig.certFiles.key}</small>
-              <button type="button" class="change-btn" data-field="key">Change</button>
-            </div>`
-          : `<input type="file" name="key" id="keyFile">`
-      }
-      <br>
-    </fieldset>
+        conn = get_db_connection(db_cred, timeout=3)
+        if not conn:
+            return
 
-          <br>
+        cur = conn.cursor()
 
-          <button type="submit" class="button-primary">Save</button>
-          <span id="kafka-save-status" style="margin-left:1em; color: green;"></span>
-        </form>
-      `;
+        # Create DB
+        cur.execute(f"CREATE DATABASE IF NOT EXISTS `{database}`")
+        conn.database = database
 
-  const form = document.getElementById("kafka-form");
+        # Create table
+        cur.execute(f"""
+            CREATE TABLE IF NOT EXISTS `{table}` (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                ts DATETIME NOT NULL
+            ) ENGINE=InnoDB;
+        """)
 
-  form.onsubmit = async (ev) => {
-    ev.preventDefault();
+        # Add missing columns
+        cur.execute(f"SHOW COLUMNS FROM `{table}`")
+        existing_cols = {row[0] for row in cur.fetchall()}
 
-    const brokers = form.brokers.value
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-    const topic = form.topic.value.trim();
+        for col in values.keys():
+            if col not in existing_cols:
+                cur.execute(
+                    f"ALTER TABLE `{table}` ADD COLUMN `{col}` TINYINT(1) DEFAULT 0"
+                )
 
-    // File uploads
-    const certFiles = {
-      ca: kafkaConfig.certFiles.ca,
-      cert: kafkaConfig.certFiles.cert,
-      key: kafkaConfig.certFiles.key,
-    };
-    const uploadFile = async (fileInputId, key) => {
-      const input = document.getElementById(fileInputId);
-      if (input && input.files.length > 0) {
-        const fileData = new FormData();
-        fileData.append("file", input.files[0]);
-        const resp = await fetch("/upload-kafka-cert/", {
-          method: "POST",
-          body: fileData,
-        });
-        if (!resp.ok) throw new Error(`Failed to upload ${key}`);
-        const json = await resp.json();
-        console.log(json);
+        # Insert row
+        cols = ["ts"] + list(values.keys())
+        placeholders = ", ".join(["%s"] * len(cols))
+        cols_sql = ", ".join(f"`{c}`" for c in cols)
 
-        certFiles[key] = json.path;
-        kafkaConfig.certFiles[key] = json.path; // <-- keep global config in sync
-      }
-    };
+        data = [timestamp] + list(values.values())
 
-    try {
-      // Upload cert files if selected
-      await Promise.all([
-        uploadFile("caFile", "ca"),
-        uploadFile("certFile", "cert"),
-        uploadFile("keyFile", "key"),
-      ]);
+        cur.execute(
+            f"INSERT INTO `{table}` ({cols_sql}) VALUES ({placeholders})",
+            data,
+        )
 
-      // Prepare config save payload
-      const kafka = {
-        brokers,
+        conn.commit()
+        log_info(f"[DIGITAL][DB] Inserted into {database}.{table}")
+
+    except Exception as e:
+        log_error(f"[DIGITAL][DB] Insert failed: {e}")
+
+    finally:
+        if conn:
+            conn.close()
+
+
+def setup_gpio_input(gpio_num):
+    """
+    Ensures the GPIO is exported and set to 'in' direction.
+    """
+    base_path = f"/sys/class/gpio/gpio{gpio_num}"
+    
+    # 1. Export if directory doesn't exist
+    if not os.path.exists(base_path):
+        try:
+            with open("/sys/class/gpio/export", "w") as f:
+                f.write(str(gpio_num))
+            time.sleep(0.1)  # Wait for udev to create sysfs nodes
+        except OSError as e:
+            if e.errno != 16: # 16 is 'Device or resource busy'
+                raise
+
+    # 2. Set direction to 'in'
+    with open(f"{base_path}/direction", "w") as f:
+        f.write("in")
+
+def read_sysfs_gpio(gpio_num):
+    """
+    Ensures pin is ready, then reads the value.
+    """
+    try:
+        # Step A: Ensure pin is exported and set to 'in'
+        setup_gpio_input(gpio_num)
+        
+        # Step B: Read the value
+        path = f"/sys/class/gpio/gpio{gpio_num}/value"
+        with open(path, "r") as f:
+            return int(f.read().strip())
+    except Exception as e:
+        log_error(f"[SYSFS GPIO ERROR] gpio{gpio_num}: {e}")
+        return None
+
+def read_digital_inputs(di_channels, generate=False):
+    readings = {}
+
+    for idx, ch in enumerate(di_channels):
+        if not ch.get("enabled", False):
+            continue
+
+        pin = ch.get("pin")
+        if pin is None:
+            continue
+
+        try:
+            if generate:
+                raw = random.randint(0, 1)
+                log_info(f"[DI][RANDOM] CH{idx} = {raw}")
+            else:
+                raw = read_sysfs_gpio(pin)
+                if raw is None:
+                    continue
+
+            # 🔥 ACTIVE-LOW inversion: 
+            # High voltage (1) -> state 0 (OFF)
+            # Low voltage (0)  -> state 1 (ON)
+            state = 0 if raw == 1 else 1
+
+            readings[f"digital_ch_{idx}"] = state
+            log_info(f"[DI] CH{idx} GPIO{pin} raw={raw} state={state}")
+
+            # Assuming check_digital_alarm is defined elsewhere
+            check_digital_alarm(idx, state)
+
+        except Exception as e:
+            log_error(f"[DI][ERROR] CH{idx} (pin={pin}): {e}")
+
+    return readings
+
+
+def read_digital_inputs_gpio(di_channels, generate=False):
+    readings = {}
+
+    for idx, ch in enumerate(di_channels):
+        if not ch.get("enabled", False):
+            continue
+
+        pin = ch.get("pin")
+
+        if not generate and pin is None:
+            log_warn(f"[DI] CH{idx} has no valid pin, skipping")
+            continue
+
+        try:
+            if generate:
+                state = random.randint(0, 1)
+                log_info(f"[DI][RANDOM] CH{idx} = {state}")
+            else:
+                state = GPIO.input(pin)
+                log_info(f"[DI] CH{idx} GPIO {pin} = {state}")
+
+            readings[f"digital_ch_{idx}"] = int(state)
+
+            check_digital_alarm(idx, state)
+
+        except Exception as e:
+            log_error(f"[DI][ERROR] CH{idx} (pin={pin}): {e}")
+
+    return readings
+
+
+ENERGY_ALARM_STATE = {}   # {(slave_id, tag_key, idx): bool}
+ENERGY_ALARM_TIMER = {}  # {(slave_id, tag_key, idx): first_trigger_time}
+
+
+def check_energy_alarms(readings):
+    now = time.time()
+    alerts_cfg = config.get("alarmSettings", {}).get("ModbusRTU", {})
+
+    for alert_key, alert_list in alerts_cfg.items():
+
+        # Reading must exist with EXACT SAME KEY
+        if alert_key not in readings:
+            continue
+
+        value = readings[alert_key]
+
+        for idx, alert in enumerate(alert_list):
+            state_key = (alert_key, idx)
+
+            if not alert.get("enabled", False):
+                ENERGY_ALARM_STATE.pop(state_key, None)
+                ENERGY_ALARM_TIMER.pop(state_key, None)
+                continue
+
+            raw_threshold = alert.get("threshold")
+            try:
+                threshold = float(raw_threshold)
+            except (TypeError, ValueError):
+                log_error(
+                    f"[ENERGY ALARM] Invalid threshold "
+                    f"key={alert_key} value={raw_threshold!r}"
+                )
+                continue
+
+            cond = alert.get("condition")
+            delay = int(alert.get("delay", 0))
+            email = alert.get("email")
+            contact = alert.get("contact")
+            message = alert.get("message", "")
+
+            triggered = (
+                (cond == "<=" and value <= threshold) or
+                (cond == "<"  and value <  threshold) or
+                (cond == ">=" and value >= threshold) or
+                (cond == ">"  and value >  threshold)
+            )
+
+            prev_state = ENERGY_ALARM_STATE.get(state_key, False)
+
+            if triggered:
+                if state_key not in ENERGY_ALARM_TIMER:
+                    ENERGY_ALARM_TIMER[state_key] = now
+                    log_info(
+                        f"[ENERGY ALARM] {alert_key} trigger detected "
+                        f"(delay {delay}s)"
+                    )
+
+                if now - ENERGY_ALARM_TIMER[state_key] < delay:
+                    continue
+
+                # 🔴 Rising edge
+                if not prev_state:
+                    ENERGY_ALARM_STATE[state_key] = True
+                    ENERGY_ALARM_TIMER.pop(state_key, None)
+
+                    text = (
+                        f"{message}\n"
+                        f"Tag: {alert_key}\n"
+                        f"Value: {value}\n"
+                        f"Threshold: {cond} {threshold}"
+                    )
+
+                    log_warn(f"[ENERGY ALARM] {text}")
+
+                    if contact:
+                        send_sms(contact, text=text)
+                    if email:
+                        send_email(
+                            email,
+                            subject="Energy Alarm",
+                            body=text
+                        )
+
+            else:
+                # Condition cleared → reset latch
+                ENERGY_ALARM_STATE.pop(state_key, None)
+                ENERGY_ALARM_TIMER.pop(state_key, None)
+
+
+def send_energy_alert(alert_info):
+    """Send alert via SMS/Contact and Email"""
+    brand = alert_info["brand"]
+    slave = alert_info["slave"]
+    register = alert_info["register"]
+    current = alert_info["current"]
+    threshold = alert_info["threshold"]
+    condition = alert_info["condition"]
+    message = alert_info["message"]
+    contact = alert_info["contact"]
+    email = alert_info["email"]
+
+    full_message = f"{message}\nCurrent: {current}\nThreshold: {threshold} {condition}"
+
+    log_info(f"[ALERT] Sending: {full_message}")
+
+    # Send SMS/Contact
+    if contact:
+        try:
+            send_sms(contact, full_message)
+            log_info(f"[SMS] Sent to {contact}")
+        except Exception as e:
+            log_error(f"[ERROR] SMS failed: {e}")
+
+    # Send Email
+    if email:
+        try:
+            send_email(email, f"Energy Meter Alert: {brand} S{slave}", full_message)
+            log_info(f"[EMAIL] Sent to {email}")
+        except Exception as e:
+            log_error(f"[ERROR] Email failed: {e}")
+
+
+def send_email(to_email, subject, body):
+    """Send email alert"""
+    import smtplib
+    from email.mime.text import MIMEText
+
+    try:
+        # Get SMTP config from config.json or use defaults
+        smtp_config = config.get("smtp", {})
+        smtp_server = smtp_config.get("server", "smtp.gmail.com")
+        smtp_port = smtp_config.get("port", 587)
+        smtp_user = smtp_config.get("user", "")
+        smtp_pass = smtp_config.get("password", "")
+
+        msg = MIMEText(body, "html")
+        msg["Subject"] = subject
+        msg["From"] = smtp_user
+        msg["To"] = to_email
+
+        log_info(f"[INFO] Message for mail: {msg}")
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        log_info(f"[INFO] Server: {server}")
+        server.starttls()
+        server.login(smtp_user, smtp_pass)
+        server.send_message(msg)
+        server.quit()
+
+    except Exception as e:
+        log_error(f"[ERROR] Email send failed: {e}")
+        raise
+
+def modbus_db_writer_loop():
+    log_info("[THREAD] Modbus DB writer started")
+
+    while not STOP_EVENT.is_set():
+        try:
+            ts, reading, channel_meta = MODBUS_DB_QUEUE.get(timeout=0.5)
+                        # Convert NaN / Inf to None (SQL NULL)
+            if isinstance(reading, dict):
+                for k, v in reading.items():
+                    if isinstance(v, float):
+                        if math.isnan(v) or math.isinf(v):
+                            reading[k] = None
+                            
+            insert_energy_data(ts, reading,  channel_meta)
+            check_energy_alarms(reading)
+            MODBUS_DB_QUEUE.task_done()
+
+        except queue.Empty:
+            continue
+        except Exception as e:
+            log_error(f"[MODBUS][DB] Error: {e}")
+
+
+def modbus_reader_loop():
+    log_info("[THREAD] Modbus reader started")
+    local_version = -1
+    instruments = None
+    last_poll = 0
+
+    while not STOP_EVENT.is_set():
+        if local_version != CONFIG_VERSION:
+            with RS485_LOCK:
+                instruments = setup_modbus_instruments()
+            local_version = CONFIG_VERSION
+            log_info("[MODBUS] Serial instruments re-initialized")
+
+        try:
+            if MODBUS_ENABLED and (time.time() - last_poll >= 5):
+                ts = datetime.now(timezone.utc)\
+                    .astimezone(ZoneInfo("Asia/Kolkata"))\
+                    .strftime("%Y-%m-%d %H:%M:%S")
+
+
+                with RS485_LOCK:
+                    readings, channel_meta = read_modbus_devices_setup_every_time(
+                        instruments
+                    )
+                    MODBUS_DB_QUEUE.put((ts, readings,  channel_meta))
+                    log_info(f"[INFO] Readings: {readings} with channel_meta: {channel_meta}")
+
+                last_poll = time.time()
+
+        except Exception as e:
+            log_error(f"[MODBUS] Error: {e}")
+            instruments = None
+        
+        time.sleep(0.5)
+
+
+
+# ==================================================
+# PERIODIC FLUSHER FOR CSV AND 4G/TCP SENDS
+# ==================================================
+def send_flush_loop():
+    """Flushes the aggregated csv_buffer to CSV and handles 4G/TCP sends on cadence/size thresholds."""
+    try:
+        interval = convert_polling_interval_to_seconds(
+            WIRELESS_POLLING_INTERVAL, WIRELESS_POLLING_UNIT
+        )
+    except Exception:
+        interval = 10
+    last_send = 0.0
+    log_info(
+        f"[THREAD] Sender started, interval={interval}s; batch thresholds size>=5 or interval expiry"
+    )
+
+    while True:
+        try:
+            now = time.time()
+            do_flush = False
+            with csv_lock:
+                size = len(csv_buffer)
+            if size >= 5:
+                do_flush = True
+            elif (now - last_send) >= interval and size > 0:
+                do_flush = True
+
+            if do_flush:
+                # Snapshot and clear
+                with csv_lock:
+                    snapshot = dict(csv_buffer)
+                    csv_buffer.clear()
+
+                # CSV write
+                csv_path = get_csv_path()
+                write_to_csv(csv_path, snapshot)
+                temp_file = "current_readings.csv"
+                write_to_csv(temp_file, snapshot)
+
+                # LTE upload if configured
+                if COMMUNICATION_MEDIA == "4G/LTE":
+                    try:
+                        send_data_via_4g(temp_file)
+                    except Exception as e:
+                        log_error(f"[ERROR] 4G send failed: {e}")
+
+                # TCP broadcast if big enough snapshot
+                if len(snapshot) >= 10:
+                    payload = json.dumps(snapshot, separators=(",", ":")).encode(
+                        "utf-8"
+                    )
+                    for target in SEND_TARGETS:
+                        try:
+                            target_ip = target.get("ip", "")
+                            target_port = int(target.get("port", 12345))
+                            if not target_ip:
+                                continue
+                            with socket.socket(
+                                socket.AF_INET, socket.SOCK_STREAM
+                            ) as sock:
+                                sock.settimeout(3)
+                                sock.connect((target_ip, target_port))
+                                sock.sendall(payload)
+                                log_info(
+                                    f"[INFO] Sent {len(payload)} bytes to {target_ip}:{target_port}"
+                                )
+                        except Exception as e:
+                            log_error(f"[ERROR] TCP send failed -> {e}")
+
+                last_send = now
+
+            time.sleep(0.5)
+        except Exception as e:
+            log_error(f"[ERROR] Sender loop: {e}")
+            time.sleep(1.0)
+
+
+"""
+What: Periodically checks ANALOG_ALARMS rules against latest analog_readings and emits alarms.
+Calls: check_analog_alarm()
+Required by: main() as a background thread
+Notes: Uses analog_readings dict populated by main_data_collection_loop(); checks every 5s.
+Side effects: Console alarm output; hook to extend (SMS/Email).
+"""
+
+
+def alarm_monitoring_loop():
+    while True:
+        try:
+            # Check analog alarms
+            for channel_key, alarm_cfg in ANALOG_ALARMS.items():
+                if alarm_cfg.get("alert_enable") == "Enable":
+                    # Get current reading for this channel
+                    channel_id = f"analog_ch_{channel_key.replace('A', '')}"
+                    if channel_id in analog_readings:
+                        current_value = analog_readings[channel_id]
+                        check_analog_alarm(channel_key, current_value, alarm_cfg)
+
+            time.sleep(5)  # Check alarms every 5 seconds
+
+        except KeyboardInterrupt:
+            log_warn("[INFO] Alarm monitoring stopped by user")
+            break
+        except Exception as e:
+            log_error(f"[ERROR] Alarm monitoring error: {e}")
+            time.sleep(5)
+
+
+"""
+What: Evaluate analog value against alarm thresholds (up to 5 levels) and print when exceeded.
+Calls: None
+Required by: alarm_monitoring_loop()
+Notes: Thresholds and contact/message fields come from ANALOG_ALARMS config.
+Side effects: Console output; extend for notifications.
+"""
+
+
+def check_analog_alarm(channel_key, value, alarm_cfg):
+    for level in range(5):
+        level_key = f"level_enable_{level}"
+        if alarm_cfg.get(level_key) == "Enable":
+            threshold = float(alarm_cfg.get(f"level_threshold_{level}", "0"))
+            contact = alarm_cfg.get(f"level_contact_{level}", "")
+            message = alarm_cfg.get(f"level_message_{level}", "")
+
+            if value >= threshold:
+                log_warn(
+                    f"[ALARM] {channel_key}: {message} - Value: {value} >= {threshold} - Contact: {contact}"
+                )
+                # Here you could implement SMS/email notification
+
+
+"""
+What: Background scheduler for offline data operations, e.g., timed FTP transfers.
+Calls: transfer_offline_data()
+Required by: main() as a background thread
+Notes: If OFFLINE_ENABLED and OFFLINE_MODE=='schedule', performs transfer at configured clock time.
+Side effects: Potential network transfers; logging.
+"""
+
+
+def offline_data_handler():
+    while True:
+        try:
+            if OFFLINE_ENABLED:
+                if OFFLINE_MODE == "schedule":
+                    schedule = OFFLINE_SCHEDULE
+                    target_hour = schedule.get("hour", 0)
+                    target_min = schedule.get("min", 0)
+                    target_sec = schedule.get("sec", 0)
+
+                    current = datetime.now()
+                    if (
+                        current.hour == target_hour
+                        and current.minute == target_min
+                        and current.second == target_sec
+                    ):
+                        log_info("[INFO] Scheduled offline data transfer")
+                        # Transfer data via FTP
+                        transfer_offline_data()
+
+                time.sleep(60)  # Check every minute
+            else:
+                time.sleep(300)  # Check every 5 minutes if disabled
+
+        except KeyboardInterrupt:
+            log_info("[INFO] Offline data handler stopped by user")
+            break
+        except Exception as e:
+            log_error(f"[ERROR] Offline data handler error: {e}")
+            time.sleep(60)
+
+
+"""
+What: Perform FTP transfer using OFFLINE_FTP configuration (currently a stub/log-only).
+Calls: (Potentially ftplib in future)
+Required by: offline_data_handler()
+Notes: Replace stub with actual FTP upload logic if required.
+Side effects: None currently (only logs).
+"""
+
+
+def transfer_offline_data():
+    try:
+        ftp_cfg = OFFLINE_FTP
+        server = ftp_cfg.get("server", "")
+        username = ftp_cfg.get("user", "")
+        password = ftp_cfg.get("pass", "")
+        port = ftp_cfg.get("port", 21)
+        folder = ftp_cfg.get("folder", "")
+
+        if server and username:
+            log_info(
+                f"[INFO] Would transfer data to FTP server {server}:{port}/{folder}"
+            )
+            # Implement actual FTP transfer here
+            # import ftplib
+            # ftp = ftplib.FTP()
+            # ftp.connect(server, port)
+            # ftp.login(username, password)
+            # ... transfer files
+
+    except Exception as e:
+        log_error(f"[ERROR] FTP transfer failed: {e}")
+
+
+def poll_plc(plc_config, plc_type, thread_id):
+    log_info(f"[PLC THREAD STARTED] {thread_id}")
+    local_version = CONFIG_VERSION
+
+    try:
+        if plc_type == "Siemens":
+            plc_obj = S7_protocol(plc_config)
+
+        elif plc_type in ["Allen Bradley", "Delta"]:
+            plc_obj = ModbusTCPProtocol(plc_config)
+
+        else:
+            raise ValueError(f"Unsupported PLC type: {plc_type}")
+
+        while not STOP_EVENT.is_set():
+            # Detect config change
+            if local_version != CONFIG_VERSION:
+                log_info(f"[{thread_id}] Config version changed. Exiting thread.")
+                break
+
+            plc_obj.plc_to_db()   # MUST be single-cycle
+            time.sleep(1)
+
+    except Exception as e:
+        log_error(f"[{thread_id}] PLC polling error: {e}")
+
+    finally:
+        log_info(f"[PLC THREAD STOPPED] {thread_id}")
+
+
+
+"""
+What: Periodically iterate configured Modbus TCP entries and (stub) read data.
+Calls: (Future) pymodbus or similar
+Required by: main() as background thread when MODBUS_TCP_ENABLED True
+Notes: Currently logs intended actions; implement actual TCP reads per device.
+Side effects: None besides logs (for now).
+"""
+
+
+PLC_REGISTRY = {} # Keep track of {plc_id: thread_object}
+
+def modbus_tcp_handler():
+    log_info("[THREAD] Modbus TCP Manager started")
+    local_version = -1
+
+    while not STOP_EVENT.is_set():
+        if local_version != CONFIG_VERSION:
+            log_info("[MODBUS TCP] Config change detected. Updating PLC sub-threads...")
+            
+            # Note: We don't kill threads here. 
+            # We let existing poll_plc threads detect the version change themselves.
+            # We only need to start threads for NEW configurations if they aren't running.
+            
+            if MODBUS_TCP_ENABLED:
+                # Start Siemens PLCs
+                for i, cfg in enumerate(SIEMENS_CONFIGS):
+                    thread_id = f"Siemens_{i}"
+                    ensure_plc_thread_running(thread_id, cfg, "Siemens")
+
+                # Start Allen Bradley / Delta PLCs
+                for i, cfg in enumerate(COMBINED_CONFIG):
+                    thread_id = f"AB_Delta_{i}"
+                    ensure_plc_thread_running(thread_id, cfg, "Allen Bradley")
+            
+            local_version = CONFIG_VERSION
+
+        time.sleep(2)
+
+def ensure_plc_thread_running(thread_id, config, plc_type):
+    global PLC_REGISTRY
+    with THREAD_LOCK:
+        if thread_id not in PLC_REGISTRY or not PLC_REGISTRY[thread_id].is_alive():
+            log_info(f"[MODBUS TCP] Launching independent thread for {thread_id}")
+            t = threading.Thread(
+                target=poll_plc, 
+                args=(config, plc_type, thread_id), 
+                name=thread_id, 
+                daemon=True
+            )
+            t.start()
+            PLC_REGISTRY[thread_id] = t
+        
+
+
+"""
+What: Read last processed timestamp for polling deltas from a file.
+Calls: built-in file I/O
+Required by: poll_new_data()
+Notes: File path fixed to /home/gateway/GATEWAY-COMPLETE/Demo application/Main Application/last_kafka_timestamp.txt.
+Side effects: None.
+"""
+
+
+def get_last_timestamp():
+    timestamp_file = "/home/gateway/GATEWAY-COMPLETE/Demo application/Main Application/last_kafka_timestamp.txt"
+    try:
+        if os.path.exists(timestamp_file):
+            with open(timestamp_file, "r") as f:
+                return f.read().strip()
+        return None
+    except Exception as e:
+        log_error(f"[ERROR] Failed to read last timestamp: {e}")
+        return None
+
+
+"""
+What: Persist last processed timestamp to a file for incremental polling.
+Calls: built-in file I/O
+Required by: poll_new_data()
+Notes: Writes to /home/gateway/GATEWAY-COMPLETE/Demo application/Main Application/last_kafka_timestamp.txt.
+Side effects: Overwrites file.
+"""
+
+
+def set_last_timestamp(timestamp):
+    timestamp_file = "/home/gateway/GATEWAY-COMPLETE/Demo application/Main Application/last_kafka_timestamp.txt"
+    try:
+        with open(timestamp_file, "w") as f:
+            f.write(str(timestamp))
+    except Exception as e:
+        log_error(f"[ERROR] Failed to save timestamp: {e}")
+
+
+"""
+What: Poll HTTP API for new data since last timestamp and process/store it.
+Calls: get_last_timestamp(), requests.get(), process_external_data(), set_last_timestamp()
+Required by: (Not launched in main; add a thread if needed)
+Notes: GETs {JSON_ENDPOINT}/api/new-data with optional 'since' param; expects JSON array.
+Side effects: DB insert via process_external_data(); updates timestamp file.
+"""
+
+
+def poll_new_data():
+    since = get_last_timestamp()
+    http_new_url = f"{JSON_ENDPOINT}/api/new-data"  # Construct new data URL
+
+    try:
+        params = {"since": since} if since else {}
+        response = requests.get(http_new_url, params=params, timeout=10)
+
+        if response.status_code == 200:
+            data = response.json()
+            if data:
+                log_info(f"[INFO] New records received: {len(data)} items")
+                # Process the new data
+                for record in data:
+                    log_info(f"[DATA] Record: {record}")
+                    # You can store this data or process it as needed
+                    timestamp = record.get("timestamp")
+                    if timestamp:
+                        # Insert into database or process
+                        process_external_data(record)
+
+                # Update last timestamp
+                if isinstance(data, list) and data:
+                    latest_ts = max([d.get("timestamp", "") for d in data])
+                    if latest_ts:
+                        set_last_timestamp(latest_ts)
+            else:
+                log_info("[INFO] No new records found.")
+        else:
+            log_warn(f"[WARN] Poll failed: HTTP {response.status_code}")
+
+    except Exception as e:
+        log_error(f"[ERROR] Polling error: {e}")
+
+
+"""
+What: Persist a single external data record to MySQL (external_data table).
+Calls: mysql.connector.connect(), cursor.execute(), conn.commit()
+Required by: poll_new_data() after fetching new items from the HTTP endpoint.
+Notes:
+    - Auto-creates the 'external_data' table with columns:
+        id (AUTO_INCREMENT), timestamp (DATETIME), data_source (VARCHAR),
+        data_json (JSON), received_at (CURRENT_TIMESTAMP).
+    - Stores the entire input 'record' as JSON in the data_json column and sets
+    data_source='http_poll' by default.
+    - Expects 'record' to be a dict; if 'timestamp' key exists, it's inserted
+    into the timestamp column, otherwise NULL will be stored.
+    - Uses MYSQL_CONFIG for connection parameters; ensure credentials/db exist.
+    - Commits the transaction per call; batching may improve performance if needed.
+Side effects:
+    - Writes to MySQL (creates table if missing).
+    - Prints status or error messages to stdout.
+Failure modes:
+    - Any DB connection/SQL errors are caught and logged; the exception is not re-raised.
+    """
+
+
+def process_external_data(record):
+    try:
+        # Insert external data into database
+        conn = mysql.connector.connect(**MYSQL_CONFIG)
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS external_data (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                timestamp DATETIME,
+                data_source VARCHAR(100),
+                data_json JSON,
+                received_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+
+        cursor.execute(
+            "INSERT INTO external_data (timestamp, data_source, data_json) VALUES (%s, %s, %s)",
+            (record.get("timestamp"), "http_poll", json.dumps(record)),
+        )
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+        log_info(f"[INFO] Stored external data record")
+
+    except Exception as e:
+        log_error(f"[ERROR] Failed to store external data: {e}")
+
+
+"""
+What: Handle config updates received over Kafka (dynamic parameter changes).
+Calls: None
+Required by: Potential Kafka command processing flow.
+Notes: Example updates WIRELESS_POLLING_INTERVAL from message['config'].
+Side effects: Mutates globals.
+"""
+
+
+def process_config_update(message):
+    try:
+        config_data = message.get("config", {})
+        log_info(f"[INFO] Processing config update: {config_data}")
+
+        if "pollingInterval" in config_data:
+            global WIRELESS_POLLING_INTERVAL
+            WIRELESS_POLLING_INTERVAL = config_data["pollingInterval"]
+            log_info(f"[INFO] Updated polling interval to {WIRELESS_POLLING_INTERVAL}")
+
+    except Exception as e:
+        log_error(f"[ERROR] Config update processing failed: {e}")
+
+
+# --- Kafka Consumer/Producer helpers ---
+
+"""
+What: Deserialize bytes to JSON for Kafka consumer; returns None on empty or invalid JSON.
+Calls: json.loads()
+Required by: start_local_kafka_consumer()
+Notes: Logs invalid JSON and skips it.
+Side effects: None.
+"""
+
+
+def safe_json_deserializer(v):
+    if not v:
+        return None
+    try:
+        val = json.loads(v.decode("utf-8"))
+        log_info(val)
+        return val
+    except json.JSONDecodeError:
+        log_warn(f"[WARN] NON-JSON message skipped: {v}")
+        return None
+
+
+def ensure_topic_exists(topic_name):
+    try:
+        admin = KafkaAdminClient(bootstrap_servers=KAFKA_BROKERS)
+        existing_topics = admin.list_topics()
+        if topic_name not in existing_topics:
+            log_info(f"[INFO] Topic '{topic_name}' not found, creating...")
+            topic = NewTopic(name=topic_name, num_partitions=1, replication_factor=1)
+            admin.create_topics(new_topics=[topic], validate_only=False)
+            log_info(f"[INFO] Topic '{topic_name}' created.")
+        else:
+            log_info(f"[INFO] Topic '{topic_name}' already exists.")
+    except Exception as e:
+        log_error(f"[ERROR] Could not ensure topic exists: {e}")
+
+
+"""
+What: Start a Kafka consumer for KAFKA_TOPIC and batch-forward messages via flush_batch_to_api().
+Calls: flush_batch_to_api()
+Required by: kafka_local_consumer_thread()
+Notes: Commits offsets only on successful batch send; batches by size/time.
+Side effects: Network to Kafka and API; console logs.
+"""
+
+
+def start_local_kafka_consumer():
+    topic = KAFKA_TOPIC or "iot-readings"
+
+    ensure_topic_exists(topic)
+
+    consumer = KafkaConsumer(
         topic,
-        certFiles,
-      };
-      config.kafka = kafka; // Update global config
-      saveConfig(); // Save to config.json
+        bootstrap_servers=KAFKA_BROKERS or ["127.0.0.1:9092"],
+        group_id="gateway-consumer",
+        auto_offset_reset="latest",
+        value_deserializer=safe_json_deserializer,
+        key_deserializer=lambda v: v.decode("utf-8") if v else None,
+    )
 
-      document.getElementById("kafka-save-status").textContent = "Saved ✓";
-      setTimeout(() => {
-        document.getElementById("kafka-save-status").textContent = "";
-      }, 3000);
-    } catch (err) {
-      alert(`Error: ${err.message}`);
-    }
-  };
+    batch = []
+    last_flush = time.time()
+    batch_max = int(config.get("kafka", {}).get("batchMaxMessages", 200))
+    batch_sec = int(config.get("kafka", {}).get("batchMaxSeconds", 5))
 
-  document.querySelectorAll(".change-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const field = btn.getAttribute("data-field");
+    log_info(
+        f"[INFO] Kafka consumer started on topic {topic} (batch {batch_max}/{batch_sec}s)"
+    )
 
-      // Clear the stored filename in kafkaConfig
-      kafkaConfig.certFiles[field] = "";
+    while True:
+        try:
+            for msg in consumer:
+                record = {"key": msg.key, "value": msg.value, "ts": time.time()}
+                batch.append(record)
+                log_info(batch)
+                if len(batch) >= 10 or (time.time() - last_flush) >= batch_sec:
+                    if flush_batch_to_api(batch):
+                        consumer.commit()
+                        batch.clear()
+                        last_flush = time.time()
+                    else:
+                        time.sleep(2)
 
-      // Replace the display with a file input
-      btn.parentElement.outerHTML = `<input type="file" name="${field}" id="${field}File">`;
-    });
-  });
-}
+            if batch and (time.time() - last_flush) >= batch_sec:
+                if flush_batch_to_api(batch):
+                    consumer.commit()
+                    batch.clear()
+                    last_flush = time.time()
 
-function renderAddUserPanel(currentRole) {
-  const allowed = {
-    superadmin: ["superadmin", "admin", "user"],
-    admin: ["user"],
-    user: [],
-  };
+            time.sleep(0.1)
 
-  const main = document.getElementById("main-panel");
+        except KeyboardInterrupt:
+            log_info("[INFO] Kafka consumer stopping...")
+            break
+        except Exception as e:
+            log_error(f"[ERROR] Kafka consumer error: {e}")
+            time.sleep(2)
 
-  if (allowed[currentRole].length === 0) {
-    main.innerHTML = `<div class="panel-header">Add User</div>
-                          <p style="padding:15px;">You are not allowed to create new users.</p>`;
-    return;
-  }
 
-  main.innerHTML = `
-        <div class="panel-header">Add User</div>
-        <div style="padding:15px;">
-          <form id="add-user-form">
-            <label>Username:
-              <input type="text" name="username" required style="margin-left:10px;">
-            </label>
-            <br><br>
-            <label>Password:
-              <input type="password" name="password" required style="margin-left:10px;">
-            </label>
-            <br><br>
-            <label>Role:
-              <select name="role" style="margin-left:10px;">
-                ${allowed[currentRole]
-                  .map((r) => `<option value="${r}">${r}</option>`)
-                  .join("")}
-              </select>
-            </label>
-            <br><br>
-            <button type="submit" class="button-primary">Create User</button>
-            <span id="add-user-tick" style="display:none;font-size:18px;color:#49ba3c;">&#10004;</span>
-          </form>
-        </div>
-      `;
+"""
+What: Send batched messages to external API via LTE. Returns True on success.
+Calls: (Commented out: requests.post to JSON_ENDPOINT)
+Required by: start_local_kafka_consumer()
+Notes: Currently returns True as a stub; implement actual POST if needed.
+Side effects: None in stub form.
+"""
 
-  document.getElementById("add-user-form").onsubmit = async (ev) => {
-    ev.preventDefault();
-    const data = {
-      username: ev.target.username.value,
-      password: ev.target.password.value,
-      role: ev.target.role.value,
-    };
 
-    const res = await fetch("/create-user", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
+def flush_batch_to_api(batch):
+    # Real implementation commented out in original code.
+    return True
 
-    if (res.ok) {
-      document.getElementById("add-user-tick").style.display = "inline";
-      setTimeout(
-        () => (document.getElementById("add-user-tick").style.display = "none"),
-        1200
-      );
-    } else {
-      const err = await res.json();
-      alert("Error: " + err.error);
-    }
-  };
-}
 
-function logoutUser() {
-  fetch("/logout", {
-    method: "POST",
-    credentials: "include", // send cookies so backend can delete
-    headers: {
-      "Content-Type": "application/json",
+"""
+What: Wrapper to run start_local_kafka_consumer() with basic crash handling.
+Calls: start_local_kafka_consumer()
+Required by: main() to start consumer thread.
+Side effects: Starts consumption loop.
+"""
+
+
+def kafka_local_consumer_thread():
+    try:
+        start_local_kafka_consumer()
+    except Exception as e:
+        log_error(f"[ERROR] Consumer thread crashed: {e}")
+        time.sleep(2)
+
+
+"""
+What: Serialize Kafka message values: dict/list->JSON bytes, str->utf-8, else str(v)->utf-8.
+Calls: json.dumps()
+Required by: init_local_kafka_producer()
+Side effects: None.
+"""
+
+
+def value_serializer(v):
+    if isinstance(v, (dict, list)):
+        return json.dumps(v, separators=(",", ":")).encode("utf-8")
+    elif isinstance(v, str):
+        return v.encode("utf-8")
+    else:
+        return str(v).encode("utf-8")
+
+
+"""
+What: Initialize a KafkaProducer using KAFKA_BROKERS and config settings.
+Calls: KafkaProducer(...)
+Required by: kafka_publish() on first use
+Notes: Uses compression, batching, and value/key serializers. Prints chosen topic.
+Side effects: Opens connection to Kafka.
+"""
+
+
+def init_local_kafka_producer():
+    global kafka_producer, KAFKA_TOPIC
+    kafka_topic = KAFKA_TOPIC or "iot-readings"
+    compression = config.get("kafka", {}).get("compression", "gzip") or "gzip"
+    acks = config.get("kafka", {}).get("acks", "1")
+    kafka_producer = KafkaProducer(
+        bootstrap_servers=KAFKA_BROKERS or ["127.0.0.1:9092"],
+        compression_type=compression,
+        linger_ms=100,
+        batch_size=32768,
+        value_serializer=value_serializer,
+        key_serializer=lambda v: (v.encode("utf-8") if isinstance(v, str) else None),
+        retries=3,
+        max_in_flight_requests_per_connection=1,
+    )
+
+    log_info(f"[INFO] Kafka producer initialized on {kafka_topic}")
+
+
+"""
+What: Non-blocking publish to Kafka; source_key e.g. 'analog','digital','modbus','rs485','tcp'
+Calls: init_local_kafka_producer() on first publish
+Required by: start_tcp_server() handler, main_data_collection_loop(), process_rs485_data(), etc.
+Notes: Waits for send() future with timeout=10, then flushes. Rate-limits error logs.
+Side effects: Network to Kafka; console logs on error.
+"""
+
+
+def kafka_publish(source_key, payload):
+    global kafka_producer, kafka_last_err, KAFKA_TOPIC
+    if not kafka_producer:
+        log_info("[INFO] Initializing Kafka producer lazily")
+        init_local_kafka_producer()
+    try:
+        kafka_producer.send(KAFKA_TOPIC, key=source_key, value=payload).get(timeout=10)
+        kafka_producer.flush()
+    except Exception as e:
+        now = time.time()
+        if now - kafka_last_err > 10:
+            log_warn(f"[WARN] Kafka publish failed: {e}")
+            kafka_last_err = now
+
+
+"""
+What: Poll HTTP endpoint for commands and dispatch to process_remote_command().
+Calls: requests.get(), process_remote_command()
+Required by: main() as background thread
+Notes: Polls every 30s from {JSON_ENDPOINT}/commands; expects JSON array of commands.
+Side effects: None besides logs; could modify runtime if commands implemented.
+"""
+
+
+def http_command_poller():
+    poll_url = JSON_ENDPOINT
+
+    while True:
+        try:
+            response = requests.get(f"{poll_url}/commands", timeout=5)
+            if response.status_code == 200:
+                commands = response.json()
+                log_info(f"[INFO] Received commands: {commands}")
+
+                for command in commands:
+                    process_remote_command(command)
+            else:
+                log_warn(f"[WARN] Command polling failed: HTTP {response.status_code}")
+
+        except Exception as e:
+            log_error(f"[ERROR] Command polling error: {e}")
+
+        time.sleep(30)
+
+
+"""
+What: Process a remote command structure {type, data}.
+Calls: None (extend to call appropriate handlers)
+Required by: http_command_poller()
+Notes: Stub with logging for config_update, restart, data_request.
+Side effects: None currently (just logs).
+"""
+
+
+def process_remote_command(command):
+    try:
+        cmd_type = command.get("type", "")
+        cmd_data = command.get("data", {})
+
+        if cmd_type == "config_update":
+            log_info(f"[INFO] Config update command received: {cmd_data}")
+            # Update configuration dynamically
+
+        elif cmd_type == "restart":
+            log_info("[INFO] Restart command received")
+            # Implement restart logic
+
+        elif cmd_type == "data_request":
+            log_info(f"[INFO] Data request command: {cmd_data}")
+            # Send specific data
+
+        else:
+            log_warn(f"[WARN] Unknown command type: {cmd_type}")
+    except Exception as e:
+        log_error(f"[ERROR] Command processing error: {e}")
+
+
+"""
+What: Handle RS485 communication: periodically send latest data, and read/process inbound lines.
+Calls: process_rs485_data()
+Required by: main() as background thread
+Notes: Writes a single-line JSON-framed message prefixed with 'RS485_DATA:'; replace with protocol as needed.
+Side effects: Serial I/O; DB/Kafka via process_rs485_data().
+"""
+
+
+def rs485_communication_handler():
+    try:
+        ser = serial.Serial(RS485_PORT, MODBUS_BAUD_RATE, timeout=1)
+        log_info(
+            f"[INFO] RS485 communication started on {RS485_PORT} at {MODBUS_BAUD_RATE} baud"
+        )
+
+        while True:
+            # Send any queued data
+            if data_map:
+                latest_timestamp = max(data_map.keys())
+                latest_data = data_map[latest_timestamp]
+                message = f"RS485_DATA:{json.dumps(latest_data)}\n"
+                ser.write(message.encode())
+                log_info(f"[INFO] Sent RS485 data: {len(message)} bytes")
+
+            # Check for incoming data
+            if ser.in_waiting:
+                line = ser.readline().decode(errors="ignore").strip()
+                if line:
+                    log_info(f"[RS485 IN] {line}")
+                    process_rs485_data(line)
+
+            time.sleep(2)
+
+    except Exception as e:
+        log_error(f"[ERROR] RS485 communication error: {e}")
+
+
+"""
+What: Process incoming RS485 data lines that start with 'RS485_DATA:' containing JSON.
+Calls: insert_readings_mysql(), kafka_publish()
+Required by: rs485_communication_handler()
+Notes: Stores received values into DB with sensor_id prefixed 'rs485_' and publishes to Kafka.
+Side effects: DB insert; Kafka publish; console logs.
+"""
+
+
+def process_rs485_data(data):
+    try:
+        if data.startswith("RS485_DATA:"):
+            json_data = data[11:]  # Remove prefix
+            parsed_data = json.loads(json_data)
+            log_info(f"[INFO] Received RS485 data: {parsed_data}")
+
+            # Store or process the received data
+            timestamp = datetime.now(timezone.utc).astimezone(ZoneInfo("Asia/Kolkata")).strftime('%Y-%m-%d %H:%M:%S')
+            insert_readings_mysql(
+                timestamp, {f"rs485_{k}": v for k, v in parsed_data.items()}
+            )
+            # kafka_publish("rs485", {"ts": datetime.now(timezone.utc).isoformat(), "data": parsed_data})
+    except Exception as e:
+        log_error(f"[ERROR] RS485 data processing error: {e}")
+
+
+"""
+What: Monitor system resource usage and persist periodic status metrics.
+Calls: mysql.connector.connect() to insert into system_status
+Required by: main() as background thread
+Notes: Logs CPU/Memory/Disk; also checks network interfaces (LTE, eth0, wlan0).
+Side effects: DB insert each minute; console logs.
+"""
+
+
+def system_status_monitor():
+    while True:
+        try:
+            # Check system resources
+            cpu_percent = psutil.cpu_percent(interval=1)
+            memory = psutil.virtual_memory()
+            disk_usage = psutil.disk_usage("/")
+
+            log_info(
+                f"[STATUS] CPU: {cpu_percent}%, Memory: {memory.percent}%, Disk: {disk_usage.percent}%"
+            )
+
+            # Check network interfaces
+            net_stats = psutil.net_if_stats()
+            for interface, stats in net_stats.items():
+                if interface in [LTE_INTERFACE, "eth0", "wlan0"]:
+                    status = "UP" if stats.isup else "DOWN"
+                    log_info(f"[STATUS] {interface}: {status}")
+
+            # Log system status
+            status_data = {
+                "cpu_percent": cpu_percent,
+                "memory_percent": memory.percent,
+                "disk_percent": disk_usage.percent,
+                "timestamp": datetime.now(timezone.utc).astimezone(ZoneInfo("Asia/Kolkata")).strftime('%Y-%m-%d %H:%M:%S'),
+            }
+
+            # Insert system status into database
+            try:
+                conn = mariadb.connect(**MYSQL_CONFIG)
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS system_status (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        cpu_percent FLOAT,
+                        memory_percent FLOAT,
+                        disk_percent FLOAT
+                    )
+                """
+                )
+                cursor.execute(
+                    "INSERT INTO system_status (timestamp, cpu_percent, memory_percent, disk_percent) VALUES (%s, %s, %s, %s)",
+                    (
+                        status_data["timestamp"],
+                        cpu_percent,
+                        memory.percent,
+                        disk_usage.percent,
+                    ),
+                )
+                conn.commit()
+                cursor.close()
+                conn.close()
+            except Exception as e:
+                log_error(f"[ERROR] System status database insert failed: {e}")
+
+            time.sleep(60)  # Monitor every minute
+
+        except KeyboardInterrupt:
+            log_info("[INFO] System status monitor stopped by user")
+            break
+        except Exception as e:
+            log_error(f"[ERROR] System status monitor error: {e}")
+            time.sleep(60)
+
+
+# ==================================================
+# WIFI, 4G, Ethernet
+# ==================================================
+
+
+
+import hashlib
+
+# ---------------- PATHS ----------------
+BASE = Path("/home/gateway/Gateway-UI/Main Application/")
+
+CONFIG_FILE  = BASE / "config.json"
+UPDATED_FILE = BASE / "is_updated.json"
+STATE_FILE   = BASE / "last_network_state.json"
+
+SERIAL_PORT = "/dev/ttyUSB2"
+BAUDRATE    = 115200
+MODEM_USB_ID = "1e0e:9011"
+
+MODEMS = {
+    "simcom": {
+        "usb_id": "1e0e:9011",
+        "at_port": "/dev/ttyUSB2",
+        "mode": "ecm"
     },
-  })
-    .then((res) => res.json())
-    .then((data) => {
-      if (data.status === "logged_out") {
-        // Optionally redirect to login page
-        window.location.href = "/";
-      } else {
-        alert("Logout failed");
-      }
-    })
-    .catch((err) => {
-      console.error("Logout error:", err);
-      alert("Error logging out");
-    });
+    "quectel": {
+        "usb_id": "2c7c:0125",
+        "at_port": "/dev/ttyUSB2",
+        "ppp_port": "/dev/ttyUSB3",
+        "mode": "ppp"
+    }
 }
 
-// Side menu navigation logic
-document.querySelectorAll("#side-nav li").forEach((li) => {
-  li.onclick = () => {
-    // Highlight selected
-    document
-      .querySelectorAll("#side-nav li")
-      .forEach((l) => l.classList.remove("active"));
-    li.classList.add("active");
-    let panel = li.getAttribute("data-panel");
-    if (panel === "io-settings") renderIOSettingsPanel("Settings");
-    else if (panel === "modbus-rtu") renderModBusRTUPanel();
-    else if (panel === "modbus-tcp") renderModbusTcpPanel();
-    else if (panel === "Wifi/4G") renderNetworkPanel();
-    else if (panel === "alarm") renderAlarmSettings();
-    else if (panel === "manual") renderOfflineDataPanel();
-    else if (panel === "file-to-db") file_to_db();
-    else if (panel === "kafka") renderKafkaPanel();
-    else if (panel === "add-user") {
-      fetch("/whoami")
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.role) {
-            renderAddUserPanel(data.role);
-          } else {
-            alert("Unauthorized");
-          }
-        });
-    } else if (panel === "change-password") renderChangePasswordPanel();
-    else if (panel === "logout") {
-      if (confirm("Are you sure you want to log out?")) {
-        logoutUser(); // calls the function above
-      }
-    } else if (panel === "help")
-      renderSimplePanel(
-        "Help",
-        "For help, contact support.<br>Version: <b>v1.2.5</b>"
-      );
-  };
-});
 
-// Simple panel renderer for Logout/Help
-function renderSimplePanel(title, content) {
-  document.getElementById(
-    "main-panel"
-  ).innerHTML = `<div class="panel-header">${title}</div><div class="tab-content">${content}</div>`;
-}
+# ---------------- LOGGING ----------------
+LOG_BASE = Path("/home/gateway/logs")
+TODAY = datetime.now().strftime("%Y-%m-%d")
+LOG_DIR = LOG_BASE / TODAY / "Network"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
 
-// Show green checkmark briefly
-function showTick(id) {
-  const el = document.getElementById(id);
-  el.style.display = "inline";
-  setTimeout(() => {
-    el.style.display = "none";
-  }, 1200);
-}
+LOG_FILE = LOG_DIR / "network.log"
 
-// Download config.json helper
-function downloadConfig() {
-  const blob = new Blob([JSON.stringify(config, null, 2)], {
-    type: "application/json",
-  });
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = "config.json";
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-}
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler(LOG_FILE),
+        logging.StreamHandler()  # keeps console output
+    ]
+)
 
-// Initial panel
-window.onload = loadConfig;
+log = logging.getLogger("network")
+
+
+# ---------------- HELPERS ----------------
+def load_json(path, default=None):
+    try:
+        return json.loads(path.read_text())
+    except Exception:
+        return default
+
+def write_json(path, data):
+    path.write_text(json.dumps(data, indent=2))
+
+def hash_dict(d):
+    return hashlib.sha256(json.dumps(d, sort_keys=True).encode()).hexdigest()
+
+def detect_modem():
+    out = subprocess.run(["lsusb"], capture_output=True, text=True).stdout
+    for name, cfg in MODEMS.items():
+        if cfg["usb_id"] in out:
+            log.info(f"[MODEM] Detected {name}")
+            return name
+    return None
+
+
+def setup_quectel_ppp(apn):
+    log.info("[4G] Starting Quectel PPP")
+
+    # kill old sessions
+    subprocess.run(["sudo", "poff", "-a"], check=False)
+    subprocess.run(["sudo", "killall", "pppd"], check=False)
+    time.sleep(2)
+
+    # update chat script dynamically (important!)
+    chat = f"""
+        ABORT "NO CARRIER"
+        ABORT "ERROR"
+        ABORT "NO DIALTONE"
+        ABORT "BUSY"
+        ABORT "NO ANSWER"
+        "" AT
+        OK ATE0
+        OK AT+CGDCONT=1,"IP","{apn}"
+        OK ATD*99#
+        CONNECT \\d\\c
+    """
+    log_info(f"[INFO] quectel chat {chat}")
+    subprocess.run(
+        ["sudo", "tee", "/etc/chatscripts/quectel-connect"],
+        input=chat,
+        text=True,
+        check=True
+    )
+
+    subprocess.run(["sudo", "pon", "quectel"], check=False)
+
+    # wait for ppp0
+    for _ in range(20):
+        if os.path.exists("/sys/class/net/ppp0"):
+            log.info("[4G] PPP interface up")
+            return
+        time.sleep(1)
+
+    raise RuntimeError("PPP failed to come up")
+
+def fix_routes(mode):
+    if mode == "ppp":
+        subprocess.run(["sudo", "ip", "route", "replace", "default", "dev", "ppp0"])
+    else:
+        subprocess.run([
+            "sudo", "ip", "route", "replace",
+            "default", "via", "192.168.225.1",
+            "dev", "usb0", "metric", "900"
+        ])
+
+def sim_present(ser):
+    resp = send_at(ser, "AT+CPIN?", 1)
+    return "OK" in resp
+
+def setup_simcom_ecm(apn):
+    if not apn:
+        log.warning("APN not configured — skipping attach")
+        subprocess.run(["sudo","ip","link","set","usb0","down"],check=False)
+        time.sleep(2)
+        return
+    log_info("[4G] Starting CFUN-based attach (Jio-safe)")
+    if not detect_modem():
+        subprocess.run(["sudo","gpioset","0","6=1"],check=False)
+        time.sleep(8)
+
+    free_port(SERIAL_PORT)
+    wait_for_tty(SERIAL_PORT)
+
+    with serial.Serial(SERIAL_PORT, BAUDRATE, timeout=2) as ser:
+        send_at(ser, "AT")
+        # 🔥 CFUN reset (THIS IS THE KEY)
+        send_at(ser, "AT+CFUN=0", 2)
+        time.sleep(15)
+
+        send_at(ser, "AT+CFUN=1", 2)
+        time.sleep(20)
+        if not sim_present(ser):
+            log_info("No Sim Inserted")
+            subprocess.run(["sudo","ip","link","set","usb0","down"],check=False)
+            time.sleep(2)
+            return
+
+
+        # Wait for LTE registration
+        log_info("[4G] Waiting for network registration")
+
+        send_at(ser, "AT+CREG", 1)
+        send_at(ser, "AT+CGREG", 1)
+        send_at(ser, "AT+CEREG", 1)
+        send_at(ser, "AT+CNSMOD", 1)
+
+        for _ in range(40):
+            creg  = send_at(ser, "AT+CREG?", 1)
+            cgreg = send_at(ser, "AT+CGREG?", 1)
+            cereg = send_at(ser, "AT+CEREG?", 1)
+            cns   = send_at(ser, "AT+CNSMOD?", 1)
+            log_info(f"creg :{creg}, cgreg: {cgreg}, cereg: {cereg}, cns: {cns}")
+
+            if (
+                ("CREG: 1" in creg or "CREG: 0,1" in creg) and
+                ("CGREG: 1" in cgreg or "CGREG: 0,1" in cgreg) and
+                ("CEREG: 1" in cereg or "CEREG: 0,1" in cereg)
+            ):
+                log_info("[4G] Registered on LTE")
+                break
+
+            time.sleep(2)
+        else:
+            raise RuntimeError("LTE registration failed")
+
+        # Attach packet service (retry like you did manually)
+        for _ in range(10):
+            resp = send_at(ser, "AT+CGATT=1", 2)
+            if "OK" in resp:
+                break
+            time.sleep(3)
+
+        # Set APN
+        send_at(ser, f'AT+CGDCONT=1,"IPV4V6","{apn}"', 2)
+
+        # Activate PDP (IGNORE ERROR — Jio behavior)
+        send_at(ser, "AT+CGACT=1,1", 2)
+
+        # Poll for IP (THIS IS THE REAL SUCCESS SIGNAL)
+        log_info("[4G] Waiting for IP from network")
+        for _ in range(30):
+            ipinfo = send_at(ser, "AT+CGPADDR=1", 2)
+            if "+CGPADDR:" in ipinfo:
+                log_info("[4G] IP assigned")
+                break
+            time.sleep(3)
+        else:
+            raise RuntimeError("No IP assigned by network")
+
+    subprocess.run(["sudo", "dhclient", "usb0"], check=False)
+    log_info("[4G] LTE READY (CFUN path)")
+
+def free_port(port):
+    subprocess.run(["sudo", "fuser", "-k", port], check=False)
+    time.sleep(1)
+
+def wait_for_tty(port, timeout=40):
+    log_info(f"[4G] Waiting for {port}")
+    for _ in range(timeout):
+        if os.path.exists(port):
+            return
+        time.sleep(1)
+    raise RuntimeError("Serial port did not appear")
+
+def send_at(ser, cmd, timeout=2):
+    log.info(f"[AT] {cmd}")
+    ser.write((cmd + "\r").encode())
+
+    end = time.time() + timeout
+    buf = ""
+    while time.time() < end:
+        buf += ser.read(ser.in_waiting or 1).decode(errors="ignore")
+        if "OK" in buf or "ERROR" in buf:
+            break
+
+    if buf.strip():
+        log.info(buf.strip())
+    return buf
+
+# ---------------- LTE REGISTRATION WAIT ----------------
+def wait_for_lte(ser, present, timeout=5):
+    log_info("[4G] Waiting for LTE registration")
+    # if present:
+    #     send_at(ser,"AT+CRESET",45)
+    for _ in range(timeout):
+        send_at(ser, "AT+CREG", 1)
+        send_at(ser, "AT+CGREG", 1)
+        send_at(ser, "AT+CEREG", 1)
+        send_at(ser, "AT+CNSMOD", 1)
+        creg  = send_at(ser, "AT+CREG?", 1)
+        cgreg = send_at(ser, "AT+CGREG?", 1)
+        cereg = send_at(ser, "AT+CEREG?", 1)
+        mode  = send_at(ser, "AT+CNSMOD?", 1)
+
+        if ("CREG: 1" in creg or "CREG: 0,1" in creg):
+            log_info("[4G] LTE registered")
+            return
+
+        time.sleep(2)
+
+    raise RuntimeError("LTE registration timeout")
+
+# ---------------- WIFI ----------------
+def connect_wifi(ssid, password):
+    print("[WIFI] SSID =",ssid,"Password =",password)
+    if not ssid:
+        log_info("[WiFi] No SSID configured")
+        return
+
+    # 1️⃣ Check current active Wi-Fi
+    active = subprocess.run(
+        ["nmcli", "-t", "-f", "ACTIVE,SSID", "dev", "wifi"],
+        capture_output=True, text=True
+    ).stdout
+
+    for line in active.splitlines():
+        if line.startswith("yes:") and line.split(":", 1)[1] == ssid:
+            log_info(f"[WiFi] Already connected to {ssid}")
+            return
+
+    # 2️⃣ Check saved connections
+    saved = subprocess.run(
+        ["nmcli", "-t", "-f", "NAME,TYPE", "connection", "show"],
+        capture_output=True, text=True
+    ).stdout
+
+    log_info(f"[INFO] Saved WIFI: {saved}")
+    for line in saved.splitlines():
+        name, ctype = line.split(":", 1)
+        if name == ssid and ctype == "802-11-wireless":
+            log_info(f"[WiFi] Bringing up saved connection {ssid}")
+            subprocess.run(
+                ["nmcli", "connection", "up", ssid],
+                check=False
+            )
+            return
+
+    # 3️⃣ New network → password required
+    if not password:
+        log_info(f"[WiFi] Password required for new network {ssid}")
+        return
+
+    log_info(f"[WiFi] Connecting to new network {ssid}")
+    subprocess.run(
+        ["nmcli", "dev", "wifi", "connect", ssid, "password", password],
+        check=False
+    )
+
+
+# ---------------- 4G ----------------
+def setup_4g(apn):
+    modem = detect_modem()
+    if not modem:
+        raise RuntimeError("No supported modem detected")
+
+    if MODEMS[modem]["mode"] == "ppp":
+        setup_quectel_ppp(apn)
+    else:
+        setup_simcom_ecm(apn)
+
+# ---------------- STATIC ETHERNET (DHCP + STATIC IP) ----------------
+ETH_CONNECTION = "Wired connection 1"
+ETH_CONNECTION2 = "Wired connection 2"
+
+# ---------------- ETH IP CHECK ----------------
+def eth0_has_ip(ip):
+    """
+    Returns True if eth0 already has the given IPv4 address
+    """
+    try:
+        out = subprocess.run(
+            ["ip", "-4", "addr", "show", "dev", "eth0"],
+            capture_output=True,
+            text=True,
+            check=True
+        ).stdout
+
+        for line in out.splitlines():
+            if line.strip().startswith("inet "):
+                addr = line.split()[1].split("/")[0]
+                if addr == ip:
+                    return True
+        return False
+
+    except Exception as e:
+        log.exception("[ETH] Failed to read eth0 addresses")
+        return False
+
+
+def apply_static_ethernet(static_cfg, iface, prev_cfg):
+    """
+    Apply DHCP or DHCP + secondary static IP on a given interface
+    """
+    iface = ETH_CONNECTION2 if iface=="eth1" else ETH_CONNECTION
+
+    if static_cfg == prev_cfg:
+        log_info(f"[{iface}] No config change")
+        return static_cfg
+
+    enabled = static_cfg.get("enabled", False)
+
+    try:
+        if not enabled:
+            log_info(f"[{iface}] Static IP Not enabled")
+
+        else:
+            ip = static_cfg.get("ip")
+            subnet = static_cfg.get("subnet")
+
+            if not ip or not subnet:
+                log_warning(f"[{iface}] Static enabled but IP/subnet missing")
+                return prev_cfg
+
+            cidr = sum(bin(int(x)).count("1") for x in subnet.split("."))
+            addr = f"{ip}/{cidr}"
+
+            dns1 = static_cfg.get("dns_primary", "")
+            dns2 = static_cfg.get("dns_secondary", "")
+            dns = " ".join(d for d in [dns1, dns2] if d)
+
+            log_info(f"[{iface}] Applying DHCP + static {addr}")
+
+            subprocess.run([
+                "sudo", "nmcli", "con", "mod", iface,
+                "ipv4.method", "auto",
+                "ipv4.addresses", addr
+            ], check=True)
+
+            subprocess.run([
+                "sudo", "nmcli", "con", "mod", iface,
+                "ipv4.ignore-auto-dns", "yes"
+            ], check=True)
+
+            if dns:
+                subprocess.run([
+                    "sudo", "nmcli", "con", "mod", iface,
+                    "ipv4.dns", dns
+                ], check=True)
+
+        subprocess.run(["sudo", "nmcli", "con", "down", iface], check=False)
+        subprocess.run(["sudo", "nmcli", "con", "up", iface], check=False)
+
+        log_info(f"[{iface}] Network applied successfully")
+        return static_cfg
+
+    except Exception:
+        log.exception(f"[{iface}] Failed to apply network config")
+        return prev_cfg
+
+
+def network_watcher_loop():
+    log_info("[INFO] Network watcher started")
+
+    prev_static = {}
+    prev_static2 = {}
+
+    while not STOP_EVENT.is_set():
+        try:
+            network = NETWORK
+
+            # WiFi & 4G (still unconditional — acceptable for now)
+            connect_wifi(
+                network.get("wifi", {}).get("ssid", ""),
+                network.get("wifi", {}).get("password", "")
+            )
+            setup_4g(network.get("sim4g", {}).get("apn", ""))
+
+            # ---- ETH0 ----
+            prev_static = apply_static_ethernet(
+                network.get("static", {}),
+                "eth0",
+                prev_static
+            )
+
+            # ---- ETH1 / STATIC2 ----
+            static2 = network.get("static2", {})
+            iface2 = static2.get("iface")
+
+            if iface2:
+                prev_static2 = apply_static_ethernet(
+                    static2,
+                    iface2,
+                    prev_static2
+                )
+
+        except Exception as e:
+            log_error(f"[NETWORK] Watcher error: {e}")
+
+        time.sleep(10)
+
+
+# ==================================================
+# MAIN EXECUTION
+# ==================================================
+
+"""
+What: Main entrypoint that initializes 4G (if configured), starts all background threads,
+        and runs the main data collection loop.
+Calls:
+    - enable_4g_module(), connect_4g() when COMMUNICATION_MEDIA == "4G/LTE"
+    - start_config_monitor(), start_tcp_server(), http_command_poller(),
+    alarm_monitoring_loop(), offline_data_handler(), modbus_tcp_handler(),
+    kafka_local_consumer_thread(), rs485_communication_handler(), system_status_monitor()
+    - main_data_collection_loop()
+Side effects: Launches multiple daemon threads; sets up hardware/network; runs indefinitely.
+"""
+
+
+
+def main():
+    # Initial config load
+    if not UPDATED:
+        if not update_global_config():
+            log_error("[CRITICAL] Initial configuration load failed. Exiting.")
+            sys.exit(1)
+ 
+    log_info("=" * 60)
+    log_info("INDEPENDENT DATA LOGGER SYSTEM STARTING")
+    log_info("=" * 60)
+ 
+    # 1. Start the config monitor (it survives thread restarts)
+    monitor_thread = threading.Thread(
+        target=config_monitor_loop,
+        daemon=True,
+        name="ConfigMonitor"
+    )
+    monitor_thread.start()
+    log_info("[INFO] 🚀 Configuration monitor thread started")
+ 
+    # 2. Launch all enabled worker threads for the first time
+    STOP_EVENT.clear()
+    start_enabled_threads()
+ 
+    log_info("=" * 60)
+    log_info("ALL INDEPENDENT THREADS DISPATCHED")
+    log_info("=" * 60)
+ 
+    try:
+        # Keep main alive
+        while True:
+            time.sleep(1)
+ 
+    except KeyboardInterrupt:
+        log_info("\n[INFO] Shutdown requested by user")
+    except Exception as e:
+        log_error(f"\n[CRITICAL] Main crashed: {e}")
+ 
+    finally:
+        log_info("[SHUTDOWN] Signaling all threads to stop...")
+        stop_all_threads()
+        time.sleep(2)
+        log_info("[SHUTDOWN] System complete.")
+        os._exit(0)
+
+if __name__ == "__main__":
+    main()
