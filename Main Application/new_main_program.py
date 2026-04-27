@@ -1148,7 +1148,7 @@ def update_global_config():
     global CSV_FILENAME, LAST_SENT_FILE, DATABASE
     global ADC_I2C_ADDRESS, data_map
     global analog_readings, digital_readings, modbus_readings, bus, MODBUS_PARITY_MAP
-    global UPDATED
+    global UPDATED, NETWORK
     global WIFI_SSID, WIFI_PASSWORD, WIFI_IP_MODE, WIFI_IP, WIFI_SUBNET, WIFI_GATEWAY, WIFI_DNS1, WIFI_DNS2
 
     log_info("[INFO] 🔄 Updating global configuration variables...")
@@ -1160,7 +1160,12 @@ def update_global_config():
         log_error("[ERROR] Failed to load configuration")
         return False
 
+    NETWORK = config.get("network",{})
+
     # Com Port Configuration
+
+
+
     com_port_cfg = config.get("comPort", {})
     CONNECTION_TYPE = com_port_cfg.get("connectionType", "USB")
     COM_PORT = com_port_cfg.get("comPort", "COM7")
@@ -1851,7 +1856,7 @@ def start_enabled_threads():
             log_info(f"[THREAD] {name} started")
 
         start("NetworkWatcher", network_watcher_loop)
-        start("SystemStatus", system_status_monitor)
+        # start("SystemStatus", system_status_monitor)
 
         if ANALOG_ENABLED:
             start("AnalogReader", analog_reader_loop)
@@ -2374,94 +2379,6 @@ def check_digital_alarm(channel, state):
             DIGITAL_ALARM_TIMER.pop(key, None)
 
 
-# ==================================================
-# WIFI
-# ==================================================
-
-
-def connect_wifi():
-    global WIFI_SSID, WIFI_PASSWORD, WIFI_IP_MODE
-    global WIFI_IP, WIFI_SUBNET, WIFI_GATEWAY, WIFI_DNS1, WIFI_DNS2
-
-    if not WIFI_SSID:
-        log_error("❌ No WiFi SSID configured.")
-        return False
-
-    try:
-        # Get current active SSID
-        result = subprocess.run(
-            ["nmcli", "-t", "-f", "active,ssid", "dev", "wifi"],
-            capture_output=True,
-            text=True,
-        )
-        current_ssid = None
-        for line in result.stdout.strip().splitlines():
-            if line.startswith("yes:"):
-                current_ssid = line.split(":", 1)[1]
-                break
-
-        if current_ssid == WIFI_SSID:
-            log_info(f"✅ Already connected to {WIFI_SSID}, skipping reconfigure.")
-            return True
-
-        # Not connected or different network → reconfigure
-        log_info(f"🔄 Switching WiFi from {current_ssid} → {WIFI_SSID}")
-        # Delete old connection for target SSID
-        subprocess.run(
-            ["nmcli", "connection", "delete", WIFI_SSID],
-            check=False,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-
-        # Connect with password
-        cmd = [
-            "nmcli",
-            "device",
-            "wifi",
-            "connect",
-            WIFI_SSID,
-            "password",
-            WIFI_PASSWORD,
-        ]
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            log_error(f"❌ Failed to connect WiFi: {result.stderr.strip()}")
-            return False
-
-        # Configure static IP if required
-        if WIFI_IP_MODE.upper() == "STATIC":
-            ip_config = f"{WIFI_IP}/{WIFI_SUBNET} {WIFI_GATEWAY}"
-            subprocess.run(
-                [
-                    "nmcli",
-                    "connection",
-                    "modify",
-                    WIFI_SSID,
-                    "ipv4.addresses",
-                    ip_config,
-                    "ipv4.gateway",
-                    WIFI_GATEWAY,
-                    "ipv4.dns",
-                    ",".join(filter(None, [WIFI_DNS1, WIFI_DNS2])),
-                    "ipv4.method",
-                    "manual",
-                ],
-                check=True,
-            )
-            subprocess.run(["nmcli", "connection", "up", WIFI_SSID], check=True)
-        else:
-            subprocess.run(
-                ["nmcli", "connection", "modify", WIFI_SSID, "ipv4.method", "auto"],
-                check=True,
-            )
-
-        log_info(f"✅ Connected to WiFi {WIFI_SSID} ({WIFI_IP_MODE})")
-        return True
-
-    except Exception as e:
-        log_error(f"❌ WiFi connection failed: {e}")
-        return False
 
 
 # ==================================================
@@ -2961,7 +2878,8 @@ def read_modbus_devices_setup_every_time(instruments):
             if slave_id is None:
                 continue
 
-            generate = bool(slave.get("generate_random", False))
+            # generate = bool(slave.get("generate_random", False))
+            generate = False
             use_usb = bool(slave.get("use_usb", False))
             regs = registers_by_slave.get(str(slave_id), [])
             inst_key = f"{brand_key}_{slave_id}"
@@ -2978,6 +2896,13 @@ def read_modbus_devices_setup_every_time(instruments):
                 name = reg.get("name", "unknown")
                 key = f"{brand_key}_S{slave_id}_{name}"
 
+
+                # ADD THIS IMMEDIATELY
+                channel_meta[key] = {
+                    "column": name,
+                    "sensor_type": reg.get("sensor_type"),
+                    "eng_symbol": reg.get("eng_symbol")
+                }
                 try:
                     # ===== RANDOM MODE =====
                     if generate:
@@ -3089,11 +3014,6 @@ def read_modbus_devices_setup_every_time(instruments):
                                 value = None
                         
                     readings[key] = value
-                    channel_meta[key] = {
-                        "column": name,
-                        "sensor_type": reg.get("sensor_type"),
-                        "eng_symbol": reg.get("eng_symbol")
-                    }
                     log_info(f"[INFO] The reading for {slave_id} after conversion is {value} for sid {slave_id}")
 
                 except Exception as e:
@@ -4755,6 +4675,13 @@ def modbus_db_writer_loop():
     while not STOP_EVENT.is_set():
         try:
             ts, reading, channel_meta = MODBUS_DB_QUEUE.get(timeout=0.5)
+                        # Convert NaN / Inf to None (SQL NULL)
+            if isinstance(reading, dict):
+                for k, v in reading.items():
+                    if isinstance(v, float):
+                        if math.isnan(v) or math.isinf(v):
+                            reading[k] = None
+                            
             insert_energy_data(ts, reading,  channel_meta)
             check_energy_alarms(reading)
             MODBUS_DB_QUEUE.task_done()
@@ -5919,6 +5846,7 @@ def wait_for_lte(ser, present, timeout=5):
 
 # ---------------- WIFI ----------------
 def connect_wifi(ssid, password):
+    print("[WIFI] SSID =",ssid,"Password =",password)
     if not ssid:
         log_info("[WiFi] No SSID configured")
         return
@@ -6072,8 +6000,7 @@ def network_watcher_loop():
 
     while not STOP_EVENT.is_set():
         try:
-            config_data = load_json(CONFIG_FILE, {})
-            network = config_data.get("network", {})
+            network = NETWORK
 
             # WiFi & 4G (still unconditional — acceptable for now)
             connect_wifi(
