@@ -13659,5 +13659,155 @@
     "fields": [
       "Database"
     ]
+  },
+  {
+    "ts": "2026-04-29T14:48:47.513998",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-04-29T14:55:51.778922",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-04-29T15:35:12.739383",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-04-29T15:55:19.294800",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-04-29T15:59:50.694153",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-04-29T16:08:53.736770",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-04-29T16:10:00.727298",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-04-29T16:11:09.881174",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-04-29T16:12:13.855538",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-04-29T16:12:16.049983",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-04-29T16:12:56.084279",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-04-29T16:18:18.900096",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-04-29T17:46:32.671226",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-04-29T17:48:03.547230",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-04-29T17:56:31.815094",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
   }
 ]

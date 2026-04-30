@@ -617,7 +617,7 @@ from flask_cors import CORS
 # PATHS
 # ============================================================
 
-BASE = Path("/home/pi/Downloads/Gateway-UI/Main Application")
+BASE = Path("/home/recomputer/Gateway-UI/Main Application/")
 STATIC = BASE / "static"
 
 CONFIG_FILE = BASE / "config.json"

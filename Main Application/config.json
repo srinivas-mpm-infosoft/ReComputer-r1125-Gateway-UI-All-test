@@ -109,8 +109,8 @@
     "settings": {
       "analog": false,
       "digitalInput": false,
-      "modbus": true,
-      "modbusTCP": false
+      "modbus": false,
+      "modbusTCP": true
     }
   },
   "wireless": {
@@ -224,85 +224,85 @@
   },
   "plc_configurations": [
     {
+      "plcType": "Delta",
+      "isExpanded": false,
+      "enabled": false,
       "PLC": {
-        "Database": {
-          "db_name": "test",
-          "table_name": "delta_plc",
-          "upload_cloud": false,
-          "upload_local": true
-        },
-        "address_access": {
-          "read": [
-            {
-              "address": "100",
-              "datatype": "FLOAT",
-              "length": 1,
-              "max": "4000",
-              "min": 0,
-              "read": false,
-              "tag": "Data register",
-              "value": 60,
-              "write": true
-            },
-            {
-              "address": "6",
-              "datatype": "FLOAT",
-              "length": 1,
-              "max": 100,
-              "min": 0,
-              "read": true,
-              "tag": "Read register",
-              "value": "",
-              "write": false
-            }
-          ]
-        },
         "cred": {
           "ip": "192.168.1.5",
           "port": 502
         },
-        "data_freq_sec": 10,
-        "data_freq_unit": "sec"
-      },
-      "enabled": true,
-      "generate_random": true,
-      "isExpanded": true,
-      "plcType": "Delta"
-    },
-    {
-      "plcType": "Siemens",
-      "PLC": {
-        "cred": {
-          "ip": "192.168.0.1",
-          "rack": 0,
-          "slot": 2
-        },
         "address_access": {
           "read": [
             {
-              "content": "",
-              "DB_no": 1,
-              "address": 0,
-              "type": "float",
-              "size": "",
+              "tag": "Data register",
+              "address": "100",
+              "datatype": "FLOAT",
+              "length": 1,
+              "min": 0,
+              "max": "4000",
+              "value": 60,
+              "read": false,
+              "write": false
+            },
+            {
+              "tag": "Read register",
+              "address": "6",
+              "datatype": "FLOAT",
+              "length": 1,
               "min": 0,
               "max": 100,
-              "read": true,
+              "value": "",
+              "read": false,
               "write": false
             }
           ]
         },
-        "data_freq_sec": 1,
+        "data_freq_sec": 10,
         "data_freq_unit": "sec",
         "Database": {
           "upload_local": true,
           "upload_cloud": false,
           "db_name": "test",
-          "table_name": ""
+          "table_name": "delta_plc"
         }
-      },
+      }
+    },
+    {
+      "plcType": "Siemens",
       "isExpanded": true,
-      "enabled": true
+      "enabled": true,
+      "PLC": {
+        "cred": {
+          "ip": "192.168.0.1",
+          "rack": 0,
+          "slot": 1
+        },
+        "address_access": {
+          "read": [
+            {
+              "content": "ABC",
+              "DB_no": 1,
+              "address": 0,
+              "type": "dint",
+              "size": "5",
+              "min": 0,
+              "max": 100,
+              "value": "90",
+              "read": true,
+              "write": false
+            }
+          ]
+        },
+        "data_freq_sec": 5,
+        "data_freq_unit": "sec",
+        "Database": {
+          "upload_local": true,
+          "upload_cloud": false,
+          "db_name": "gateway",
+          "table_name": "siemens"
+        }
+      }
     }
   ],
   "fileToDb": {
