@@ -11,6 +11,7 @@ paramiko
 pandas
 flask
 flask_sqlalchemy
+flask_cors
 smbus2
 mysql.connector
 pysmb

@@ -49,11 +49,11 @@ Wants=network-online.target
 Type=simple
 User=pi
 Group=pi
-WorkingDirectory=/home/pi/grafana-12.2.0/bin
+WorkingDirectory=/home/gateway/grafana-12.2.0/bin
 
-ExecStart=/home/pi/grafana-12.2.0/bin/grafana-server \
-  --homepath /home/pi/grafana-12.2.0 \
-  --config /home/pi/grafana-12.2.0/conf/defaults.ini
+ExecStart=/home/gateway/grafana-12.2.0/bin/grafana-server \
+  --homepath /home/gateway/grafana-12.2.0 \
+  --config /home/gateway/grafana-12.2.0/conf/grafana.ini
 
 Restart=on-failure
 RestartSec=5

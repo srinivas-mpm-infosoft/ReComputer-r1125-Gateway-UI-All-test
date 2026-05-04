@@ -617,7 +617,7 @@ from flask_cors import CORS
 # PATHS
 # ============================================================
 
-BASE = Path("/home/recomputer/Gateway-UI/Main Application/")
+BASE = Path("/home/gateway/Gateway-UI/Main Application")
 STATIC = BASE / "static"
 
 CONFIG_FILE = BASE / "config.json"
@@ -651,8 +651,7 @@ CORS(
     app,
     supports_credentials=True,
     origins=[
-        "http://localhost:5173",   # React dev
-        "http://127.0.0.1:5173",
+    "*"
     ]
 )
 

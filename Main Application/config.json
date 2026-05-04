@@ -26,6 +26,7 @@
         "upload_cloud": false,
         "upload_local": true
       },
+      "generate_random": false,
       "pollingInterval": 5,
       "pollingIntervalUnit": "Sec"
     },
@@ -69,6 +70,7 @@
         "upload_cloud": false,
         "upload_local": true
       },
+      "generate_random": false,
       "pollingInterval": 5,
       "pollingIntervalUnit": "Sec"
     },
@@ -110,7 +112,7 @@
       "analog": false,
       "digitalInput": false,
       "modbus": false,
-      "modbusTCP": true
+      "modbusTCP": false
     }
   },
   "wireless": {
@@ -3082,12 +3084,12 @@
     },
     "rs485Ports": [
       {
-        "name": "RS485_1 (/dev/ttyACM1)",
-        "port": "/dev/ttyACM1"
+        "name": "RS485_1 (/dev/ttyACM0)",
+        "port": "/dev/ttyACM0"
       },
       {
-        "name": "RS485 2",
-        "port": "/dev/serial/by-id/usb-1a86_USB_Single_Serial_5A99022512-if00"
+        "name": "RS485_2 (/dev/ttyACM1)",
+        "port": "/dev/ttyACM1"
       }
     ]
   },
