@@ -13830,5 +13830,362 @@
     "fields": [
       "ioSettings"
     ]
+  },
+  {
+    "ts": "2026-05-07T14:10:24.929995",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "comPort",
+      "ethernet",
+      "kafka",
+      "modbusTcp",
+      "offlineData",
+      "plc_configurations",
+      "rs485",
+      "wireless",
+      "scada_configurations",
+      "hmi_configurations"
+    ]
+  },
+  {
+    "ts": "2026-05-07T14:12:31.335251",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "scada_configurations"
+    ]
+  },
+  {
+    "ts": "2026-05-07T14:13:29.785456",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "scada_configurations"
+    ]
+  },
+  {
+    "ts": "2026-05-07T16:28:16.127150",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "hmi_configurations",
+      "scada_configurations"
+    ]
+  },
+  {
+    "ts": "2026-05-07T16:29:16.603704",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "hmi_configurations",
+      "scada_configurations"
+    ]
+  },
+  {
+    "ts": "2026-05-07T16:38:07.467242",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "hmi_configurations"
+    ]
+  },
+  {
+    "ts": "2026-05-07T17:40:22.063509",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "hmi_configurations",
+      "plc_configurations",
+      "scada_configurations"
+    ]
+  },
+  {
+    "ts": "2026-05-07T17:41:17.066245",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "scada_configurations"
+    ]
+  },
+  {
+    "ts": "2026-05-07T17:42:52.552514",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "scada_configurations"
+    ]
+  },
+  {
+    "ts": "2026-05-08T08:58:44.029396",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "hmi_configurations",
+      "scada_configurations"
+    ]
+  },
+  {
+    "ts": "2026-05-08T09:00:21.067230",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "hmi_configurations"
+    ]
+  },
+  {
+    "ts": "2026-05-09T18:04:11.150600",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "scada_configurations"
+    ]
+  },
+  {
+    "ts": "2026-05-09T18:09:58.233462",
+    "user": {
+      "role": "user",
+      "username": "superadmin"
+    },
+    "fields": [
+      "hmi_configurations",
+      "scada_configurations"
+    ]
+  },
+  {
+    "ts": "2026-05-09T18:33:40.808299",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "hmi_configurations",
+      "scada_configurations"
+    ]
+  },
+  {
+    "ts": "2026-05-09T18:35:50.685432",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "scada_configurations"
+    ]
+  },
+  {
+    "ts": "2026-05-09T18:49:58.331427",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "scada_configurations"
+    ]
+  },
+  {
+    "ts": "2026-05-09T20:23:17.868561",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "scada_configurations"
+    ]
+  },
+  {
+    "ts": "2026-05-09T20:25:01.458331",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "scada_configurations"
+    ]
+  },
+  {
+    "ts": "2026-05-10T21:16:15.931706",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "network"
+    ]
+  },
+  {
+    "ts": "2026-05-10T21:50:02.815427",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "network"
+    ]
+  },
+  {
+    "ts": "2026-05-10T21:56:47.050675",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "network"
+    ]
+  },
+  {
+    "ts": "2026-05-10T21:57:36.437027",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "network"
+    ]
+  },
+  {
+    "ts": "2026-05-10T22:06:58.765062",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "hmi_configurations",
+      "scada_configurations"
+    ]
+  },
+  {
+    "ts": "2026-05-11T09:00:46.371898",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "network"
+    ]
+  },
+  {
+    "ts": "2026-05-11T09:02:22.835937",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-05-11T09:11:20.884194",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "network"
+    ]
+  },
+  {
+    "ts": "2026-05-11T09:31:35.102005",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-05-11T09:33:55.497918",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-05-11T10:53:58.873677",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "hmi_configurations"
+    ]
+  },
+  {
+    "ts": "2026-05-11T10:55:54.560726",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "hmi_configurations"
+    ]
+  },
+  {
+    "ts": "2026-05-11T11:04:27.232734",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "hmi_configurations"
+    ]
+  },
+  {
+    "ts": "2026-05-11T11:07:35.119405",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
+  },
+  {
+    "ts": "2026-05-11T11:28:18.032181",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "ioSettings"
+    ]
+  },
+  {
+    "ts": "2026-05-11T11:38:14.502075",
+    "user": {
+      "role": "superadmin",
+      "username": "superadmin"
+    },
+    "fields": [
+      "plc_configurations"
+    ]
   }
 ]

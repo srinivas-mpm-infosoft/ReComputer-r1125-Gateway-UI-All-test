@@ -47,13 +47,13 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=pi
-Group=pi
-WorkingDirectory=/home/gateway/grafana-12.2.0/bin
+User=recomputer
+Group=recomputer
+WorkingDirectory=/home/recomputer/grafana-12.2.0/bin
 
-ExecStart=/home/gateway/grafana-12.2.0/bin/grafana-server \
-  --homepath /home/gateway/grafana-12.2.0 \
-  --config /home/gateway/grafana-12.2.0/conf/grafana.ini
+ExecStart=/home/recomputer/grafana-12.2.0/bin/grafana-server \
+  --homepath /home/recomputer/grafana-12.2.0 \
+  --config /home/recomputer/grafana-12.2.0/conf/grafana.ini
 
 Restart=on-failure
 RestartSec=5
@@ -73,10 +73,10 @@ Description=Main Linux Gateway UI
 After=network.target
 
 [Service]
-User=pi
-Group=pi
-WorkingDirectory=/home/pi/Downloads/Gateway-UI
-ExecStart=/home/pi/Downloads/Gateway-UI/executablefiles/main_linux_gateway_ui
+User=recomputer
+Group=recomputer
+WorkingDirectory=/home/recomputer/Downloads/Gateway-UI
+ExecStart=/home/recomputer/Downloads/Gateway-UI/executablefiles/main_linux_gateway_ui
 Restart=always
 RestartSec=2
 
@@ -94,10 +94,10 @@ After=network.target
 
 [Service]
 
-User=pi
-Group=pi
-WorkingDirectory=/home/pi/Downloads/Gateway-UI
-ExecStart=/home/pi/Downloads/Gateway-UI/executablefiles/main_4g_old
+User=recomputer
+Group=recomputer
+WorkingDirectory=/home/recomputer/Downloads/Gateway-UI
+ExecStart=/home/recomputer/Downloads/Gateway-UI/executablefiles/main_4g_old
 Restart=always
 RestartSec=2
 

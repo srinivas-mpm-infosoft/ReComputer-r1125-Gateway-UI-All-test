@@ -1,14 +1,4 @@
 {
-  "comPort": {
-    "baudRate": "19200",
-    "comPort": "COM7",
-    "connectionType": "USB",
-    "dataBit": "",
-    "firmware": "RDL V2.00.1",
-    "parity": "",
-    "serial": "RDL0009",
-    "stopBit": ""
-  },
   "ioSettings": {
     "analog": {
       "channels": [
@@ -112,95 +102,8 @@
       "analog": false,
       "digitalInput": false,
       "modbus": false,
-      "modbusTCP": false
+      "modbusTCP": true
     }
-  },
-  "wireless": {
-    "apn": "airtelgprs.com",
-    "communicationMedia": "4G/LTE",
-    "ftp": {
-      "logFolder": "",
-      "password": "",
-      "port": 21,
-      "serverIP": "",
-      "username": ""
-    },
-    "jsonEndpoint": "https://testfor4glte.vercel.app/api/voltages/uploadCsv",
-    "pollingInterval": 5,
-    "pollingTimeUnit": "Sec",
-    "sendFormat": "JSON",
-    "wifiDns1": "",
-    "wifiDns2": "",
-    "wifiGateway": "",
-    "wifiIp": "",
-    "wifiIpMode": "DHCP",
-    "wifiPassword": "9398255369",
-    "wifiSsid": "Srinivas Kommirisetty",
-    "wifiSubnet": ""
-  },
-  "modbusTcp": {
-    "gateway": "",
-    "ip": "",
-    "log": true,
-    "mac": "",
-    "modbusTcpInterval": 3,
-    "subnet": "",
-    "table": [
-      {
-        "conv": "Float: Big Endian",
-        "enabled": false,
-        "len": 1,
-        "offset": 0,
-        "port": 12345,
-        "slave": 1,
-        "slaveIp": "192.168.137.1",
-        "socket": 502,
-        "start": 1,
-        "type": "Input Register"
-      }
-    ]
-  },
-  "ethernet": {
-    "recvIp": "0.0.0.0",
-    "recvPort": 12345,
-    "sendTargets": [
-      {
-        "ip": "192.168.137.1",
-        "port": 12345
-      }
-    ]
-  },
-  "rs485": {
-    "baud": 9600,
-    "port": "/dev/ttyAMA5"
-  },
-  "offlineData": {
-    "enabled": true,
-    "ftp": {
-      "folder": "datalogger",
-      "pass": "",
-      "port": 8080,
-      "server": "FTPserver",
-      "user": "ftpusername"
-    },
-    "mode": "schedule",
-    "schedule": {
-      "date": "2025-10-08",
-      "hour": 17,
-      "min": 15,
-      "sec": 0
-    }
-  },
-  "kafka": {
-    "brokers": [
-      "127.0.0.1:9092"
-    ],
-    "certFiles": {
-      "ca": "ca.pem",
-      "cert": "service.cert",
-      "key": "service.key"
-    },
-    "topic": "test-topic"
   },
   "Database": {
     "local": {
@@ -228,7 +131,7 @@
     {
       "plcType": "Delta",
       "isExpanded": false,
-      "enabled": false,
+      "enabled": true,
       "PLC": {
         "cred": {
           "ip": "192.168.1.5",
@@ -255,7 +158,7 @@
               "min": 0,
               "max": 100,
               "value": "",
-              "read": false,
+              "read": true,
               "write": false
             }
           ]
@@ -291,7 +194,7 @@
               "min": 0,
               "max": 100,
               "value": "90",
-              "read": true,
+              "read": false,
               "write": false
             }
           ]
@@ -303,6 +206,42 @@
           "upload_cloud": false,
           "db_name": "gateway",
           "table_name": "siemens"
+        }
+      }
+    },
+    {
+      "plcType": "Siemens",
+      "isExpanded": true,
+      "enabled": true,
+      "PLC": {
+        "cred": {
+          "ip": "192.168.0.10",
+          "rack": 0,
+          "slot": 1
+        },
+        "address_access": {
+          "read": [
+            {
+              "content": "abc",
+              "DB_no": 1,
+              "address": 1,
+              "type": "float",
+              "size": "4",
+              "min": "0",
+              "max": "100",
+              "value": "80",
+              "read": false,
+              "write": false
+            }
+          ]
+        },
+        "data_freq_sec": 1,
+        "data_freq_unit": "sec",
+        "Database": {
+          "upload_local": true,
+          "upload_cloud": false,
+          "db_name": "test",
+          "table_name": ""
         }
       }
     }
@@ -2888,8 +2827,8 @@
   },
   "network": {
     "wifi": {
-      "ssid": "",
-      "password": ""
+      "ssid": "mpminfosoft_airtel_5GHz",
+      "password": "SANDman_2020"
     },
     "sim4g": {
       "provider": "airtel",
@@ -2898,20 +2837,47 @@
     "static": {
       "iface": "eth0",
       "enabled": false,
-      "ip": "192.168.1.15",
-      "subnet": "255.255.255.0",
-      "gateway": "",
+      "internet_router": false,
+      "ip_configs": [
+        {
+          "dns_primary": "",
+          "dns_secondary": "",
+          "gateway": "",
+          "ip": "",
+          "subnet": ""
+        }
+      ],
       "dns_primary": "8.8.8.8",
-      "dns_secondary": "8.8.4.4"
+      "dns_secondary": "8.8.4.4",
+      "gateway": "",
+      "ip": "192.168.1.15",
+      "subnet": "255.255.255.0"
     },
     "static2": {
       "iface": "eth1",
-      "enabled": false,
-      "ip": "",
-      "subnet": "",
-      "gateway": "",
+      "enabled": true,
+      "internet_router": false,
+      "ip_configs": [
+        {
+          "dns_primary": "8.8.8.8",
+          "dns_secondary": "8.8.4.4",
+          "gateway": "192.168.0.1",
+          "ip": "192.168.0.128",
+          "subnet": "255.255.255.0"
+        },
+        {
+          "dns_primary": "8.8.8.8",
+          "dns_secondary": "8.8.4.4",
+          "gateway": "192.168.1.1",
+          "ip": "192.168.1.128",
+          "subnet": "255.255.255.0"
+        }
+      ],
       "dns_primary": "",
-      "dns_secondary": ""
+      "dns_secondary": "",
+      "gateway": "",
+      "ip": "",
+      "subnet": ""
     }
   },
   "adminSettings": {
@@ -3098,5 +3064,246 @@
     "host": "localhost",
     "password": "gateway",
     "user": "gateway"
-  }
+  },
+  "comPort": {
+    "baudRate": "19200",
+    "comPort": "COM7",
+    "connectionType": "USB",
+    "dataBit": "",
+    "firmware": "RDL V2.00.1",
+    "parity": "",
+    "serial": "RDL0009",
+    "stopBit": ""
+  },
+  "ethernet": {
+    "recvIp": "0.0.0.0",
+    "recvPort": 12345,
+    "sendTargets": [
+      {
+        "ip": "192.168.137.1",
+        "port": 12345
+      }
+    ]
+  },
+  "kafka": {
+    "brokers": [
+      "127.0.0.1:9092"
+    ],
+    "certFiles": {
+      "ca": "ca.pem",
+      "cert": "service.cert",
+      "key": "service.key"
+    },
+    "topic": "test-topic"
+  },
+  "modbusTcp": {
+    "gateway": "",
+    "ip": "",
+    "log": true,
+    "mac": "",
+    "modbusTcpInterval": 3,
+    "subnet": "",
+    "table": [
+      {
+        "conv": "Float: Big Endian",
+        "enabled": false,
+        "len": 1,
+        "offset": 0,
+        "port": 12345,
+        "slave": 1,
+        "slaveIp": "192.168.137.1",
+        "socket": 502,
+        "start": 1,
+        "type": "Input Register"
+      }
+    ]
+  },
+  "offlineData": {
+    "enabled": true,
+    "ftp": {
+      "folder": "datalogger",
+      "pass": "",
+      "port": 8080,
+      "server": "FTPserver",
+      "user": "ftpusername"
+    },
+    "mode": "schedule",
+    "schedule": {
+      "date": "2025-10-08",
+      "hour": 17,
+      "min": 15,
+      "sec": 0
+    }
+  },
+  "rs485": {
+    "baud": 9600,
+    "port": "/dev/ttyAMA5"
+  },
+  "wireless": {
+    "apn": "airtelgprs.com",
+    "communicationMedia": "4G/LTE",
+    "ftp": {
+      "logFolder": "",
+      "password": "",
+      "port": 21,
+      "serverIP": "",
+      "username": ""
+    },
+    "jsonEndpoint": "https://testfor4glte.vercel.app/api/voltages/uploadCsv",
+    "pollingInterval": 5,
+    "pollingTimeUnit": "Sec",
+    "sendFormat": "JSON",
+    "wifiDns1": "",
+    "wifiDns2": "",
+    "wifiGateway": "",
+    "wifiIp": "",
+    "wifiIpMode": "DHCP",
+    "wifiPassword": "9398255369",
+    "wifiSsid": "Srinivas Kommirisetty",
+    "wifiSubnet": ""
+  },
+  "scada_configurations": [
+    {
+      "label": "",
+      "enabled": true,
+      "os": "Linux",
+      "protocol": "OPC UA",
+      "connection": {
+        "endpoint_url": "opc.tcp://10.42.0.1:4840",
+        "security_mode": "None",
+        "security_policy": "None",
+        "certificate_path": "",
+        "private_key_path": ""
+      },
+      "authentication": {
+        "type": "bearer",
+        "username": "admin",
+        "password": "admin",
+        "bearer_token": ""
+      },
+      "data_source": {
+        "mode": "subscription",
+        "publishing_interval": 1000,
+        "polling_interval_ms": 1000,
+        "nodes": [
+          {
+            "label": "Temperature",
+            "node_id": "ns=2;i=2",
+            "data_type": "FLOAT"
+          },
+          {
+            "label": "Pressure",
+            "node_id": "ns=2;i=3",
+            "data_type": "FLOAT"
+          }
+        ]
+      },
+      "scada_software": "WinCC"
+    },
+    {
+      "label": "",
+      "enabled": true,
+      "os": "Linux",
+      "protocol": "HTTP / HTTPS",
+      "connection": {
+        "base_url": "http://10.42.0.1:5000",
+        "verify_ssl": false,
+        "timeout_seconds": 10
+      },
+      "authentication": {
+        "type": "username_password",
+        "username": "",
+        "password": "",
+        "bearer_token": ""
+      },
+      "data_source": {
+        "requests": [
+          {
+            "name": "Scada Reading",
+            "method": "GET",
+            "path": "/sensor-data",
+            "tags": [
+              {
+                "tag_name": "temperature",
+                "data_type": "FLOAT"
+              },
+              {
+                "tag_name": "pressure",
+                "data_type": "FLOAT"
+              }
+            ]
+          }
+        ]
+      },
+      "scada_software": ""
+    }
+  ],
+  "hmi_configurations": [
+    {
+      "label": "",
+      "enabled": true,
+      "os": "Linux",
+      "protocol": "OPC UA",
+      "connection": {
+        "endpoint_url": "opc.tcp://10.42.0.1:4840",
+        "security_mode": "None",
+        "security_policy": "None",
+        "certificate_path": "",
+        "private_key_path": ""
+      },
+      "authentication": {
+        "type": "username_password",
+        "username": "",
+        "password": "",
+        "bearer_token": ""
+      },
+      "data_source": {
+        "mode": "subscription",
+        "publishing_interval": 1000,
+        "polling_interval_ms": 1000,
+        "nodes": [
+          {
+            "label": "Temperature",
+            "node_id": "ns=2;i=2",
+            "data_type": "FLOAT"
+          },
+          {
+            "label": "Pressure",
+            "node_id": "ns=2;i=3",
+            "data_type": "FLOAT"
+          },
+          {
+            "label": "Motor On",
+            "node_id": "ns=2;i=4",
+            "data_type": "BOOL"
+          }
+        ]
+      }
+    },
+    {
+      "label": "",
+      "enabled": true,
+      "os": "Windows",
+      "protocol": "File Based Sharing",
+      "connection": {
+        "file_location": "\\\\192.168.1.15\\Update Meet PPT\\basic_sample_sheet.xlsx",
+        "username": "Admin",
+        "password": "Admin"
+      },
+      "authentication": {
+        "type": "username_password",
+        "username": "",
+        "password": "",
+        "bearer_token": ""
+      },
+      "data_source": {
+        "columns": [
+          {
+            "column_name": "Name",
+            "data_type": "STRING"
+          }
+        ]
+      }
+    }
+  ]
 }

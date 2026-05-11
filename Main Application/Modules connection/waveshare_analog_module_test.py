@@ -7,7 +7,7 @@ import serial
 
 PORT = "/dev/ttyACM1"
 # PORT = "/dev/serial/by-id/usb-1a86_USB_Single_Serial_5A99022512-if00"
-SLAVE_ID = 2
+SLAVE_ID = 1
 
 instrument = minimalmodbus.Instrument(PORT, SLAVE_ID)
 

@@ -11,14 +11,14 @@ import logging
 from logging.handlers import TimedRotatingFileHandler
 
 # ================= CONFIG =================
-BASE_DIR = "/home/pi/Downloads/Gateway-UI/Main Application"
+BASE_DIR = "/home/recomputer/Gateway-UI/Main Application"
 CONFIG_FILE = f"{BASE_DIR}/config.json"
 BAUDRATE = 115200
 
 # ================= LOGGING =================
 def setup_logging():
     today = datetime.now().strftime("%Y-%m-%d")
-    log_dir = Path(f"/home/pi/logs/{today}")
+    log_dir = Path(f"/home/recomputer/logs/{today}")
     log_dir.mkdir(parents=True, exist_ok=True)
 
     logger = logging.getLogger()
@@ -172,20 +172,20 @@ def wait_for_network(ser):
 
 # ================= NETWORK =================
 def bring_usb_up():
-    logger.info("[NET] Bringing up usb0")
+    logger.info("[NET] Bringing up wwan0")
 
-    subprocess.run(["sudo", "ip", "link", "set", "usb0", "up"], check=False)
+    subprocess.run(["sudo", "ip", "link", "set", "wwan0", "up"], check=False)
     time.sleep(1)
 
-    subprocess.run(["sudo", "dhclient", "usb0"], check=False)
+    subprocess.run(["sudo", "dhclient", "wwan0"], check=False)
     time.sleep(2)
 
     subprocess.run([
         "sudo", "ip", "route", "replace",
-        "default", "dev", "usb0", "metric", "50"
+        "default", "dev", "wwan0", "metric", "50"
     ], check=False)
 
-    logger.info("[NET] usb0 READY")
+    logger.info("[NET] wwan0 READY")
 
 # ================= MAIN =================
 def run_4g(apn):
@@ -199,7 +199,7 @@ def run_4g(apn):
         send_at(ser, "AT")
 
         if not check_sim(ser):
-            subprocess.run(["sudo", "ip", "link", "set", "usb0", "down"], check=False)
+            subprocess.run(["sudo", "ip", "link", "set", "wwan0", "down"], check=False)
             return
 
         if not wait_for_network(ser):
